@@ -280,7 +280,9 @@ export const App: React.FC = () => {
             <Alarms
               theme={theme}
               alarms={alarms}
+              aiSettings={aiSettings}
               onUpdateAlarms={setAlarms}
+              onOpenAISettings={() => setActiveTab('ai')}
             />
           )}
 
@@ -288,8 +290,11 @@ export const App: React.FC = () => {
             <AITrainer
               theme={theme}
               aiSettings={aiSettings}
+              alarms={alarms}
               onUpdateAISettings={setAISettings}
               onSelectRoutine={handleSelectRoutine}
+              onApplyAlarms={setAlarms}
+              onSwitchTab={setActiveTab}
             />
           )}
         </div>
