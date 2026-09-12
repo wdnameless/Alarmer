@@ -1,0 +1,68 @@
+import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+
+export class WindowService {
+  private static isTauri(): boolean {
+    return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+  }
+
+  static async minimize(): Promise<void> {
+    if (this.isTauri()) {
+      try {
+        const win = getCurrentWindow();
+        await win.minimize();
+      } catch (e) {
+        console.warn('Tauri minimize error:', e);
+      }
+    }
+  }
+
+  static async close(): Promise<void> {
+    if (this.isTauri()) {
+      try {
+        const win = getCurrentWindow();
+        await win.close();
+      } catch (e) {
+        console.warn('Tauri close error:', e);
+      }
+    }
+  }
+
+  static async setCompact(compact: boolean): Promise<void> {
+    if (this.isTauri()) {
+      try {
+        const win = getCurrentWindow();
+        const size = compact ? new LogicalSize(300, 420) : new LogicalSize(480, 680);
+        await win.setSize(size);
+      } catch (e) {
+        console.warn('Tauri setSize error:', e);
+      }
+    }
+  }
+
+  static async toggleCompactMode(compact: boolean): Promise<void> {
+    return this.setCompact(compact);
+  }
+
+  static async setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {
+    if (this.isTauri()) {
+      try {
+        const win = getCurrentWindow();
+        await win.setAlwaysOnTop(alwaysOnTop);
+      } catch (e) {
+        console.warn('Tauri setAlwaysOnTop error:', e);
+      }
+    }
+  }
+
+  static async startDragging(): Promise<void> {
+    if (this.isTauri()) {
+      try {
+        const win = getCurrentWindow();
+        await win.startDragging();
+      } catch (e) {
+        console.warn('Tauri startDragging error:', e);
+      }
+    }
+  }
+}
+export const windowService = WindowService;

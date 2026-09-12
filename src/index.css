@@ -1,0 +1,26 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    user-select: none;
+    -webkit-user-select: none;
+    overflow: hidden;
+    background: transparent;
+  }
+}
+
+/* Custom scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
