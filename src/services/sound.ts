@@ -72,17 +72,26 @@ class SoundService {
       window.speechSynthesis.cancel(); // stop current
       const utterance = new SpeechSynthesisUtterance(text);
       utterance.volume = volume;
-      utterance.rate = 1.05; // Slightly energetic
+      utterance.rate = 1.0;
       utterance.pitch = 1.0;
 
-      // Find Russian voice or fall back
-      const voices = window.speechSynthesis.getVoices();
-      const ruVoice = voices.find(v => v.lang.includes('ru') || v.lang.includes('RU'));
-      if (ruVoice) {
-        utterance.voice = ruVoice;
-      }
+      const doSpeak = () => {
+        const voices = window.speechSynthesis.getVoices();
+        const ruVoice = voices.find(v => v.lang.toLowerCase().includes('ru'));
+        if (ruVoice) {
+          utterance.voice = ruVoice;
+        }
+        window.speechSynthesis.speak(utterance);
+      };
 
-      window.speechSynthesis.speak(utterance);
+      if (window.speechSynthesis.getVoices().length === 0) {
+        window.speechSynthesis.onvoiceschanged = () => {
+          window.speechSynthesis.onvoiceschanged = null;
+          doSpeak();
+        };
+      } else {
+        doSpeak();
+      }
     } catch (e) {
       console.warn('TTS voice error:', e);
     }

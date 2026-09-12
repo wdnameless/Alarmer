@@ -28,7 +28,7 @@ export const App: React.FC = () => {
   // App state
   const [activeTab, setActiveTab] = useState<AppMode>('timer');
   const [themeKey, setThemeKey] = useState<ThemeKey>('dark-neon');
-  const [isCompact, setIsCompact] = useState(false);
+  const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(true);
   const [showThemePicker, setShowThemePicker] = useState(false);
 
@@ -76,11 +76,16 @@ export const App: React.FC = () => {
   }, [routines]);
 
   // Sync window size on compact mode toggle
-  const toggleCompact = async () => {
+  const toggleCompact = () => {
     soundService.playCountdownTick();
-    const next = !isCompact;
-    setIsCompact(next);
-    await windowService.toggleCompactMode(next);
+    setIsCompact((prev) => {
+      const next = !prev;
+      if (next) {
+        setActiveTab('timer');
+      }
+      windowService.toggleCompactMode(next).catch(console.error);
+      return next;
+    });
   };
 
   const togglePin = async () => {
@@ -107,14 +112,17 @@ export const App: React.FC = () => {
   const theme = THEMES[themeKey];
 
   return (
-    <div
-      className="flex flex-col w-full h-screen rounded-2xl overflow-hidden shadow-2xl transition-colors duration-200 border select-none"
-      style={{
-        backgroundColor: theme.bg,
-        borderColor: theme.border,
-        color: theme.text,
-      }}
-    >
+    <div className="w-screen h-screen flex items-center justify-center p-0 md:p-4 bg-transparent overflow-hidden">
+      <div
+        className={`flex flex-col rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 border select-none ${
+          isCompact ? 'w-[250px] h-[410px]' : 'w-full max-w-[460px] h-full max-h-[640px]'
+        }`}
+        style={{
+          backgroundColor: theme.bg,
+          borderColor: theme.border,
+          color: theme.text,
+        }}
+      >
       {/* Sleek Custom Windows / macOS Titlebar with Drag & Controls */}
       <TitleBar
         theme={theme}
@@ -297,6 +305,7 @@ export const App: React.FC = () => {
               onSwitchTab={setActiveTab}
             />
           )}
+          </div>
         </div>
       </div>
     </div>

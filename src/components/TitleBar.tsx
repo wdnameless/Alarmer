@@ -32,58 +32,77 @@ export const TitleBar: React.FC<TitleBarProps> = ({
         borderBottom: `1px solid ${theme.border}40`,
       }}
     >
-      <div className="flex items-center space-x-2 pointer-events-none">
-        <div
-          className="w-2.5 h-2.5 rounded-full"
-          style={{
-            backgroundColor: theme.accent,
-            boxShadow: `0 0 6px ${theme.accentGlow}`,
-          }}
-        />
-        <span className="text-xs font-bold tracking-wider uppercase" style={{ color: theme.subtext }}>
-          Alarmer
-        </span>
+      <div className="flex items-center space-x-1.5 cursor-pointer" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        {!isCompact && (
+          <>
+            <div
+              className="w-2.5 h-2.5 rounded-full"
+              style={{
+                backgroundColor: theme.accent,
+                boxShadow: `0 0 6px ${theme.accentGlow}`,
+              }}
+            />
+            <span className="text-xs font-bold tracking-wider uppercase opacity-75 hover:opacity-100" style={{ color: theme.subtext }}>
+              Alarmer
+            </span>
+          </>
+        )}
+        {isCompact && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleCompact();
+            }}
+            title="Развернуть меню и AI"
+            className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+          >
+            <Maximize2 size={12} />
+          </button>
+        )}
       </div>
 
-      <div className="flex items-center space-x-1">
-        {/* Always on top toggle */}
-        <button
-          onClick={onTogglePin}
-          title={isPinned ? 'Открепить поверх всех окон' : 'Закрепить поверх всех окон'}
-          className="p-1 rounded hover:bg-white/10 transition-colors"
-          style={{ color: isPinned ? theme.accent : theme.subtext }}
-        >
-          {isPinned ? <Pin size={13} /> : <PinOff size={13} />}
-        </button>
+      <div className="flex items-center space-x-1.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        {!isCompact && (
+          <>
+            {/* Always on top toggle */}
+            <button
+              onClick={onTogglePin}
+              title={isPinned ? 'Открепить поверх всех окон' : 'Закрепить поверх всех окон'}
+              className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors"
+              style={{ color: isPinned ? theme.accent : theme.subtext }}
+            >
+              {isPinned ? <Pin size={13} /> : <PinOff size={13} />}
+            </button>
 
-        {/* Toggle Compact / Expanded mode */}
-        <button
-          onClick={onToggleCompact}
-          title={isCompact ? 'Развернуть меню' : 'Свернуть в мини-оверлей'}
-          className="p-1 rounded hover:bg-white/10 transition-colors"
-          style={{ color: theme.subtext }}
-        >
-          {isCompact ? <Maximize2 size={13} /> : <Minimize2 size={13} />}
-        </button>
+            {/* Toggle Compact mode */}
+            <button
+              onClick={onToggleCompact}
+              title="Свернуть в мини-виджет"
+              className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors"
+              style={{ color: theme.subtext }}
+            >
+              <Minimize2 size={13} />
+            </button>
+          </>
+        )}
 
-        {/* Minimize */}
+        {/* Minimize (matches reference —) */}
         <button
           onClick={() => WindowService.minimize()}
           title="Свернуть"
-          className="p-1.5 rounded-md hover:bg-white/10 transition-colors"
-          style={{ color: theme.subtext }}
+          className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/15 active:scale-95 transition-all text-white/80"
         >
-          <Minus size={14} />
+          <Minus size={15} strokeWidth={2.5} />
         </button>
 
-        {/* Close */}
+        {/* Close (matches reference ✕) */}
         <button
           onClick={() => WindowService.close()}
           title="Закрыть"
-          className="p-1.5 rounded-md hover:bg-red-500/30 hover:text-red-400 transition-colors"
-          style={{ color: theme.subtext }}
+          className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-red-500/80 hover:text-white active:scale-95 transition-all text-white/80"
         >
-          <X size={14} />
+          <X size={15} strokeWidth={2.5} />
         </button>
       </div>
     </div>

@@ -55,11 +55,7 @@ export const AITrainer: React.FC<AITrainerProps> = ({
     const query = customPrompt || prompt;
     if (!query.trim()) return;
 
-    if (!aiSettings.apiKey) {
-      setShowConfig(true);
-      setError('Сначала укажите ваш API ключ (BYOK) ниже.');
-      return;
-    }
+    // If no API key provided, AIService will use smart local offline fallback!
 
     setLoading(true);
     setError(null);

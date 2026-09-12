@@ -18,7 +18,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   secondaryText,
   isInteractive = true,
   onProgressChange,
-  size = 230,
+  size = 200,
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -62,7 +62,9 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!isInteractive) return;
     setIsDragging(true);
-    (e.target as HTMLElement).setPointerCapture?.(e.pointerId);
+    try {
+      (e.currentTarget as Element).setPointerCapture(e.pointerId);
+    } catch {}
     calculateProgressFromEvent(e.clientX, e.clientY);
   };
 
@@ -75,26 +77,23 @@ export const RadialDial: React.FC<RadialDialProps> = ({
     if (!isDragging) return;
     setIsDragging(false);
     try {
-      (e.target as HTMLElement).releasePointerCapture?.(e.pointerId);
-    } catch {
-      // Ignored if capture already lost
-    }
+      (e.currentTarget as Element).releasePointerCapture(e.pointerId);
+    } catch {}
   };
 
-  // Generate 48 tick marks radiating inward
-  const totalTicks = 48;
+  // Generate 60 tick marks radiating inward
+  const totalTicks = 60;
   const ticks = Array.from({ length: totalTicks }, (_, i) => {
     const tickAngle = (i / totalTicks) * 2 * Math.PI - Math.PI / 2;
-    const isMajor = i % 4 === 0;
-    const outerR = dialRadius - 8;
-    const innerR = isMajor ? dialRadius - 22 : dialRadius - 15;
+    const isMajor = i % 5 === 0;
+    const outerR = dialRadius - 6;
+    const innerR = isMajor ? dialRadius - 22 : dialRadius - 14;
 
     const x1 = radius + outerR * Math.cos(tickAngle);
     const y1 = radius + outerR * Math.sin(tickAngle);
     const x2 = radius + innerR * Math.cos(tickAngle);
     const y2 = radius + innerR * Math.sin(tickAngle);
 
-    // Active state if before current progress
     const tickProgress = i / totalTicks;
     const isActive = tickProgress <= clampedProgress;
 
@@ -160,9 +159,9 @@ export const RadialDial: React.FC<RadialDialProps> = ({
             y1={t.y1}
             x2={t.x2}
             y2={t.y2}
-            stroke={t.isActive ? theme.accent : theme.ticks}
-            strokeWidth={t.isMajor ? 2.2 : 1.2}
-            strokeOpacity={t.isActive ? 0.9 : 0.35}
+            stroke={t.isActive ? theme.accent : "#ffffff"}
+            strokeWidth={t.isMajor ? 2.4 : 1.2}
+            strokeOpacity={t.isActive ? 1 : 0.65}
             strokeLinecap="round"
           />
         ))}
@@ -211,14 +210,14 @@ export const RadialDial: React.FC<RadialDialProps> = ({
       {/* Center Labels */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
         <span
-          className="text-3xl font-extrabold tracking-tight"
-          style={{ color: theme.text }}
+          className="text-4xl font-extrabold tracking-tight"
+          style={{ color: theme.text, fontFamily: 'system-ui, -apple-system, sans-serif' }}
         >
           {primaryText}
         </span>
         {secondaryText && (
           <span
-            className="text-xs font-mono font-medium tracking-widest mt-1 opacity-80"
+            className="text-sm font-mono font-medium tracking-widest mt-1 opacity-80"
             style={{ color: theme.subtext }}
           >
             {secondaryText}

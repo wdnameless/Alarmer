@@ -31,26 +31,28 @@ export const Timer: React.FC<TimerProps> = ({
 
   useEffect(() => {
     let timer: number | undefined;
-    if (isRunning && remainingSeconds > 0) {
+    if (isRunning) {
       timer = window.setInterval(() => {
         setRemainingSeconds((prev) => {
-          if (prev <= 4 && prev > 1) {
-            soundService.playCountdownTick();
-          } else if (prev === 1) {
-            soundService.playFinishAlarm();
+          if (prev > 1) {
+            if (prev <= 4) {
+              soundService.playCountdownTick();
+            }
+            return prev - 1;
           }
-          return prev - 1;
+
+          // prev is 1 -> reach 0
+          setIsRunning(false);
+          soundService.playFinishAlarm();
+          soundService.speak('Время вышло!');
+          confetti({ particleCount: 60, spread: 60 });
+          onFinish?.();
+          return 0;
         });
       }, 1000);
-    } else if (isRunning && remainingSeconds === 0) {
-      setIsRunning(false);
-      soundService.playFinishAlarm();
-      soundService.speak('Время вышло!');
-      confetti({ particleCount: 50, spread: 50 });
-      onFinish?.();
     }
     return () => window.clearInterval(timer);
-  }, [isRunning, remainingSeconds, onFinish]);
+  }, [isRunning, onFinish]);
 
   const toggleRun = () => {
     soundService.playCountdownTick();
@@ -73,7 +75,15 @@ export const Timer: React.FC<TimerProps> = ({
   // Dial progress 0..1
   const progress = totalSeconds > 0 ? (totalSeconds - remainingSeconds) / totalSeconds : 0;
 
-  const formatDigital = (sec: number) => {
+  // Format digital stopwatch format matching reference: 00:00:00
+  const formatSubDigital = (sec: number) => {
+    const h = Math.floor(sec / 3600);
+    const m = Math.floor((sec % 3600) / 60);
+    const s = sec % 60;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+  };
+
+  const formatPrimaryTime = (sec: number) => {
     const m = Math.floor(sec / 60);
     const s = sec % 60;
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
@@ -89,69 +99,84 @@ export const Timer: React.FC<TimerProps> = ({
     }
   };
 
-  const minutesRemaining = Math.ceil(remainingSeconds / 60);
-
   return (
     <div className="flex flex-col items-center w-full">
       <RadialDial
         theme={theme}
         progress={progress}
-        primaryText={formatDigital(remainingSeconds)}
-        secondaryText={`${minutesRemaining} мин`}
+        primaryText={formatPrimaryTime(remainingSeconds)}
+        secondaryText={formatSubDigital(remainingSeconds)}
         isInteractive={!isRunning}
         onProgressChange={handleProgressChange}
       />
 
       {/* Control Buttons matching reference image */}
-      <div className="flex items-center justify-center space-x-3 mt-4 w-full px-4">
-        {/* Play/Pause Button */}
+      {/* Control grid matching screenshot 1-to-1 */}
+      <div className="grid grid-cols-2 gap-3 mt-4 w-full max-w-[210px]">
+        {/* Top-Left: Play / Pause */}
         <button
           onClick={toggleRun}
-          className="flex-1 py-3 px-4 rounded-xl flex items-center justify-center space-x-2 transition-transform active:scale-95 shadow-md"
+          className="h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-95 shadow-md"
           style={{
             backgroundColor: theme.cardBg,
-            border: `1px solid ${isRunning ? theme.accent : theme.border}`,
+            border: `1.5px solid ${isRunning ? theme.accent : theme.border}`,
             color: isRunning ? theme.accent : theme.text,
           }}
+          title={isRunning ? 'Пауза' : 'Старт'}
         >
-          {isRunning ? <Pause size={20} /> : <Play size={20} />}
-          <span className="font-bold text-sm">{isRunning ? 'Пауза' : 'Старт'}</span>
+          {isRunning ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
         </button>
 
-        {/* Reset / Set Button */}
+        {/* Top-Right: Stopwatch / Lap icon */}
         <button
           onClick={reset}
-          className="py-3 px-5 rounded-xl flex items-center justify-center space-x-1.5 transition-transform active:scale-95 font-bold text-xs uppercase tracking-wider"
+          className="h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-95 shadow-md"
           style={{
             backgroundColor: theme.cardBg,
-            border: `1px solid ${theme.border}`,
+            border: `1.5px solid ${theme.border}`,
             color: theme.subtext,
           }}
-          title="Сброс таймера"
+          title="Сбросить время"
         >
-          <RotateCcw size={16} />
-          <span>SET</span>
+          <RotateCcw size={22} />
         </button>
-      </div>
 
-      {/* Quick Presets */}
-      <div className="flex items-center justify-center space-x-2 mt-3 w-full px-4">
-        {[5, 10, 15, 25, 45].map((m) => (
-          <button
-            key={m}
-            onClick={() => setPresetMinutes(m)}
-            className={`flex-1 py-1.5 rounded-lg text-xs font-mono font-bold transition-colors border ${
-              totalSeconds === m * 60 ? 'border-emerald-400 text-emerald-400 bg-white/5' : 'border-white/10 opacity-70 hover:opacity-100'
-            }`}
-            style={{
-              backgroundColor: totalSeconds === m * 60 ? `${theme.accent}15` : theme.cardBg,
-              borderColor: totalSeconds === m * 60 ? theme.accent : theme.border,
-              color: totalSeconds === m * 60 ? theme.accent : theme.subtext,
-            }}
-          >
-            {m}m
-          </button>
-        ))}
+        {/* Bottom-Left: SET button */}
+        <button
+          onClick={() => {
+            const nextMins = totalSeconds === 25 * 60 ? 15 : totalSeconds === 15 * 60 ? 5 : 25;
+            setPresetMinutes(nextMins);
+          }}
+          className="h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-95 font-black text-sm tracking-wider shadow-md"
+          style={{
+            backgroundColor: theme.cardBg,
+            border: `1.5px solid ${theme.border}`,
+            color: theme.text,
+          }}
+          title="Сменить пресет времени"
+        >
+          SET
+        </button>
+
+        {/* Bottom-Right: Preset Number display (e.g. 25) */}
+        <button
+          onClick={() => {
+            const presets = [5, 10, 15, 20, 25, 30, 45, 60];
+            const curMins = Math.round(totalSeconds / 60);
+            const idx = presets.indexOf(curMins);
+            const next = presets[(idx + 1) % presets.length];
+            setPresetMinutes(next);
+          }}
+          className="h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-95 font-mono font-extrabold text-2xl shadow-md hover:border-emerald-400/50"
+          style={{
+            backgroundColor: theme.cardBg,
+            border: `1.5px solid ${theme.border}`,
+            color: theme.text,
+          }}
+          title="Нажмите чтобы переключить минуты"
+        >
+          {Math.round(totalSeconds / 60)}
+        </button>
       </div>
     </div>
   );

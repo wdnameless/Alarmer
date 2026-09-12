@@ -39,47 +39,49 @@ export const WorkoutPlayer: React.FC<WorkoutPlayerProps> = ({
   // Main tick interval
   useEffect(() => {
     let timer: number | undefined;
-    if (isRunning && timeRemaining > 0) {
+    if (isRunning) {
       timer = window.setInterval(() => {
         setTimeRemaining((prev) => {
-          if (prev <= 4 && prev > 1) {
-            soundService.playCountdownTick();
-          } else if (prev === 1) {
-            soundService.playBeep(1200, 0.25, 0.6);
+          if (prev > 1) {
+            if (prev <= 4) {
+              soundService.playCountdownTick();
+            }
+            return prev - 1;
           }
-          return prev - 1;
+
+          // prev is 1 -> finishes now
+            soundService.playFinishAlarm();
+
+          // Transition to next step or next round
+          if (stepIndex < totalSteps - 1) {
+            setStepIndex((s) => s + 1);
+          } else {
+            if (currentRound < routine.repeatCount) {
+              setCurrentRound((r) => r + 1);
+              setStepIndex(0);
+              if (voiceEnabled) {
+                soundService.speak(`Раунд ${currentRound + 1}`);
+              }
+            } else {
+              setIsRunning(false);
+              soundService.playFinishAlarm();
+              if (voiceEnabled) {
+                soundService.speak('Тренировка завершена! Отличная работа!');
+              }
+              confetti({
+                particleCount: 80,
+                spread: 60,
+                origin: { y: 0.7 },
+              });
+              onFinish?.();
+            }
+          }
+          return 0;
         });
       }, 1000);
-    } else if (isRunning && timeRemaining === 0) {
-      // Step complete! Move to next step or next round
-      if (stepIndex < totalSteps - 1) {
-        setStepIndex((s) => s + 1);
-      } else {
-        // Round completed
-        if (currentRound < routine.repeatCount) {
-          setCurrentRound((r) => r + 1);
-          setStepIndex(0);
-          if (voiceEnabled) {
-            soundService.speak(`Раунд ${currentRound + 1}`);
-          }
-        } else {
-          // Entire workout completed!
-          setIsRunning(false);
-          soundService.playFinishAlarm();
-          if (voiceEnabled) {
-            soundService.speak('Тренировка завершена! Отличная работа!');
-          }
-          confetti({
-            particleCount: 80,
-            spread: 60,
-            origin: { y: 0.7 },
-          });
-          onFinish?.();
-        }
-      }
     }
     return () => window.clearInterval(timer);
-  }, [isRunning, timeRemaining, stepIndex, currentRound, routine, totalSteps, voiceEnabled, onFinish]);
+  }, [isRunning, stepIndex, currentRound, routine.repeatCount, totalSteps, voiceEnabled, onFinish]);
 
   const toggleRun = () => {
     if (!isRunning && timeRemaining === currentStep?.durationSec && voiceEnabled) {

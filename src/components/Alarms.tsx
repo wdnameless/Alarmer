@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Bell, BellOff, Volume2, Sparkles, Loader2 } from 'lucide-react';
 import { ThemeColors, AlarmItem, AISettings } from '../types';
 import { soundService } from '../services/sound';
@@ -22,42 +22,63 @@ export const Alarms: React.FC<AlarmsProps> = ({
   const [newTime, setNewTime] = useState('08:00');
   const [newLabel, setNewLabel] = useState('Утренняя разминка');
   const [currentTime, setCurrentTime] = useState('');
+  const [ringingAlarm, setRingingAlarm] = useState<AlarmItem | null>(null);
+  const triggeredAlarmsRef = useRef<Set<string>>(new Set());
   
   // AI Smart Setup state
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('Вот моя тренировка: в 7:00 подъем, в 7:15 силовая разминка, в 19:30 вечерняя растяжка');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-
   // Clock ticker & trigger check
+  // Clock ticker & trigger check with deduplication and ringing screen
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
+      const currentDay = now.getDay(); // 0-6
       const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now
         .getMinutes()
         .toString()
         .padStart(2, '0')}`;
       setCurrentTime(timeStr);
 
-      // Check if second is 00 to trigger active alarms
+      // Clear triggered cache on minute change
       if (now.getSeconds() === 0) {
-        alarms.forEach((alarm) => {
-          if (alarm.enabled && alarm.time === timeStr) {
-            soundService.playFinishAlarm();
-            if (alarm.voicePrompt) {
-              soundService.speak(alarm.voicePrompt);
-            } else {
-              soundService.speak(`Будильник: ${alarm.label || alarm.title}`);
-            }
-          }
-        });
+        triggeredAlarmsRef.current.clear();
       }
+
+      alarms.forEach((alarm) => {
+        if (!alarm.enabled || alarm.time !== timeStr) return;
+        
+        // Check day match (if days array is specified and not empty)
+        if (alarm.days && alarm.days.length > 0 && !alarm.days.includes(currentDay)) {
+          return;
+        }
+
+        // Trigger once per minute per alarm
+        const key = `${alarm.id}_${timeStr}`;
+        if (!triggeredAlarmsRef.current.has(key)) {
+          triggeredAlarmsRef.current.add(key);
+          setRingingAlarm(alarm);
+          soundService.playFinishAlarm();
+          if (alarm.voicePrompt) {
+            soundService.speak(alarm.voicePrompt);
+          } else {
+            soundService.speak(`Внимание! Будильник: ${alarm.label || alarm.title}`);
+          }
+        }
+      });
     };
 
     updateTime();
     const interval = window.setInterval(updateTime, 1000);
     return () => window.clearInterval(interval);
   }, [alarms]);
+
+  const dismissRingingAlarm = () => {
+    soundService.playCountdownTick();
+    setRingingAlarm(null);
+  };
 
   const toggleAlarm = (id: string) => {
     soundService.playCountdownTick();
@@ -119,6 +140,34 @@ export const Alarms: React.FC<AlarmsProps> = ({
 
   return (
     <div className="flex flex-col w-full px-2 py-1 space-y-3">
+      {/* Ringing Overlay */}
+      {ringingAlarm && (
+        <div
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 backdrop-blur-xl animate-pulse"
+          style={{ backgroundColor: `${theme.bg}F0` }}
+        >
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-red-500/20 text-red-400 border border-red-500/40">
+            <Bell size={40} className="animate-bounce" />
+          </div>
+          <h2 className="text-3xl font-black mb-2 tracking-tight" style={{ color: theme.text }}>
+            {ringingAlarm.time}
+          </h2>
+          <p className="text-lg font-bold mb-4 text-center" style={{ color: theme.accent }}>
+            {ringingAlarm.label || ringingAlarm.title}
+          </p>
+          {ringingAlarm.voicePrompt && (
+            <p className="text-xs text-center opacity-80 mb-6 italic max-w-xs" style={{ color: theme.subtext }}>
+              "{ringingAlarm.voicePrompt}"
+            </p>
+          )}
+          <button
+            onClick={dismissRingingAlarm}
+            className="w-full max-w-xs py-4 rounded-2xl font-black text-sm uppercase tracking-wider bg-red-500 hover:bg-red-600 text-white shadow-xl active:scale-95 transition-all"
+          >
+            Остановить будильник
+          </button>
+        </div>
+      )}
       {/* Header bar */}
       <div className="flex items-center justify-between px-1">
         <div className="flex items-center space-x-2">

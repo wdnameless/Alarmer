@@ -18,10 +18,11 @@ export class AIService {
     messages: Array<{ role: 'system' | 'user'; content: string }>,
     settings: AISettings
   ): Promise<string> {
-    if (!settings.apiKey) {
-      throw new Error('Укажите API ключ в настройках AI (BYOK).');
+    // If no API key is provided, perform instant heuristic local parsing so user can test out of the box!
+    if (!settings.apiKey || settings.apiKey.trim() === '') {
+      const userMsg = messages.find((m) => m.role === 'user')?.content || '';
+      return this.localFallbackParser(userMsg);
     }
-
     const url = `${settings.baseUrl.replace(/\/+$/, '')}/chat/completions`;
     const response = await fetch(url, {
       method: 'POST',
@@ -259,5 +260,81 @@ export class AIService {
     }
 
     return result;
+  }
+  private static localFallbackParser(prompt: string): string {
+    const lower = prompt.toLowerCase();
+    const timeMatches = prompt.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g);
+
+    const alarms = [];
+    if (timeMatches && timeMatches.length > 0) {
+      for (const t of timeMatches) {
+        const [hourStr, minStr] = t.split(':');
+        const h = parseInt(hourStr, 10);
+        const isMorning = h < 12;
+        alarms.push({
+          title: isMorning ? 'Утренняя активность' : 'Вечерняя активность',
+          time: `${hourStr.padStart(2, '0')}:${minStr}`,
+          days: [1, 2, 3, 4, 5],
+          enabled: true,
+          sound: 'gentle',
+          voicePrompt: `Время для активности: ${t}! Выполняем запланированное.`,
+        });
+      }
+    } else {
+      alarms.push({
+        title: 'Запланированная тренировка',
+        time: '08:00',
+        days: [1, 2, 3, 4, 5],
+        enabled: true,
+        sound: 'gentle',
+        voicePrompt: 'Доброе утро! Время для тренировки.',
+      });
+    }
+
+    const isTabata = lower.includes('табат');
+    const isPomodoro = lower.includes('помодоро');
+
+    let steps = [
+      { name: 'Разминка', duration: 180, type: 'warmup', voiceAnnouncement: 'Начинаем суставную разминку' },
+      { name: 'Приседания', duration: 45, type: 'work', voiceAnnouncement: 'Приседания, 45 секунд, держим темп' },
+      { name: 'Отдых', duration: 15, type: 'rest', voiceAnnouncement: 'Отдых 15 секунд' },
+      { name: 'Планка', duration: 45, type: 'work', voiceAnnouncement: 'Планка, держим корпус прямо' },
+      { name: 'Заминка', duration: 120, type: 'cooldown', voiceAnnouncement: 'Отличная работа! Переходим к растяжке' },
+    ];
+
+    if (isTabata) {
+      steps = [
+        { name: 'Интенсивная работа', duration: 20, type: 'work', voiceAnnouncement: 'Максимальное ускорение, 20 секунд!' },
+        { name: 'Быстрый отдых', duration: 10, type: 'rest', voiceAnnouncement: 'Отдых 10 секунд' },
+      ];
+    } else if (isPomodoro) {
+      steps = [
+        { name: 'Фокус-работа', duration: 1500, type: 'work', voiceAnnouncement: 'Фокусируемся на задаче, 25 минут' },
+        { name: 'Перерыв', duration: 300, type: 'rest', voiceAnnouncement: 'Время отдохнуть и сделать разминку' },
+      ];
+    }
+
+    return JSON.stringify({
+      name: isTabata ? 'Табата комплекс' : isPomodoro ? 'Помодоро сессия' : 'Тренировка по запросу',
+      description: prompt,
+      repeatCount: isTabata ? 8 : isPomodoro ? 4 : 3,
+      steps,
+      hasAlarms: true,
+      alarms,
+      hasWorkout: true,
+      workout: {
+        name: isTabata ? 'Табата комплекс' : isPomodoro ? 'Помодоро сессия' : 'Тренировка по запросу',
+        description: prompt,
+        repeatCount: isTabata ? 8 : isPomodoro ? 4 : 3,
+        steps: steps.map((s, idx) => ({
+          id: `step-${idx}`,
+          name: s.name,
+          durationSec: s.duration,
+          type: s.type,
+          voicePrompt: s.voiceAnnouncement,
+        })),
+      },
+      summary: `План составлен: ${alarms.length} будильника(ов) и комплекс «${isTabata ? 'Табата' : 'Тренировка'}» на ${steps.length} этапов.`,
+    });
   }
 }

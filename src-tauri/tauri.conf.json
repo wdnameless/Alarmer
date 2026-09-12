@@ -13,8 +13,10 @@
     "windows": [
       {
         "title": "Alarmer",
-        "width": 320,
-        "height": 480,
+        "width": 260,
+        "height": 420,
+        "minWidth": 220,
+        "minHeight": 360,
         "resizable": true,
         "decorations": false,
         "transparent": true,
