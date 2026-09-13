@@ -28,7 +28,35 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [model, setModel] = useState(aiSettings.model);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [testingVoice, setTestingVoice] = useState(false);
+  const [uiClicks, setUiClicks] = useState<boolean>(() => {
+    return localStorage.getItem('alarmer_ui_clicks') !== 'false';
+  });
+  const [countdownTicks, setCountdownTicks] = useState<boolean>(() => {
+    return localStorage.getItem('alarmer_countdown_ticks') !== 'false';
+  });
+  const [soundProfile, setSoundProfile] = useState<string>(() => {
+    return localStorage.getItem('alarmer_sound_profile') || 'neon';
+  });
 
+  const handleToggleUiClicks = () => {
+    const next = !uiClicks;
+    setUiClicks(next);
+    localStorage.setItem('alarmer_ui_clicks', String(next));
+    if (next) soundService.playUiClick();
+  };
+
+  const handleToggleCountdownTicks = () => {
+    const next = !countdownTicks;
+    setCountdownTicks(next);
+    localStorage.setItem('alarmer_countdown_ticks', String(next));
+    if (next) soundService.playCountdownTick();
+  };
+
+  const handleSelectProfile = (prof: string) => {
+    setSoundProfile(prof);
+    localStorage.setItem('alarmer_sound_profile', prof);
+    soundService.playUiClick();
+  };
   const handleVoiceSelect = (voiceId: string) => {
     setSelectedVoice(voiceId);
     localStorage.setItem('alarmer_voice_id', voiceId);
@@ -121,6 +149,64 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </p>
       </div>
 
+      {/* Sound Effects & Clicks Controls */}
+      <div className="flex flex-col space-y-3 border-t pt-4" style={{ borderColor: theme.border }}>
+        <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.accent }}>
+          <Volume2 size={15} />
+          <span>Звуковые эффекты и клики интерфейса</span>
+        </label>
+
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => handleToggleUiClicks()}
+            className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all"
+            style={{
+              borderColor: uiClicks ? theme.accent : theme.border,
+              backgroundColor: uiClicks ? `${theme.accent}15` : 'transparent',
+              color: theme.text,
+            }}
+          >
+            <span>Клики кнопок и вкладок</span>
+            <span className="text-[10px] font-bold opacity-80">{uiClicks ? 'ВКЛ' : 'ВЫКЛ'}</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => handleToggleCountdownTicks()}
+            className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all"
+            style={{
+              borderColor: countdownTicks ? theme.accent : theme.border,
+              backgroundColor: countdownTicks ? `${theme.accent}15` : 'transparent',
+              color: theme.text,
+            }}
+          >
+            <span>Тиканье таймера (3..2..1)</span>
+            <span className="text-[10px] font-bold opacity-80">{countdownTicks ? 'ВКЛ' : 'ВЫКЛ'}</span>
+          </button>
+        </div>
+
+        <div className="flex flex-col space-y-1.5 pt-1">
+          <span className="text-[10px] opacity-60">Профиль звука кликов:</span>
+          <div className="grid grid-cols-4 gap-1.5">
+            {(['neon', 'mechanical', 'soft', 'arcade'] as const).map((prof) => (
+              <button
+                key={prof}
+                type="button"
+                onClick={() => handleSelectProfile(prof)}
+                className="py-1.5 px-2 rounded-lg border text-[11px] font-medium capitalize transition-all"
+                style={{
+                  borderColor: soundProfile === prof ? theme.accent : theme.border,
+                  backgroundColor: soundProfile === prof ? `${theme.accent}20` : 'transparent',
+                  color: theme.text,
+                }}
+              >
+                {prof}
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
       {/* AI Key Config */}
       <form onSubmit={handleSaveAI} className="flex flex-col space-y-3 border-t pt-4" style={{ borderColor: theme.border }}>
         <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.accent }}>

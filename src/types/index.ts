@@ -57,9 +57,19 @@ export interface AISettings {
   autoAdjustIntervals?: boolean;
 }
 
+export type SoundProfileId = 'mechanical' | 'soft' | 'neon' | 'arcade';
+
+export interface SoundSettings {
+  uiClicksEnabled: boolean;
+  countdownTickEnabled: boolean;
+  profile: SoundProfileId;
+  volume: number; // 0..1
+}
+
 export interface AppSettings {
   theme: ThemeId;
   ai: AISettings;
+  sound: SoundSettings;
   soundEnabled: boolean;
   ttsEnabled: boolean;
   volume: number; // 0..1

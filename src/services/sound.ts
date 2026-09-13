@@ -37,11 +37,33 @@ export class SoundService {
     }
   }
 
-  // 3 quick countdown beeps
-  playCountdownTick() {
-    this.playBeep(600, 0.08, 0.3);
+  // UI click sound (tabs, buttons, presets) with mute check and profile support
+  playUiClick() {
+    const enabled = localStorage.getItem('alarmer_ui_clicks') !== 'false';
+    if (!enabled) return;
+    const profile = localStorage.getItem('alarmer_sound_profile') || 'neon';
+    switch (profile) {
+      case 'mechanical':
+        this.playBeep(220, 0.04, 0.4);
+        break;
+      case 'soft':
+        this.playBeep(440, 0.06, 0.15);
+        break;
+      case 'arcade':
+        this.playBeep(980, 0.05, 0.25);
+        break;
+      case 'neon':
+      default:
+        this.playBeep(600, 0.05, 0.2);
+        break;
+    }
   }
 
+  playCountdownTick() {
+    const enabled = localStorage.getItem('alarmer_countdown_ticks') !== 'false';
+    if (!enabled) return;
+    this.playUiClick();
+  }
   // High pitch completion sound
   playFinishAlarm() {
     try {

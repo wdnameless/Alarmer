@@ -8,6 +8,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
     model: 'gpt-4o-mini',
     systemPrompt: 'Ты элитный фитнес-тренер и ментор по тайм-менеджменту. Давай краткие, зажигательные инструкции, рекомендации по подходам и отдыху.',
   },
+  sound: {
+    uiClicksEnabled: true,
+    countdownTickEnabled: true,
+    profile: 'neon',
+    volume: 0.8,
+  },
   soundEnabled: true,
   ttsEnabled: true,
   volume: 0.8,

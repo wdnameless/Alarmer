@@ -102,7 +102,7 @@ export const App: React.FC = () => {
 
   // Sync window size on compact mode toggle
   const toggleCompact = () => {
-    soundService.playCountdownTick();
+    soundService.playUiClick();
     setIsCompact((prev) => {
       const next = !prev;
       if (next) {
@@ -120,7 +120,7 @@ export const App: React.FC = () => {
   };
 
   const handleSelectTab = (tab: AppMode) => {
-    soundService.playCountdownTick();
+    soundService.playUiClick();
     setActiveTab(tab);
     setShowThemePicker(false);
   };
