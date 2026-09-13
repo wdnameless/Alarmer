@@ -194,6 +194,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           fill="none"
           transform={`rotate(-90 ${radius} ${radius})`}
           filter="url(#glow)"
+          style={{ transition: dragProgress !== null ? 'none' : 'stroke-dashoffset 0.8s ease' }}
         />
 
         {/* Vintage Style: Roman Clock Hour Numerals / Chronograph ticks */}

@@ -129,6 +129,7 @@ export const Timer: React.FC<TimerProps> = ({
     const mins = Math.max(1, Math.round(finalProgress * 60));
     setTotalSeconds(mins * 60);
     setRemainingSeconds(mins * 60);
+    setIsOvertime(false);
     soundService.playCountdownTick();
     setIsRunning(true);
   };

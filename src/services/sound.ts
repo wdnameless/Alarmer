@@ -62,7 +62,7 @@ export class SoundService {
 
   // Authentic acoustic escapement clock tick (dual-frequency woodblock / pallet fork click)
   playClockTick(isTock = false) {
-    const enabled = localStorage.getItem('alarmer_clock_tick') === 'true';
+    const enabled = localStorage.getItem('alarmer_clock_tick') !== 'false';
     if (!enabled) return;
     try {
       const ctx = this.getContext();
