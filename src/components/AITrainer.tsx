@@ -1,8 +1,16 @@
-import React, { useState } from 'react';
-import { Sparkles, Key, Send, Loader2, PlayCircle, Bot, AlertCircle, Check, Bell } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Send, Loader2, Bot, PlayCircle, Bell, Check, User } from 'lucide-react';
 import { ThemeColors, AISettings, WorkoutRoutine, AlarmItem } from '../types';
 import { AIService, AIPlanResult } from '../services/ai';
 import { soundService } from '../services/sound';
+
+interface ChatMessage {
+  id: string;
+  sender: 'user' | 'assistant';
+  text: string;
+  result?: AIPlanResult;
+  time: string;
+}
 
 interface AITrainerProps {
   theme: ThemeColors;
@@ -18,350 +26,232 @@ export const AITrainer: React.FC<AITrainerProps> = ({
   theme,
   aiSettings,
   alarms = [],
-  onUpdateAISettings,
   onSelectRoutine,
   onApplyAlarms,
-  onSwitchTab,
 }) => {
-  const [prompt, setPrompt] = useState('');
+  const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
-  const [lastResult, setLastResult] = useState<AIPlanResult | null>(null);
-  const [showConfig, setShowConfig] = useState(!aiSettings.apiKey);
-  const [savedSuccess, setSavedSuccess] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement | null>(null);
 
-  // Form state for config
-  const [apiKey, setApiKey] = useState(aiSettings.apiKey);
-  const [baseUrl, setBaseUrl] = useState(aiSettings.baseUrl);
-  const [model, setModel] = useState(aiSettings.model);
-  const [availableModels, setAvailableModels] = useState<string[]>([]);
-  const [fetchingModels, setFetchingModels] = useState(false);
+  const [messages, setMessages] = useState<ChatMessage[]>(() => {
+    return [
+      {
+        id: '1',
+        sender: 'assistant',
+        text: 'Привет! Я твой AI Co-Pilot. Я умею управлять будильниками, создавать программы тренировок (HIIT, Табата), настраивать таймеры и динамически менять интерфейс приложения. Чем могу помочь?',
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      },
+    ];
+  });
 
-  const handleFetchModels = async () => {
-    if (!apiKey) return;
-    setFetchingModels(true);
-    try {
-      const list = await AIService.fetchModels(baseUrl || 'https://api.openai.com/v1', apiKey);
-      setAvailableModels(list);
-      if (list.length > 0 && !list.includes(model)) {
-        setModel(list[0]);
-      }
-    } catch (err: unknown) {
-      console.warn('Model fetch error:', err);
-    } finally {
-      setFetchingModels(false);
-    }
-  };
-  const handleSaveConfig = (e: React.FormEvent) => {
-    e.preventDefault();
-    onUpdateAISettings({
-      apiKey,
-      baseUrl: baseUrl || 'https://api.openai.com/v1',
-      model: model || 'gpt-4o-mini',
-      enabled: true,
-      autoAdjustIntervals: aiSettings.autoAdjustIntervals,
-    });
-    setSavedSuccess(true);
-    setTimeout(() => {
-      setSavedSuccess(false);
-      setShowConfig(false);
-    }, 1200);
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const handleOrchestrate = async (customPrompt?: string) => {
-    const query = customPrompt || prompt;
-    if (!query.trim()) return;
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages, loading]);
 
-    // If no API key provided, AIService will use smart local offline fallback!
+  const handleSend = async (textToSend?: string) => {
+    const query = (textToSend || input).trim();
+    if (!query || loading) return;
 
+    soundService.playUiClick();
+    const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+    const userMsg: ChatMessage = {
+      id: Date.now().toString(),
+      sender: 'user',
+      text: query,
+      time: timeStr,
+    };
+
+    setMessages((prev) => [...prev, userMsg]);
+    setInput('');
     setLoading(true);
-    setError(null);
-    try {
-      soundService.playCountdownTick();
-      const plan = await AIService.orchestratePlan(query, aiSettings);
-      setLastResult(plan);
 
-      // Speak feedback
-      if (plan.message) {
-        soundService.speak(plan.message);
-      }
+    try {
+      const plan = await AIService.orchestratePlan(query, aiSettings, alarms);
+      const assistantMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'assistant',
+        text: plan.summary || 'План успешно сформирован!',
+        result: plan,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, assistantMsg]);
+      if (plan.summary) soundService.speak(plan.summary);
     } catch (err: unknown) {
       console.error(err);
-      const message = err instanceof Error ? err.message : 'Ошибка обработки ИИ';
-      setError(message);
-      soundService.playBeep(200, 0.4, 0.4);
+      const errMessage = err instanceof Error ? err.message : 'Ошибка обработки запроса';
+      const errMsg: ChatMessage = {
+        id: (Date.now() + 1).toString(),
+        sender: 'assistant',
+        text: `Ошибка: ${errMessage}. Проверьте подключение или API ключ в Настройках.`,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      };
+      setMessages((prev) => [...prev, errMsg]);
     } finally {
       setLoading(false);
     }
   };
 
-  const handleApplyAllAlarms = () => {
-    if (lastResult?.alarms && onApplyAlarms) {
-      soundService.playCountdownTick();
-      onApplyAlarms([...alarms, ...lastResult.alarms]);
-      soundService.speak(`Применено ${lastResult.alarms.length} будильников!`);
-      if (onSwitchTab) onSwitchTab('alarm');
-    }
-  };
-
-  const handleLaunchWorkout = () => {
-    if (lastResult?.workout) {
-      soundService.playCountdownTick();
-      onSelectRoutine(lastResult.workout);
-      if (onSwitchTab) onSwitchTab('workout');
+  const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault();
+      handleSend();
     }
   };
 
   return (
-    <div className="flex flex-col w-full px-2 py-1 space-y-3">
+    <div className="flex flex-col w-full h-full p-2 space-y-2 select-none overflow-hidden">
       {/* Header */}
-      <div className="flex items-center justify-between px-1">
+      <div className="flex items-center justify-between px-2 py-1 border-b" style={{ borderColor: theme.border }}>
         <div className="flex items-center space-x-2">
-          <Bot size={20} style={{ color: theme.accent }} />
-          <span className="text-sm font-semibold tracking-wider uppercase opacity-80">
-            AI Co-Pilot
-          </span>
+          <Bot size={18} style={{ color: theme.accent }} />
+          <span className="text-xs font-bold uppercase tracking-wider opacity-80">AI Co-Pilot</span>
         </div>
-        <button
-          onClick={() => setShowConfig(!showConfig)}
-          className="flex items-center space-x-1 px-2.5 py-1 text-xs rounded-lg transition-all"
-          style={{
-            backgroundColor: showConfig ? `${theme.accent}20` : 'transparent',
-            color: showConfig ? theme.accent : theme.subtext,
-            border: `1px solid ${showConfig ? theme.accent : 'rgba(255,255,255,0.1)'}`,
-          }}
-        >
-          <Key size={13} />
-          <span>{aiSettings.apiKey ? 'Настройки BYOK' : 'Подключить API'}</span>
-        </button>
+        <span className="text-[10px] opacity-50 font-mono">
+          {aiSettings.apiKey ? aiSettings.model : 'Offline Smart Parser'}
+        </span>
       </div>
 
-      {/* BYOK Configuration Form */}
-      {showConfig && (
-        <form
-          onSubmit={handleSaveConfig}
-          className="p-3 rounded-xl border flex flex-col space-y-2.5 bg-black/30 animate-in fade-in zoom-in-95 duration-150"
-          style={{ borderColor: `${theme.accent}40` }}
-        >
-          <div className="flex items-center justify-between">
-            <span className="text-xs font-bold text-white flex items-center space-x-1.5">
-              <Sparkles size={13} style={{ color: theme.accent }} />
-              <span>Конфигурация OpenAI-Compatible</span>
-            </span>
-            <span className="text-[10px] opacity-60">Локально & Безопасно</span>
-          </div>
-
-          <div className="flex flex-col space-y-1">
-            <label className="text-[10px] uppercase font-bold tracking-wider opacity-60">
-              API Key
-            </label>
-            <input
-              type="password"
-              value={apiKey}
-              onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
-              className="bg-black/50 text-xs px-2.5 py-1.5 rounded-lg border border-white/10 focus:outline-none"
-              style={{ color: theme.text }}
-              required
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-2">
-            <div className="flex flex-col space-y-1">
-              <label className="text-[10px] uppercase font-bold tracking-wider opacity-60">
-                Base URL
-              </label>
-              <input
-                type="text"
-                value={baseUrl}
-                onChange={(e) => setBaseUrl(e.target.value)}
-                placeholder="https://api.openai.com/v1"
-                className="bg-black/50 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
-                style={{ color: theme.text }}
-              />
-            </div>
-            <div className="flex flex-col space-y-1">
-              <div className="flex items-center justify-between">
-                <label className="text-[10px] uppercase font-bold tracking-wider opacity-60">
-                  Model
-                </label>
-                <button
-                  type="button"
-                  onClick={handleFetchModels}
-                  disabled={fetchingModels || !apiKey}
-                  className="text-[10px] underline opacity-70 hover:opacity-100 disabled:opacity-30"
+      {/* Messages Scroll Area */}
+      <div className="flex-1 overflow-y-auto px-1 space-y-2.5 pr-1">
+        {messages.map((m) => (
+          <div
+            key={m.id}
+            className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
+          >
+            <div className="flex items-end space-x-1.5 max-w-[88%]">
+              {m.sender === 'assistant' && (
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mb-1"
+                  style={{ backgroundColor: `${theme.accent}25`, color: theme.accent }}
                 >
-                  {fetchingModels ? 'Загрузка...' : 'Загрузить список'}
-                </button>
+                  <Bot size={12} />
+                </div>
+              )}
+              <div
+                className={`p-2.5 rounded-2xl text-xs leading-relaxed shadow-sm ${
+                  m.sender === 'user' ? 'rounded-br-none' : 'rounded-bl-none'
+                }`}
+                style={{
+                  backgroundColor: m.sender === 'user' ? theme.accent : theme.surface,
+                  color: m.sender === 'user' ? '#000000' : theme.text,
+                  border: m.sender === 'assistant' ? `1px solid ${theme.border}` : undefined,
+                }}
+              >
+                <div className="whitespace-pre-wrap">{m.text}</div>
+
+                {/* Plan result interactive cards */}
+                {m.result && (
+                  <div className="mt-2.5 pt-2 border-t flex flex-col space-y-2" style={{ borderColor: 'rgba(255,255,255,0.1)' }}>
+                    {m.result.alarms && m.result.alarms.length > 0 && (
+                      <div className="flex items-center justify-between p-1.5 rounded-lg bg-black/20 text-[11px]">
+                        <div className="flex items-center space-x-1.5 truncate">
+                          <Bell size={13} style={{ color: theme.accent }} />
+                          <span className="truncate">{m.result.alarms.length} будильника(ов)</span>
+                        </div>
+                        {onApplyAlarms && (
+                          <button
+                            onClick={() => {
+                              onApplyAlarms(m.result!.alarms!);
+                              soundService.playUiClick();
+                            }}
+                            className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/10 hover:bg-white/20 transition-all flex items-center space-x-1"
+                          >
+                            <Check size={10} />
+                            <span>Установить</span>
+                          </button>
+                        )}
+                      </div>
+                    )}
+
+                    {m.result.workout && (
+                      <div className="flex items-center justify-between p-1.5 rounded-lg bg-black/20 text-[11px]">
+                        <div className="flex items-center space-x-1.5 truncate">
+                          <PlayCircle size={13} style={{ color: theme.accent }} />
+                          <span className="truncate">{m.result.workout.name}</span>
+                        </div>
+                        <button
+                          onClick={() => {
+                            onSelectRoutine(m.result!.workout!);
+                            soundService.playUiClick();
+                          }}
+                          className="px-2 py-0.5 rounded text-[10px] font-semibold bg-white/10 hover:bg-white/20 transition-all flex items-center space-x-1"
+                        >
+                          <PlayCircle size={10} />
+                          <span>Начать</span>
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-              {availableModels.length > 0 ? (
-                <select
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  className="bg-black/80 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
-                  style={{ color: theme.text }}
+              {m.sender === 'user' && (
+                <div
+                  className="w-5 h-5 rounded-full flex items-center justify-center flex-shrink-0 mb-1"
+                  style={{ backgroundColor: `${theme.text}20`, color: theme.text }}
                 >
-                  {availableModels.map((m) => (
-                    <option key={m} value={m} className="bg-neutral-900 text-white">
-                      {m}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <input
-                  type="text"
-                  value={model}
-                  onChange={(e) => setModel(e.target.value)}
-                  placeholder="gpt-4o-mini"
-                  className="bg-black/50 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
-                  style={{ color: theme.text }}
-                />
+                  <User size={12} />
+                </div>
               )}
             </div>
+            <span className="text-[9px] opacity-40 mt-0.5 px-7">{m.time}</span>
           </div>
+        ))}
 
-          <button
-            type="submit"
-            className="w-full py-1.5 rounded-lg text-xs font-bold flex items-center justify-center space-x-1.5 transition-all shadow-sm"
-            style={{
-              backgroundColor: theme.accent,
-              color: theme.bg,
-            }}
-          >
-            {savedSuccess ? (
-              <>
-                <Check size={14} />
-                <span>Сохранено!</span>
-              </>
-            ) : (
-              <span>Сохранить настройки</span>
-            )}
-          </button>
-        </form>
-      )}
-
-      {/* Main Orchestration Prompt Area */}
-      <div className="flex flex-col space-y-2">
-        <div className="relative">
-          <textarea
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                handleOrchestrate();
-              }
-            }}
-            placeholder="Опишите задачу: «Вот моя тренировка, расставь будильники на 7:00 подъем и 19:00 растяжка»..."
-            rows={2}
-            className="w-full bg-black/30 text-xs p-2.5 rounded-xl border border-white/10 focus:outline-none focus:border-white/20 resize-none pr-10"
-            style={{ color: theme.text }}
-          />
-          <button
-            onClick={() => handleOrchestrate()}
-            disabled={loading || !prompt.trim()}
-            className="absolute right-2 bottom-2.5 p-1.5 rounded-lg transition-transform active:scale-95 disabled:opacity-30 flex items-center justify-center"
-            style={{ backgroundColor: theme.accent, color: theme.bg }}
-          >
-            {loading ? <Loader2 size={15} className="animate-spin" /> : <Send size={15} />}
-          </button>
-        </div>
-
-        {/* Quick prompt suggestions */}
-        <div className="flex items-center space-x-1.5 overflow-x-auto pb-1 text-[10px]">
-          <span className="opacity-40 shrink-0">Быстрые:</span>
-          {[
-            'Расставь будильники на утренний бег в 6:30 и растяжку в 20:00',
-            '15 мин табата для пресса и будильник перед ней',
-            'Помодоро 4 раунда по 25 мин с будильником',
-          ].map((q, idx) => (
-            <button
-              key={idx}
-              onClick={() => {
-                setPrompt(q);
-                handleOrchestrate(q);
-              }}
-              className="px-2 py-1 rounded-md bg-white/5 hover:bg-white/10 whitespace-nowrap border border-white/5 opacity-80"
-            >
-              {q}
-            </button>
-          ))}
-        </div>
+        {loading && (
+          <div className="flex items-center space-x-2 text-xs opacity-60 px-2 py-1">
+            <Loader2 size={13} className="animate-spin" style={{ color: theme.accent }} />
+            <span>AI Co-Pilot думает...</span>
+          </div>
+        )}
+        <div ref={messagesEndRef} />
       </div>
 
-      {error && (
-        <div className="p-2.5 rounded-xl bg-red-500/10 border border-red-500/20 text-red-400 text-xs flex items-center space-x-2">
-          <AlertCircle size={15} className="shrink-0" />
-          <span>{error}</span>
-        </div>
-      )}
+      {/* Quick Prompts */}
+      <div className="flex items-center space-x-1.5 overflow-x-auto py-1 px-1 no-scrollbar opacity-75">
+        {[
+          'Что ты умеешь?',
+          'Табата на 15 минут',
+          'Будильник на 07:00 и 22:30',
+        ].map((chip) => (
+          <button
+            key={chip}
+            onClick={() => handleSend(chip)}
+            className="text-[10px] px-2.5 py-1 rounded-full whitespace-nowrap bg-white/5 hover:bg-white/10 border transition-all"
+            style={{ borderColor: theme.border, color: theme.text }}
+          >
+            {chip}
+          </button>
+        ))}
+      </div>
 
-      {/* Generated Result Card (Workout + Alarms Schedule) */}
-      {lastResult && (
-        <div
-          className="p-3 rounded-xl border flex flex-col space-y-3 bg-black/40 animate-in fade-in slide-in-from-bottom-2 duration-200"
-          style={{ borderColor: `${theme.accent}50` }}
+      {/* Message Input Box */}
+      <div className="flex items-center space-x-1.5 p-1 rounded-xl border bg-black/20" style={{ borderColor: theme.border }}>
+        <input
+          type="text"
+          value={input}
+          onChange={(e) => setInput(e.target.value)}
+          onKeyDown={handleKeyDown}
+          placeholder="Напишите сообщение AI Co-Pilot..."
+          className="flex-1 bg-transparent px-2.5 py-1.5 text-xs focus:outline-none"
+          style={{ color: theme.text }}
+        />
+        <button
+          onClick={() => handleSend()}
+          disabled={!input.trim() || loading}
+          className="p-2 rounded-lg transition-all active:scale-95 disabled:opacity-30 disabled:pointer-events-none"
+          style={{
+            backgroundColor: theme.accent,
+            color: '#000000',
+          }}
         >
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5 text-xs font-bold" style={{ color: theme.accent }}>
-              <Sparkles size={14} />
-              <span>Результат от ИИ</span>
-            </div>
-            <span className="text-[10px] opacity-60">Сгенерировано</span>
-          </div>
-
-          <p className="text-xs italic opacity-90">{lastResult.message}</p>
-
-          {/* If Alarms were planned */}
-          {lastResult.alarms && lastResult.alarms.length > 0 && (
-            <div className="flex flex-col space-y-1.5 p-2 rounded-lg bg-black/30 border border-white/5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold flex items-center space-x-1">
-                  <Bell size={13} style={{ color: theme.accent }} />
-                  <span>Будильники ({lastResult.alarms.length})</span>
-                </span>
-                <button
-                  onClick={handleApplyAllAlarms}
-                  className="px-2 py-0.5 text-[10px] font-bold rounded shadow-sm"
-                  style={{ backgroundColor: theme.accent, color: theme.bg }}
-                >
-                  Применить в расписание
-                </button>
-              </div>
-              <div className="flex flex-col space-y-1 pt-1">
-                {lastResult.alarms.map((a, i) => (
-                  <div key={i} className="flex items-center justify-between text-[11px] opacity-80">
-                    <span className="font-mono font-bold text-white">{a.time}</span>
-                    <span className="truncate max-w-[170px]">{a.label || a.title}</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
-
-          {/* If Workout routine was planned */}
-          {lastResult.workout && (
-            <div className="flex flex-col space-y-1.5 p-2 rounded-lg bg-black/30 border border-white/5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-bold flex items-center space-x-1">
-                  <PlayCircle size={13} style={{ color: theme.accent }} />
-                  <span>Тренировка: {lastResult.workout.name}</span>
-                </span>
-                <button
-                  onClick={handleLaunchWorkout}
-                  className="px-2 py-0.5 text-[10px] font-bold rounded shadow-sm"
-                  style={{ backgroundColor: theme.accent, color: theme.bg }}
-                >
-                  Запустить в таймере
-                </button>
-              </div>
-              <span className="text-[10px] opacity-70">
-                {lastResult.workout.repeatCount} раунда(ов) • {lastResult.workout.steps.length} упражнений
-              </span>
-            </div>
-          )}
-        </div>
-      )}
+          {loading ? <Loader2 size={14} className="animate-spin" /> : <Send size={14} />}
+        </button>
+      </div>
     </div>
   );
 };

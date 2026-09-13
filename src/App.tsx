@@ -2,8 +2,6 @@ import React, { useState, useEffect } from 'react';
 import {
   Timer as TimerIcon,
   Sparkles,
-  Palette,
-  Check,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { TitleBar } from './components/TitleBar';
@@ -28,10 +26,9 @@ import { DynamicUIConfig, DEFAULT_DYNAMIC_UI } from './types';
 export const App: React.FC = () => {
   // App state
   const [activeTab, setActiveTab] = useState<AppMode>('dashboard');
-  const [themeKey, setThemeKey] = useState<ThemeKey>('dark-neon');
+  const [themeKey] = useState<ThemeKey>('dark-neon');
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(true);
-  const [showThemePicker, setShowThemePicker] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   // Dynamic AI-driven UI Configuration
   const [dynamicUi, setDynamicUi] = useState<DynamicUIConfig>(() => {
@@ -116,7 +113,6 @@ export const App: React.FC = () => {
   const handleSelectTab = (tab: AppMode) => {
     soundService.playUiClick();
     setActiveTab(tab);
-    setShowThemePicker(false);
   };
 
   const handleSelectRoutine = (routine: WorkoutRoutine) => {
@@ -139,12 +135,10 @@ export const App: React.FC = () => {
   return (
     <div className="w-screen h-screen m-0 p-0 bg-transparent overflow-hidden select-none">
       <div
-        className="relative w-full h-full flex flex-col rounded-2xl overflow-hidden shadow-2xl border transition-colors duration-200"
+        className="relative w-full h-full flex flex-col rounded-2xl overflow-hidden shadow-2xl transition-colors duration-200"
         style={{
           backgroundColor: theme.bg,
-          borderColor: `${theme.accent}55`,
           color: theme.text,
-          filter: dynamicUi.dial.glowIntensity === 'high' ? `drop-shadow(0 0 15px ${theme.accent}33)` : undefined,
         }}
       >
         <ResizeHandles />
@@ -211,63 +205,8 @@ export const App: React.FC = () => {
                 <span className="text-xs hidden min-[280px]:inline truncate">Опции</span>
               </button>
             </div>
-
-            {/* Theme switcher button */}
-            <button
-              onClick={() => setShowThemePicker(!showThemePicker)}
-              className="p-1.5 ml-1 rounded-lg transition-colors hover:bg-white/10"
-              style={{ color: showThemePicker ? theme.accent : theme.subtext }}
-              title="Выбор темы оформления"
-            >
-              <Palette size={16} />
-            </button>
           </div>
         )}
-
-        {/* Theme Picker Popover */}
-        {showThemePicker && !isCompact && (
-          <div
-            className="w-full p-2.5 mb-2 rounded-xl border flex flex-col space-y-2 animate-in fade-in"
-            style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
-          >
-            <div className="text-[11px] font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
-              Темы оформления
-            </div>
-            <div className="grid grid-cols-2 gap-1.5">
-              {(Object.keys(THEMES) as ThemeKey[]).map((key) => {
-                const th = THEMES[key];
-                const isCurrent = themeKey === key;
-                return (
-                  <button
-                    key={key}
-                    onClick={() => {
-                      soundService.playCountdownTick();
-                      setThemeKey(key);
-                      setShowThemePicker(false);
-                    }}
-                    className={`flex items-center justify-between p-2 rounded-lg text-xs font-bold transition-all border ${
-                      isCurrent ? 'ring-1 ring-white/50' : 'opacity-80'
-                    }`}
-                    style={{
-                      backgroundColor: th.bg,
-                      borderColor: isCurrent ? th.accent : th.border,
-                    }}
-                  >
-                    <div className="flex items-center space-x-1.5">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: th.accent }}
-                      />
-                      <span>{th.name}</span>
-                    </div>
-                    {isCurrent && <Check size={14} style={{ color: th.accent }} />}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-        )}
-
         {/* Content Area Rendering by active Tab */}
         <div className="w-full flex-1 flex flex-col items-center justify-center">
           {activeTab === 'dashboard' && (

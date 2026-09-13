@@ -2,6 +2,7 @@ import { AISettings, WorkoutRoutine, AlarmItem } from '../types';
 
 export interface AIPlanResult {
   message: string;
+  summary?: string;
   alarms?: AlarmItem[];
   workout?: WorkoutRoutine;
 }
@@ -196,7 +197,8 @@ export class AIService {
    */
   static async orchestratePlan(
     prompt: string,
-    settings: AISettings
+    settings: AISettings,
+    _existingAlarms: AlarmItem[] = []
   ): Promise<AIPlanResult> {
     const systemPrompt = `Ты главный ИИ-распорядитель умного фитнес-будильника "Alarmer".
 Пользователь обращается на естественном языке. Он может попросить:
@@ -267,6 +269,7 @@ export class AIService {
     const parsed = JSON.parse(this.cleanJson(content));
     const result: AIPlanResult = {
       message: parsed.message || 'План успешно сформирован!',
+      summary: parsed.message || 'План успешно сформирован!',
     };
 
     if (parsed.hasAlarms && Array.isArray(parsed.alarms)) {
