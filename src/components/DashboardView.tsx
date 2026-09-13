@@ -35,7 +35,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="flex flex-col items-center w-full h-full space-y-3">
       {/* Sub-selector Pills */}
       <div
-        className="flex items-center p-1 rounded-xl border text-xs font-semibold space-x-1"
+        className="flex items-center justify-between w-full max-w-[340px] p-0.5 rounded-xl border text-xs font-semibold overflow-hidden"
         style={{
           backgroundColor: theme.surface,
           borderColor: theme.border,
@@ -43,54 +43,58 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       >
         <button
           onClick={() => setSubModule("timer")}
-          className="flex items-center space-x-1.5 px-3 py-1 rounded-lg transition-all"
+          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
           style={{
             backgroundColor: subModule === "timer" ? theme.accent : "transparent",
             color: subModule === "timer" ? "#000" : theme.text,
             fontWeight: subModule === "timer" ? 700 : 500,
           }}
+          title="Таймер"
         >
-          <TimerIcon size={14} />
-          <span>Таймер</span>
+          <TimerIcon size={13} />
+          <span className="hidden min-[290px]:inline text-[11px]">Таймер</span>
         </button>
 
         <button
           onClick={() => setSubModule("workout")}
-          className="flex items-center space-x-1.5 px-3 py-1 rounded-lg transition-all"
+          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
           style={{
             backgroundColor: subModule === "workout" ? theme.accent : "transparent",
             color: subModule === "workout" ? "#000" : theme.text,
             fontWeight: subModule === "workout" ? 700 : 500,
           }}
+          title="Тренировка"
         >
-          <Flame size={14} />
-          <span>Тренировка</span>
+          <Flame size={13} />
+          <span className="hidden min-[290px]:inline text-[11px]">Фитнес</span>
         </button>
 
         <button
           onClick={() => setSubModule("stopwatch")}
-          className="flex items-center space-x-1.5 px-3 py-1 rounded-lg transition-all"
+          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
           style={{
             backgroundColor: subModule === "stopwatch" ? theme.accent : "transparent",
             color: subModule === "stopwatch" ? "#000" : theme.text,
             fontWeight: subModule === "stopwatch" ? 700 : 500,
           }}
+          title="Секундомер"
         >
-          <Watch size={14} />
-          <span>Секундомер</span>
+          <Watch size={13} />
+          <span className="hidden min-[290px]:inline text-[11px]">Круги</span>
         </button>
 
         <button
           onClick={() => setSubModule("alarms")}
-          className="flex items-center space-x-1.5 px-3 py-1 rounded-lg transition-all"
+          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
           style={{
             backgroundColor: subModule === "alarms" ? theme.accent : "transparent",
             color: subModule === "alarms" ? "#000" : theme.text,
             fontWeight: subModule === "alarms" ? 700 : 500,
           }}
+          title="Будильники"
         >
-          <Bell size={14} />
-          <span>Будильники</span>
+          <Bell size={13} />
+          <span className="hidden min-[290px]:inline text-[11px]">Алармы</span>
         </button>
       </div>
 

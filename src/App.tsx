@@ -168,22 +168,22 @@ export const App: React.FC = () => {
             <div className="flex items-center space-x-1.5 flex-1">
               <button
                 onClick={() => handleSelectTab('dashboard')}
-                className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
                   activeTab === 'dashboard' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{
                   backgroundColor: activeTab === 'dashboard' ? `${theme.accent}25` : 'transparent',
                   color: activeTab === 'dashboard' ? theme.accent : theme.text,
                 }}
-                title="Единый дашборд: Таймеры, Секундомер, Тренировки, Будильники"
+                title="Дашборд"
               >
-                <TimerIcon size={16} />
-                <span className="text-xs">Дашборд</span>
+                <TimerIcon size={15} />
+                <span className="text-xs hidden min-[280px]:inline truncate">Дашборд</span>
               </button>
 
               <button
                 onClick={() => handleSelectTab('ai')}
-                className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
                   activeTab === 'ai' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{
@@ -192,23 +192,23 @@ export const App: React.FC = () => {
                 }}
                 title="AI Co-Pilot"
               >
-                <Sparkles size={16} />
-                <span className="text-xs">AI Co-Pilot</span>
+                <Sparkles size={15} />
+                <span className="text-xs hidden min-[280px]:inline truncate">AI</span>
               </button>
 
               <button
                 onClick={() => handleSelectTab('settings')}
-                className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
                   activeTab === 'settings' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{
                   backgroundColor: activeTab === 'settings' ? `${theme.accent}25` : 'transparent',
                   color: activeTab === 'settings' ? theme.accent : theme.text,
                 }}
-                title="Настройки озвучки, звуков и AI"
+                title="Настройки"
               >
-                <SettingsIcon size={16} />
-                <span className="text-xs">Настройки</span>
+                <SettingsIcon size={15} />
+                <span className="text-xs hidden min-[280px]:inline truncate">Опции</span>
               </button>
             </div>
 

@@ -22,7 +22,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   secondaryText,
   isInteractive = true,
   onProgressChange,
-  size = 200,
+  size = 180,
   showTicks = true,
   tickLength = 'normal',
   fontFamily = 'system-ui',
