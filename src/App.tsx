@@ -23,6 +23,7 @@ import {
 } from './constants/defaults';
 import { windowService } from './services/window';
 import { soundService } from './services/sound';
+import { NotificationService } from './services/notification';
 
 export const App: React.FC = () => {
   // App state
@@ -74,6 +75,10 @@ export const App: React.FC = () => {
   useEffect(() => {
     localStorage.setItem('alarmer_routines', JSON.stringify(routines));
   }, [routines]);
+  // Initialize notification permissions on mount
+  useEffect(() => {
+    NotificationService.init().catch(console.error);
+  }, []);
 
   // Sync window size on compact mode toggle
   const toggleCompact = () => {

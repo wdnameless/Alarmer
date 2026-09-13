@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Bell, BellOff, Volume2, Sparkles, Loader2 } from 'lucide-react';
 import { ThemeColors, AlarmItem, AISettings } from '../types';
+import { NotificationService } from '../services/notification';
 import { soundService } from '../services/sound';
 import { AIService } from '../services/ai';
 
@@ -61,11 +62,9 @@ export const Alarms: React.FC<AlarmsProps> = ({
           triggeredAlarmsRef.current.add(key);
           setRingingAlarm(alarm);
           soundService.playFinishAlarm();
-          if (alarm.voicePrompt) {
-            soundService.speak(alarm.voicePrompt);
-          } else {
-            soundService.speak(`Внимание! Будильник: ${alarm.label || alarm.title}`);
-          }
+          const announcement = alarm.voicePrompt || `Внимание! Будильник: ${alarm.label || alarm.title}`;
+          soundService.speak(announcement);
+          NotificationService.notify(alarm.label || alarm.title || 'Будильник Alarmer', announcement).catch(console.error);
         }
       });
     };
