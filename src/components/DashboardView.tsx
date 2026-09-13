@@ -6,7 +6,6 @@ import { WorkoutPlayer } from "./WorkoutPlayer";
 import { Alarms } from "./Alarms";
 import { Timer as TimerIcon, Watch, Flame, Bell } from "lucide-react";
 import { I18nService } from "../services/i18n";
-import { soundService } from "../services/sound";
 
 interface DashboardViewProps {
   theme: ThemeColors;
@@ -18,6 +17,7 @@ interface DashboardViewProps {
   onUpdateAlarms: (alarms: AlarmItem[]) => void;
   onSelectRoutine: (routine: WorkoutRoutine) => void;
   onOpenAISettings: () => void;
+  timerMinutes?: number;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -30,32 +30,14 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onUpdateAlarms,
   onSelectRoutine,
   onOpenAISettings,
+  timerMinutes,
 }) => {
   const [subModule, setSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
 
   const t = I18nService.t();
 
   return (
-    <div className="flex flex-col items-center w-full h-full space-y-2">
-      {/* Power-User Quick Capture Bar */}
-      <div className="w-full max-w-[340px] flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-white/5 border border-white/10 text-xs">
-        <span className="opacity-40 font-mono text-[10px]">#задача:</span>
-        <input
-          type="text"
-          placeholder="Быстрый старт (напр: рефакторинг 45m)"
-          onKeyDown={(e) => {
-            if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-              const val = e.currentTarget.value.trim();
-              soundService.playCountdownTick();
-              soundService.speak(`Задача ${val} запущена!`);
-              e.currentTarget.value = '';
-            }
-          }}
-          className="bg-transparent flex-1 text-xs outline-none"
-          style={{ color: theme.text }}
-        />
-      </div>
-
+    <div className="flex flex-col items-center w-full h-full space-y-4">
       {/* Sub-selector Pills */}
       <div
         className="flex items-center justify-between w-full max-w-[340px] p-0.5 rounded-xl border text-xs font-semibold overflow-hidden"
@@ -123,7 +105,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 
       {/* Main Module Content */}
       <div className="w-full flex-1 flex flex-col items-center justify-center">
-        {subModule === "timer" && <Timer theme={theme} dynamicUi={dynamicUi} />}
+        {subModule === "timer" && <Timer theme={theme} dynamicUi={dynamicUi} initialMinutes={timerMinutes} />}
         {subModule === "workout" && (
           <div className="flex flex-col w-full space-y-3">
             <div className="flex items-center space-x-2 overflow-x-auto pb-1 max-w-full">

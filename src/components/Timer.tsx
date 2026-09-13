@@ -23,8 +23,7 @@ export const Timer: React.FC<TimerProps> = ({
   const [isRunning, setIsRunning] = useState(false);
   const [isOvertime, setIsOvertime] = useState(false);
   const [overtimeSec, setOvertimeSec] = useState(0);
-  const [flowMode, setFlowMode] = useState(true);
-  const [workRhythm, setWorkRhythm] = useState<'classic' | 'deep50' | 'ultradian' | 'sprint'>('classic');
+  const [flowMode] = useState(true);
 
   // Synchronize when initialMinutes preset changes
   useEffect(() => {
@@ -162,43 +161,6 @@ export const Timer: React.FC<TimerProps> = ({
         </div>
       )}
 
-      {/* Ultradian Rhythm Selector: 25/5, 50/10, 90/20, Sprint */}
-      <div className="flex items-center space-x-1 p-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] mb-2 font-mono">
-        <button
-          onClick={() => {
-            setWorkRhythm('classic');
-            setPresetMinutes(25);
-          }}
-          className={`px-2 py-0.5 rounded ${workRhythm === 'classic' ? 'bg-white/20 font-bold text-white' : 'opacity-60'}`}
-        >
-          25/5
-        </button>
-        <button
-          onClick={() => {
-            setWorkRhythm('deep50');
-            setPresetMinutes(50);
-          }}
-          className={`px-2 py-0.5 rounded ${workRhythm === 'deep50' ? 'bg-white/20 font-bold text-white' : 'opacity-60'}`}
-        >
-          Deep 50
-        </button>
-        <button
-          onClick={() => {
-            setWorkRhythm('ultradian');
-            setPresetMinutes(90);
-          }}
-          className={`px-2 py-0.5 rounded ${workRhythm === 'ultradian' ? 'bg-white/20 font-bold text-white' : 'opacity-60'}`}
-        >
-          90/20
-        </button>
-        <button
-          onClick={() => setFlowMode(!flowMode)}
-          title="Режим продления потока (без резкого звонка)"
-          className={`px-2 py-0.5 rounded transition-colors ${flowMode ? 'text-emerald-400 bg-emerald-500/10 font-bold' : 'opacity-40'}`}
-        >
-          Flow {flowMode ? 'ON' : 'OFF'}
-        </button>
-      </div>
 
       <RadialDial
         theme={theme}

@@ -31,6 +31,7 @@ export const App: React.FC = () => {
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
+  const [aiTimerMinutes, setAiTimerMinutes] = useState<number | undefined>(undefined);
   // Dynamic AI-driven UI Configuration
   const [dynamicUi, setDynamicUi] = useState<DynamicUIConfig>(() => {
     try {
@@ -222,6 +223,7 @@ export const App: React.FC = () => {
               onUpdateAlarms={setAlarms}
               onSelectRoutine={setSelectedRoutine}
               onOpenAISettings={() => setActiveTab('settings')}
+              timerMinutes={aiTimerMinutes}
             />
           )}
           {activeTab === 'ai' && (
@@ -234,6 +236,11 @@ export const App: React.FC = () => {
               onSelectRoutine={handleSelectRoutine}
               onApplyAlarms={setAlarms}
               onApplyUI={(newUi) => setDynamicUi(newUi)}
+              onSetTimerMinutes={(mins) => {
+                setAiTimerMinutes(mins);
+                setActiveTab('dashboard');
+              }}
+              onSwitchTab={(_tab) => setActiveTab('dashboard')}
             />
           )}
           {activeTab === 'settings' && (

@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Bot, PlayCircle, Bell, Check, User } from 'lucide-react';
 import { ThemeColors, AISettings, WorkoutRoutine, AlarmItem, DynamicUIConfig } from '../types';
 import { AIPlanResult } from '../services/ai';
-import { AICompilerService } from '../services/aiCompiler';
+import { AIAssistantService } from '../services/aiAssistant';
 import { soundService } from '../services/sound';
 
 interface ChatMessage {
@@ -22,9 +22,9 @@ interface AITrainerProps {
   onSelectRoutine: (routine: WorkoutRoutine) => void;
   onApplyAlarms?: (alarms: AlarmItem[]) => void;
   onApplyUI?: (ui: DynamicUIConfig) => void;
-  onSwitchTab?: (tab: 'workout' | 'alarm') => void;
+  onSetTimerMinutes?: (minutes: number) => void;
+  onSwitchTab?: (tab: 'workout' | 'alarm' | 'dashboard') => void;
 }
-
 export const AITrainer: React.FC<AITrainerProps> = ({
   theme,
   aiSettings,
@@ -33,6 +33,8 @@ export const AITrainer: React.FC<AITrainerProps> = ({
   onSelectRoutine,
   onApplyAlarms,
   onApplyUI,
+  onSetTimerMinutes,
+  onSwitchTab: _onSwitchTab,
 }) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -76,33 +78,38 @@ export const AITrainer: React.FC<AITrainerProps> = ({
     setLoading(true);
 
     try {
-      // Execute AICompiler for deep live UI transformation, alarms & workouts
-      const mutation = await AICompilerService.compileUserIntent(query, currentUi, aiSettings);
-      if (mutation.ui && onApplyUI) {
+      // Execute universal AIAssistantService: timer, UI, alarms, workouts, or polite rejection
+      const result = await AIAssistantService.processUserInput(query, currentUi, aiSettings);
+      if (result.ui && onApplyUI) {
         onApplyUI({
           ...currentUi,
-          ...mutation.ui,
-          colors: { ...currentUi.colors, ...(mutation.ui.colors || {}) },
-          dial: { ...currentUi.dial, ...(mutation.ui.dial || {}) },
-          typography: { ...currentUi.typography, ...(mutation.ui.typography || {}) },
-          layout: { ...currentUi.layout, ...(mutation.ui.layout || {}) },
+          ...result.ui,
+          colors: { ...currentUi.colors, ...(result.ui.colors || {}) },
+          dial: { ...currentUi.dial, ...(result.ui.dial || {}) },
+          typography: { ...currentUi.typography, ...(result.ui.typography || {}) },
+          layout: { ...currentUi.layout, ...(result.ui.layout || {}) },
         });
       }
-      if (mutation.alarms && mutation.alarms.length > 0 && onApplyAlarms) {
-        onApplyAlarms(mutation.alarms);
+      if (result.alarms && result.alarms.length > 0 && onApplyAlarms) {
+        onApplyAlarms(result.alarms);
       }
-      if (mutation.workout && onSelectRoutine) {
-        onSelectRoutine(mutation.workout);
+      if (result.workout && onSelectRoutine) {
+        onSelectRoutine(result.workout);
+      }
+      if (result.timerMinutes && onSetTimerMinutes) {
+        onSetTimerMinutes(result.timerMinutes);
       }
 
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'assistant',
-        text: mutation.explanation || 'Изменения успешно применены!',
+        text: result.message,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, assistantMsg]);
-      if (mutation.explanation) soundService.speak(mutation.explanation);
+      if (result.message && !result.unsupportedReason) {
+        soundService.speak(result.message);
+      }
     } catch (err: unknown) {
       console.error(err);
       const errMessage = err instanceof Error ? err.message : 'Ошибка обработки запроса';
