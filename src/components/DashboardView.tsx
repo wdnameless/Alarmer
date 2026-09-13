@@ -5,6 +5,7 @@ import { Stopwatch } from "./Stopwatch";
 import { WorkoutPlayer } from "./WorkoutPlayer";
 import { Alarms } from "./Alarms";
 import { Timer as TimerIcon, Watch, Flame, Bell } from "lucide-react";
+import { I18nService } from "../services/i18n";
 
 interface DashboardViewProps {
   theme: ThemeColors;
@@ -31,6 +32,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
 }) => {
   const [subModule, setSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
 
+  const t = I18nService.t();
+
   return (
     <div className="flex flex-col items-center w-full h-full space-y-3">
       {/* Sub-selector Pills */}
@@ -52,7 +55,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Таймер"
         >
           <TimerIcon size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">Таймер</span>
+          <span className="hidden min-[290px]:inline text-[11px]">{t.timer}</span>
         </button>
 
         <button
@@ -66,7 +69,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Тренировка"
         >
           <Flame size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">Фитнес</span>
+          <span className="hidden min-[290px]:inline text-[11px]">{t.fitness}</span>
         </button>
 
         <button
@@ -80,7 +83,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Секундомер"
         >
           <Watch size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">Круги</span>
+          <span className="hidden min-[290px]:inline text-[11px]">{t.laps}</span>
         </button>
 
         <button
@@ -94,7 +97,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           title="Будильники"
         >
           <Bell size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">Алармы</span>
+          <span className="hidden min-[290px]:inline text-[11px]">{t.alarms}</span>
         </button>
       </div>
 

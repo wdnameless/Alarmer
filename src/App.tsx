@@ -21,6 +21,7 @@ import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { AIChatDrawer } from './components/AIChatDrawer';
+import { I18nService } from './services/i18n';
 import { DynamicUIConfig, DEFAULT_DYNAMIC_UI } from './types';
 
 export const App: React.FC = () => {
@@ -131,6 +132,7 @@ export const App: React.FC = () => {
     ...dynamicUi.colors,
     id: themeKey,
   };
+  const t = I18nService.t();
 
   return (
     <div className="w-screen h-screen m-0 p-0 bg-transparent overflow-hidden select-none">
@@ -169,10 +171,10 @@ export const App: React.FC = () => {
                   backgroundColor: activeTab === 'dashboard' ? `${theme.accent}25` : 'transparent',
                   color: activeTab === 'dashboard' ? theme.accent : theme.text,
                 }}
-                title="Дашборд"
+                title={t.dashboard}
               >
                 <TimerIcon size={15} />
-                <span className="text-xs hidden min-[280px]:inline truncate">Дашборд</span>
+                <span className="text-xs hidden min-[280px]:inline truncate">{t.dashboard}</span>
               </button>
 
               <button
@@ -184,10 +186,10 @@ export const App: React.FC = () => {
                   backgroundColor: activeTab === 'ai' ? `${theme.accent}25` : 'transparent',
                   color: activeTab === 'ai' ? theme.accent : theme.text,
                 }}
-                title="AI Co-Pilot"
+                title={t.aiCopilot}
               >
                 <Sparkles size={15} />
-                <span className="text-xs hidden min-[280px]:inline truncate">AI</span>
+                <span className="text-xs hidden min-[280px]:inline truncate">{t.aiCopilot}</span>
               </button>
 
               <button
@@ -199,10 +201,10 @@ export const App: React.FC = () => {
                   backgroundColor: activeTab === 'settings' ? `${theme.accent}25` : 'transparent',
                   color: activeTab === 'settings' ? theme.accent : theme.text,
                 }}
-                title="Настройки"
+                title={t.settings}
               >
                 <SettingsIcon size={15} />
-                <span className="text-xs hidden min-[280px]:inline truncate">Опции</span>
+                <span className="text-xs hidden min-[280px]:inline truncate">{t.settings}</span>
               </button>
             </div>
           </div>

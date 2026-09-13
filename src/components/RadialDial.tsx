@@ -83,8 +83,12 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   };
   const handlePointerUp = (e: React.PointerEvent) => {
     if (dragProgress !== null) {
-      onProgressChange?.(dragProgress);
-      setDragProgress(null);
+      const finalP = dragProgress;
+      onProgressChange?.(finalP);
+      // Keep dragProgress active briefly so parent state commits before clearing
+      setTimeout(() => {
+        setDragProgress(null);
+      }, 50);
     }
     try {
       (e.currentTarget as Element).releasePointerCapture(e.pointerId);

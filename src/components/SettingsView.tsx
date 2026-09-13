@@ -3,6 +3,7 @@ import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play } from 'lucide-
 import { ThemeColors, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '../types';
 import { CLOUD_VOICES, EdgeTtsService } from '../services/edgeTts';
 import { soundService } from '../services/sound';
+import { I18nService, Language } from '../services/i18n';
 
 interface SettingsViewProps {
   theme: ThemeColors;
@@ -46,6 +47,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [alarmVolume, setAlarmVolume] = useState<number>(() => {
     return parseFloat(localStorage.getItem('alarmer_alarm_volume') || '0.8');
   });
+  const [currentLang, setCurrentLang] = useState<Language>(() => I18nService.getLang());
+
+  const handleLangChange = (lang: Language) => {
+    I18nService.setLang(lang);
+    setCurrentLang(lang);
+    soundService.playUiClick();
+  };
 
   const handleVoiceChange = (voiceId: string) => {
     setSelectedVoice(voiceId);
@@ -110,12 +118,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     soundService.playCountdownTick();
   };
 
+  const t = I18nService.t();
+
   return (
     <div className="flex flex-col w-full h-full p-4 overflow-y-auto space-y-6">
       <div className="flex items-center justify-between border-b pb-3" style={{ borderColor: theme.border }}>
         <div>
-          <h2 className="text-base font-bold tracking-tight">Настройки системы</h2>
-          <p className="text-xs opacity-60">Озвучка, нейросети и параметры интерфейса</p>
+          <h2 className="text-base font-bold tracking-tight">{t.systemSettings}</h2>
+          <p className="text-xs opacity-60">{t.settingsDesc}</p>
+        </div>
+        <div className="flex items-center space-x-1 bg-white/5 p-1 rounded-xl border border-white/10 text-xs">
+          <button
+            type="button"
+            onClick={() => handleLangChange('en')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              currentLang === 'en' ? 'bg-white/20 text-white' : 'opacity-50 hover:opacity-100'
+            }`}
+          >
+            EN
+          </button>
+          <button
+            type="button"
+            onClick={() => handleLangChange('ru')}
+            className={`px-2.5 py-1 rounded-lg font-bold transition-all ${
+              currentLang === 'ru' ? 'bg-white/20 text-white' : 'opacity-50 hover:opacity-100'
+            }`}
+          >
+            RU
+          </button>
         </div>
       </div>
 
