@@ -16,6 +16,30 @@ export class WindowService {
     }
   }
 
+  static async toggleMaximize(): Promise<boolean> {
+    if (this.isTauri()) {
+      try {
+        const win = getCurrentWindow();
+        await win.toggleMaximize();
+        return await win.isMaximized();
+      } catch (e) {
+        console.warn('Tauri toggleMaximize error:', e);
+      }
+    }
+    return false;
+  }
+
+  static async isMaximized(): Promise<boolean> {
+    if (this.isTauri()) {
+      try {
+        const win = getCurrentWindow();
+        return await win.isMaximized();
+      } catch (e) {
+        console.warn('Tauri isMaximized error:', e);
+      }
+    }
+    return false;
+  }
   static async close(): Promise<void> {
     if (this.isTauri()) {
       try {

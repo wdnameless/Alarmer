@@ -1,4 +1,6 @@
-class SoundService {
+import { EdgeTtsService } from './edgeTts';
+
+export class SoundService {
   private ctx: AudioContext | null = null;
 
   private getContext(): AudioContext {
@@ -62,12 +64,20 @@ class SoundService {
   }
 
   // TTS Speech Synthesis voice announcement
-  speak(text: string, volume = 0.9) {
-    if (!('speechSynthesis' in window)) {
-      console.warn('Speech synthesis not supported');
-      return;
+  // Voice announcement: checks active voice setting. Defaults to 'none' (disabled)
+  speak(text: string, voiceId?: string) {
+    const savedVoice = voiceId || localStorage.getItem('alarmer_voice_id') || 'none';
+    if (savedVoice === 'none') {
+      return; // Disabled by default
     }
+    EdgeTtsService.speak(text, savedVoice);
+  }
 
+  stopSpeaking() {
+    EdgeTtsService.stop();
+  }
+
+  legacySpeak(text: string, volume = 0.9) {
     try {
       window.speechSynthesis.cancel(); // stop current
       const utterance = new SpeechSynthesisUtterance(text);

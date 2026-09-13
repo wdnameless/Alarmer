@@ -113,6 +113,14 @@ export const TitleBar: React.FC<TitleBarProps> = ({
           <Minus size={15} strokeWidth={2.5} />
         </button>
 
+        {/* Maximize / Restore to full screen */}
+        <button
+          onClick={() => WindowService.toggleMaximize()}
+          title="Развернуть на весь экран"
+          className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/15 active:scale-95 transition-all text-white/80"
+        >
+          <Maximize2 size={13} strokeWidth={2.2} />
+        </button>
         {/* Close (matches reference ✕) */}
         <button
           onClick={async () => {

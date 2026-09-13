@@ -7,6 +7,7 @@ import {
   Sparkles,
   Palette,
   Check,
+  Settings as SettingsIcon,
 } from 'lucide-react';
 import { TitleBar } from './components/TitleBar';
 import { Timer } from './components/Timer';
@@ -21,6 +22,7 @@ import {
   DEFAULT_ALARMS,
   DEFAULT_WORKOUT_ROUTINES,
 } from './constants/defaults';
+import { SettingsView } from './components/SettingsView';
 import { windowService } from './services/window';
 import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
@@ -164,7 +166,7 @@ export const App: React.FC = () => {
       {/* Main App Container */}
       <div className="flex-1 flex flex-col items-center justify-between p-3 overflow-y-auto">
         {/* Navigation Tabs (Hidden in ultra-compact view for floating pill look) */}
-        {!isCompact && (
+        {true && (
           <div
             className="flex items-center justify-between w-full p-1 mb-2 rounded-xl border transition-colors"
             style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
@@ -238,6 +240,19 @@ export const App: React.FC = () => {
                 title="AI Ассистент тренировок"
               >
                 <Sparkles size={16} />
+              </button>
+              <button
+                onClick={() => handleSelectTab('settings')}
+                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center transition-all ${
+                  activeTab === 'settings' ? 'font-bold' : 'opacity-60 hover:opacity-100'
+                }`}
+                style={{
+                  backgroundColor: activeTab === 'settings' ? `${theme.accent}25` : 'transparent',
+                  color: activeTab === 'settings' ? theme.accent : theme.text,
+                }}
+                title="Настройки озвучки и AI"
+              >
+                <SettingsIcon size={16} />
               </button>
             </div>
 
@@ -331,9 +346,19 @@ export const App: React.FC = () => {
               onUpdateAISettings={setAISettings}
               onSelectRoutine={handleSelectRoutine}
               onApplyAlarms={setAlarms}
-              onSwitchTab={setActiveTab}
             />
           )}
+
+          {activeTab === 'settings' && (
+            <SettingsView
+              theme={theme}
+              aiSettings={aiSettings}
+              currentUi={dynamicUi}
+              onUpdateAISettings={setAISettings}
+              onUpdateUI={setDynamicUi}
+            />
+          )}
+
 
           {/* Universal AI Co-Pilot & UI Compiler Drawer */}
           <AIChatDrawer
