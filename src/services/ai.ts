@@ -294,8 +294,18 @@ export class AIService {
   }
   private static localFallbackParser(prompt: string): string {
     const lower = prompt.toLowerCase();
-    const timeMatches = prompt.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g);
 
+    // If user asks about capabilities
+    if (lower.includes('что ты умеешь') || lower.includes('что умеешь') || lower.includes('помощь') || lower.includes('help') || lower.includes('возможности')) {
+      return JSON.stringify({
+        hasAlarms: false,
+        hasWorkout: false,
+        alarms: [],
+        summary: `Я — AI Co-Pilot платформы Alarmer. Вот что я умею:\n\n1. 🎨 **Генерировать интерфейс на лету** — напиши мне, в каких цветах, стиле (киберпанк, AMOLED, минимал) и с какими элементами ты хочешь видеть таймер.\n2. ⏰ **Настраивать умные будильники** — напиши расписание (например: «Поставь будильник на 07:00 и 21:30 по будням»), и я рассчитаю время, дни и голосовые фразы.\n3. 🏋️‍♂️ **Составлять программы тренировок** — HIIT, Табата, разминка, растяжка с автоматическим расчетом подходов и интервалов.\n4. 🗣 **Озвучивать события** — через Edge Neural TTS или локальный синтез.\n5. 🪄 **Управлять приложением** — таймерами, отсчетом и окном через единый интерфейс.`,
+      });
+    }
+
+    const timeMatches = prompt.match(/\b([01]?\d|2[0-3]):([0-5]\d)\b/g);
     const alarms = [];
     if (timeMatches && timeMatches.length > 0) {
       for (const t of timeMatches) {

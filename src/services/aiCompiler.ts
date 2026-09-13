@@ -144,11 +144,20 @@ export class AICompilerService {
     currentUi: DynamicUIConfig
   ): AIPlatformMutation {
     const lower = prompt.toLowerCase();
+
+    // If asking for capabilities
+    if (lower.includes('что ты умеешь') || lower.includes('что умеешь') || lower.includes('помощь') || lower.includes('help')) {
+      return {
+        type: 'hybrid',
+        explanation: `Я — твой персональный AI Co-Pilot для Alarmer. Вот весь мой арсенал:\n\n✨ 1. Генеративный UI: напиши мне любой стиль (например: «Сделай фиолетовый киберпанк с круглыми кнопками», «Убери засечки и пресеты, сделай AMOLED»).\n⏰ 2. Умные будильники: напиши расписание (например: «Будильник на 07:00 и 21:30 по будням с напоминанием о беге»).\n🏋️‍♂️ 3. Фитнес-сценарии: составлю Табату, HIIT или разминку со звуковым сопровождением и голосовыми инструкциями.\n🗣 4. Озвучка: могу говорить через нейронные голоса Microsoft Edge Neural TTS или работать без звука.\n⚙️ 5. Управление: полное управление окном, таймером и режимами.`,
+        autoApply: false,
+      };
+    }
+
     const cloned = JSON.parse(JSON.stringify(currentUi)) as DynamicUIConfig;
 
     let explanation = 'ИИ применил изменения по вашему описанию: ';
     const changes: string[] = [];
-
     // Colors & Palettes
     if (lower.includes('киберпанк') || lower.includes('cyberpunk') || lower.includes('розов')) {
       cloned.themeName = 'Cyberpunk AI';

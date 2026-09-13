@@ -119,7 +119,7 @@ export const AITrainer: React.FC<AITrainerProps> = ({
         <div className="flex items-center space-x-2">
           <Bot size={20} style={{ color: theme.accent }} />
           <span className="text-sm font-semibold tracking-wider uppercase opacity-80">
-            ИИ Распорядитель & Тренер
+            AI Co-Pilot
           </span>
         </div>
         <button

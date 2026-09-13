@@ -237,7 +237,7 @@ export const App: React.FC = () => {
                   backgroundColor: activeTab === 'ai' ? `${theme.accent}25` : 'transparent',
                   color: activeTab === 'ai' ? theme.accent : theme.text,
                 }}
-                title="AI Ассистент тренировок"
+                title="AI Co-Pilot"
               >
                 <Sparkles size={16} />
               </button>
