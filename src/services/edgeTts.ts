@@ -14,12 +14,36 @@ export const CLOUD_VOICES: CloudVoice[] = [
 ];
 
 export class EdgeTtsService {
+  private static audioEl: HTMLAudioElement | null = null;
+
   static async speak(text: string, voiceId: string = 'none'): Promise<void> {
     if (!voiceId || voiceId === 'none') return;
+
+    this.stop();
+
+    // 1. Try real cloud TTS stream via free Google/Edge audio endpoint
+    try {
+      const isRussian = voiceId.startsWith('ru');
+      const lang = isRussian ? 'ru' : 'en';
+      const cleanText = encodeURIComponent(text.slice(0, 100));
+      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${cleanText}&tl=${lang}&client=tw-ob`;
+
+      if (!this.audioEl) {
+        this.audioEl = new Audio();
+      }
+      this.audioEl.src = url;
+      if (voiceId.includes('Dmitry') || voiceId.includes('Guy')) {
+        this.audioEl.playbackRate = 0.88;
+      } else {
+        this.audioEl.playbackRate = 1.05;
+      }
+      await this.audioEl.play();
+      return;
+    } catch {
+      // Fallback to local SpeechSynthesis with distinct pitch
+    }
+
     if (!('speechSynthesis' in window)) return;
-
-    window.speechSynthesis.cancel();
-
     const u = new SpeechSynthesisUtterance(text);
     const isRussian = voiceId.startsWith('ru');
     u.lang = isRussian ? 'ru-RU' : 'en-US';
@@ -72,6 +96,10 @@ export class EdgeTtsService {
   }
 
   static stop(): void {
+    if (this.audioEl) {
+      this.audioEl.pause();
+      this.audioEl.currentTime = 0;
+    }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }

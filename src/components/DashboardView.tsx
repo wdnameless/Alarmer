@@ -6,6 +6,7 @@ import { WorkoutPlayer } from "./WorkoutPlayer";
 import { Alarms } from "./Alarms";
 import { Timer as TimerIcon, Watch, Flame, Bell } from "lucide-react";
 import { I18nService } from "../services/i18n";
+import { soundService } from "../services/sound";
 
 interface DashboardViewProps {
   theme: ThemeColors;
@@ -44,7 +45,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           placeholder="Быстрый старт (напр: рефакторинг 45m)"
           onKeyDown={(e) => {
             if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-              alert(`Сессия «${e.currentTarget.value.trim()}» запущена!`);
+              const val = e.currentTarget.value.trim();
+              soundService.playCountdownTick();
+              soundService.speak(`Задача ${val} запущена!`);
               e.currentTarget.value = '';
             }
           }}
