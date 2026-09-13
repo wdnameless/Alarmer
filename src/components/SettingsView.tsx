@@ -39,7 +39,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return localStorage.getItem('alarmer_sound_profile') || 'neon';
   });
   const [clockTick, setClockTick] = useState<boolean>(() => {
-    return localStorage.getItem('alarmer_clock_tick') === 'true';
+    return localStorage.getItem('alarmer_clock_tick') !== 'false';
   });
   const [clickVolume, setClickVolume] = useState<number>(() => {
     return parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');

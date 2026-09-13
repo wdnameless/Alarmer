@@ -96,10 +96,9 @@ export const Timer: React.FC<TimerProps> = ({
     setRemainingSeconds(min * 60);
   };
 
-  // Dial progress 0..1
-  // Progress represents remaining time so arc shrinks counter-clockwise towards zero
-  const progress = totalSeconds > 0 ? remainingSeconds / totalSeconds : 0;
-
+  // Dial progress 0..1 based on 60 minutes full circle!
+  // So 26m is exactly ~0.43 of circle, and shrinks towards 0!
+  const progress = Math.max(0, Math.min(1, remainingSeconds / 3600));
   // Format digital stopwatch format matching reference: 00:00:00
   const formatSubDigital = (sec: number) => {
     const h = Math.floor(sec / 3600);

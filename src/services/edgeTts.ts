@@ -40,15 +40,31 @@ export class EdgeTtsService {
     }
 
     // Find the best native matching voice from installed system voices
-    const voices = window.speechSynthesis.getVoices();
+    // Get available voices dynamically
+    let voices = window.speechSynthesis.getVoices();
+    if (voices.length === 0) {
+      await new Promise<void>((resolve) => {
+        window.speechSynthesis.onvoiceschanged = () => resolve();
+        setTimeout(resolve, 150);
+      });
+      voices = window.speechSynthesis.getVoices();
+    }
+
     if (voices.length > 0) {
-      const targetGender = voiceId.includes('Dmitry') || voiceId.includes('Guy') ? 'male' : 'female';
-      const langVoices = voices.filter((v) => v.lang.startsWith(isRussian ? 'ru' : 'en'));
-      const genderMatch = langVoices.find((v) => v.name.toLowerCase().includes(targetGender));
+      const isMale = voiceId.includes('Dmitry') || voiceId.includes('Guy');
+      const langPrefix = isRussian ? 'ru' : 'en';
+      const matchingLang = voices.filter((v) => v.lang.toLowerCase().startsWith(langPrefix));
+
+      // Try to find matching gender in name or voice URI
+      const genderMatch = matchingLang.find((v) => {
+        const n = v.name.toLowerCase();
+        return isMale ? (n.includes('male') || n.includes('david') || n.includes('dmitry') || n.includes('pavel') || n.includes('george')) : (n.includes('female') || n.includes('zira') || n.includes('irina') || n.includes('svetlana') || n.includes('jenny'));
+      });
+
       if (genderMatch) {
         u.voice = genderMatch;
-      } else if (langVoices.length > 0) {
-        u.voice = langVoices[0];
+      } else if (matchingLang.length > 0) {
+        u.voice = matchingLang[0];
       }
     }
 
