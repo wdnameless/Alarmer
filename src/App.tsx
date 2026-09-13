@@ -28,7 +28,7 @@ export const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<AppMode>('dashboard');
   const [themeKey] = useState<ThemeKey>('dark-neon');
   const [isCompact, setIsCompact] = useState(true);
-  const [isPinned, setIsPinned] = useState(true);
+  const [isPinned, setIsPinned] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   // Dynamic AI-driven UI Configuration
   const [dynamicUi, setDynamicUi] = useState<DynamicUIConfig>(() => {
@@ -226,13 +226,14 @@ export const App: React.FC = () => {
             <AITrainer
               theme={theme}
               aiSettings={aiSettings}
+              currentUi={dynamicUi}
               alarms={alarms}
               onUpdateAISettings={setAISettings}
               onSelectRoutine={handleSelectRoutine}
               onApplyAlarms={setAlarms}
+              onApplyUI={(newUi) => setDynamicUi(newUi)}
             />
           )}
-
           {activeTab === 'settings' && (
             <SettingsView
               theme={theme}

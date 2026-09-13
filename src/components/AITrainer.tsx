@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Send, Loader2, Bot, PlayCircle, Bell, Check, User } from 'lucide-react';
-import { ThemeColors, AISettings, WorkoutRoutine, AlarmItem } from '../types';
-import { AIService, AIPlanResult } from '../services/ai';
+import { ThemeColors, AISettings, WorkoutRoutine, AlarmItem, DynamicUIConfig } from '../types';
+import { AIPlanResult } from '../services/ai';
+import { AICompilerService } from '../services/aiCompiler';
 import { soundService } from '../services/sound';
 
 interface ChatMessage {
@@ -15,19 +16,23 @@ interface ChatMessage {
 interface AITrainerProps {
   theme: ThemeColors;
   aiSettings: AISettings;
+  currentUi: DynamicUIConfig;
   alarms?: AlarmItem[];
   onUpdateAISettings: (settings: AISettings) => void;
   onSelectRoutine: (routine: WorkoutRoutine) => void;
   onApplyAlarms?: (alarms: AlarmItem[]) => void;
+  onApplyUI?: (ui: DynamicUIConfig) => void;
   onSwitchTab?: (tab: 'workout' | 'alarm') => void;
 }
 
 export const AITrainer: React.FC<AITrainerProps> = ({
   theme,
   aiSettings,
-  alarms = [],
+  currentUi,
+  alarms: _alarms = [],
   onSelectRoutine,
   onApplyAlarms,
+  onApplyUI,
 }) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
@@ -71,16 +76,33 @@ export const AITrainer: React.FC<AITrainerProps> = ({
     setLoading(true);
 
     try {
-      const plan = await AIService.orchestratePlan(query, aiSettings, alarms);
+      // Execute AICompiler for deep live UI transformation, alarms & workouts
+      const mutation = await AICompilerService.compileUserIntent(query, currentUi, aiSettings);
+      if (mutation.ui && onApplyUI) {
+        onApplyUI({
+          ...currentUi,
+          ...mutation.ui,
+          colors: { ...currentUi.colors, ...(mutation.ui.colors || {}) },
+          dial: { ...currentUi.dial, ...(mutation.ui.dial || {}) },
+          typography: { ...currentUi.typography, ...(mutation.ui.typography || {}) },
+          layout: { ...currentUi.layout, ...(mutation.ui.layout || {}) },
+        });
+      }
+      if (mutation.alarms && mutation.alarms.length > 0 && onApplyAlarms) {
+        onApplyAlarms(mutation.alarms);
+      }
+      if (mutation.workout && onSelectRoutine) {
+        onSelectRoutine(mutation.workout);
+      }
+
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'assistant',
-        text: plan.summary || 'План успешно сформирован!',
-        result: plan,
+        text: mutation.explanation || 'Изменения успешно применены!',
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
       setMessages((prev) => [...prev, assistantMsg]);
-      if (plan.summary) soundService.speak(plan.summary);
+      if (mutation.explanation) soundService.speak(mutation.explanation);
     } catch (err: unknown) {
       console.error(err);
       const errMessage = err instanceof Error ? err.message : 'Ошибка обработки запроса';
