@@ -60,14 +60,41 @@ export class SoundService {
     }
   }
 
-  // Real watch second tick (mechanical woodblock/pendulum tick)
-  playClockTick() {
+  // Authentic acoustic escapement clock tick (dual-frequency woodblock / pallet fork click)
+  playClockTick(isTock = false) {
     const enabled = localStorage.getItem('alarmer_clock_tick') === 'true';
     if (!enabled) return;
-    const clickVol = parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');
-    this.playBeep(1200, 0.015, 0.12 * clickVol);
-  }
+    try {
+      const ctx = this.getContext();
+      const now = ctx.currentTime;
+      const clickVol = parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');
 
+      // "Tick" is slightly higher pitched, "Tock" is lower and rounder
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      const filter = ctx.createBiquadFilter();
+
+      osc.type = 'triangle';
+      osc.frequency.setValueAtTime(isTock ? 780 : 1150, now);
+      osc.frequency.exponentialRampToValueAtTime(isTock ? 300 : 500, now + 0.025);
+
+      filter.type = 'bandpass';
+      filter.frequency.setValueAtTime(isTock ? 650 : 1100, now);
+      filter.Q.setValueAtTime(3.0, now);
+
+      gain.gain.setValueAtTime(0.25 * clickVol, now);
+      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
+
+      osc.connect(filter);
+      filter.connect(gain);
+      gain.connect(ctx.destination);
+
+      osc.start(now);
+      osc.stop(now + 0.03);
+    } catch (e) {
+      console.warn('Clock tick error:', e);
+    }
+  }
   playCountdownTick() {
     const enabled = localStorage.getItem('alarmer_countdown_ticks') !== 'false';
     if (!enabled) return;

@@ -177,6 +177,27 @@ export const Alarms: React.FC<AlarmsProps> = ({
         </div>
         <div className="flex items-center space-x-2">
           <button
+            onClick={() => {
+              // Reverse Sleep Alarm shortcut
+              const sleepAlarm: AlarmItem = {
+                id: 'sleep_' + Date.now(),
+                title: 'Отход ко сну (Wind-down)',
+                time: '23:00',
+                days: [0, 1, 2, 3, 4, 5, 6],
+                enabled: true,
+                sound: 'gentle',
+                voicePrompt: 'Пора готовиться ко сну. Закрой рабочие вкладки и отдохни.',
+              };
+              onUpdateAlarms([sleepAlarm, ...alarms]);
+              soundService.playUiClick();
+              soundService.speak('Будильник ко сну установлен на 23:00');
+            }}
+            className="flex items-center space-x-1 px-2 py-1 text-[11px] font-semibold rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 transition-all"
+            title="Reverse Alarm: Будильник ко сну (за 45 мин до отдыха)"
+          >
+            <span>🌙 Ко сну</span>
+          </button>
+          <button
             onClick={() => setShowAiModal(true)}
             className="flex items-center space-x-1 px-2.5 py-1 text-xs font-bold rounded-lg transition-all shadow-sm"
             style={{

@@ -21,6 +21,10 @@ export const Timer: React.FC<TimerProps> = ({
   const [totalSeconds, setTotalSeconds] = useState(initialMinutes * 60);
   const [remainingSeconds, setRemainingSeconds] = useState(initialMinutes * 60);
   const [isRunning, setIsRunning] = useState(false);
+  const [isOvertime, setIsOvertime] = useState(false);
+  const [overtimeSec, setOvertimeSec] = useState(0);
+  const [flowMode, setFlowMode] = useState(true);
+  const [workRhythm, setWorkRhythm] = useState<'classic' | 'deep50' | 'ultradian' | 'sprint'>('classic');
 
   // Synchronize when initialMinutes preset changes
   useEffect(() => {
@@ -40,12 +44,21 @@ export const Timer: React.FC<TimerProps> = ({
             if (prev <= 4) {
               soundService.playCountdownTick();
             } else {
-              soundService.playUiClick();
+              soundService.playClockTick(prev % 2 === 0);
             }
             return prev - 1;
           }
 
-          // prev is 1 -> reach 0
+          // Time reached 0
+          if (flowMode) {
+            // FLOW EXTENSION: soft chime, switch to overtime without jarring alert
+            soundService.playBeep(520, 0.25, 0.25);
+            setIsRunning(false);
+            setIsOvertime(true);
+            setOvertimeSec(1);
+            return 0;
+          }
+
           setIsRunning(false);
           soundService.playFinishAlarm();
           soundService.speak('Время вышло!');
@@ -54,9 +67,16 @@ export const Timer: React.FC<TimerProps> = ({
           return 0;
         });
       }, 1000);
+    } else if (isOvertime) {
+      timer = window.setInterval(() => {
+        setOvertimeSec((prev) => {
+          soundService.playClockTick(prev % 2 === 0);
+          return prev + 1;
+        });
+      }, 1000);
     }
     return () => window.clearInterval(timer);
-  }, [isRunning, onFinish]);
+  }, [isRunning, isOvertime, flowMode, onFinish]);
 
   const toggleRun = () => {
     soundService.playCountdownTick();
@@ -122,22 +142,79 @@ export const Timer: React.FC<TimerProps> = ({
 
   return (
     <div className={`flex flex-col items-center w-full ${dynamicUi?.layout?.contentAlignment === 'compact' ? 'justify-center my-auto' : ''}`}>
+      {/* Flow Overtime Banner */}
+      {isOvertime && (
+        <div
+          className="flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-mono mb-2 animate-pulse"
+          style={{ backgroundColor: `${theme.accent}20`, color: theme.accent, border: `1px solid ${theme.accent}40` }}
+        >
+          <span>⚡ ПОТОК +{Math.floor(overtimeSec / 60)}:{(overtimeSec % 60).toString().padStart(2, '0')}</span>
+          <button
+            onClick={() => {
+              setIsOvertime(false);
+              setOvertimeSec(0);
+              setRemainingSeconds(totalSeconds);
+            }}
+            className="underline text-[10px] ml-1"
+          >
+            отдых
+          </button>
+        </div>
+      )}
+
+      {/* Ultradian Rhythm Selector: 25/5, 50/10, 90/20, Sprint */}
+      <div className="flex items-center space-x-1 p-0.5 rounded-lg bg-white/5 border border-white/10 text-[10px] mb-2 font-mono">
+        <button
+          onClick={() => {
+            setWorkRhythm('classic');
+            setPresetMinutes(25);
+          }}
+          className={`px-2 py-0.5 rounded ${workRhythm === 'classic' ? 'bg-white/20 font-bold text-white' : 'opacity-60'}`}
+        >
+          25/5
+        </button>
+        <button
+          onClick={() => {
+            setWorkRhythm('deep50');
+            setPresetMinutes(50);
+          }}
+          className={`px-2 py-0.5 rounded ${workRhythm === 'deep50' ? 'bg-white/20 font-bold text-white' : 'opacity-60'}`}
+        >
+          Deep 50
+        </button>
+        <button
+          onClick={() => {
+            setWorkRhythm('ultradian');
+            setPresetMinutes(90);
+          }}
+          className={`px-2 py-0.5 rounded ${workRhythm === 'ultradian' ? 'bg-white/20 font-bold text-white' : 'opacity-60'}`}
+        >
+          90/20
+        </button>
+        <button
+          onClick={() => setFlowMode(!flowMode)}
+          title="Режим продления потока (без резкого звонка)"
+          className={`px-2 py-0.5 rounded transition-colors ${flowMode ? 'text-emerald-400 bg-emerald-500/10 font-bold' : 'opacity-40'}`}
+        >
+          Flow {flowMode ? 'ON' : 'OFF'}
+        </button>
+      </div>
+
       <RadialDial
         theme={theme}
-        progress={progress}
-        primaryText={formatPrimaryTime(remainingSeconds)}
-        secondaryText={dynamicUi?.layout?.showSubtimer !== false ? formatSubDigital(remainingSeconds) : undefined}
-        isInteractive={!isRunning}
+        progress={isOvertime ? 1 : progress}
+        primaryText={isOvertime ? `+${Math.floor(overtimeSec / 60)}:${(overtimeSec % 60).toString().padStart(2, '0')}` : formatPrimaryTime(remainingSeconds)}
+        secondaryText={isOvertime ? 'OVERTIME' : dynamicUi?.layout?.showSubtimer !== false ? formatSubDigital(remainingSeconds) : undefined}
+        isInteractive={!isRunning && !isOvertime}
         onProgressChange={handleProgressChange}
         onProgressCommit={handleProgressCommit}
         showTicks={dynamicUi?.dial?.showTicks ?? true}
         tickLength={dynamicUi?.dial?.tickLength ?? 'normal'}
         fontFamily={dynamicUi?.typography?.fontFamily ?? 'system-ui'}
         timeScale={dynamicUi?.typography?.timeScale ?? 1.0}
-        size={dynamicUi?.dial?.size ?? 190}
+        size={dynamicUi?.dial?.size ?? 180}
         stylePreset={dynamicUi?.dial?.stylePreset ?? 'neon'}
       />
-
       {/* Control Buttons matching reference image */}
       <div className={`grid ${dynamicUi?.layout?.showPresetButtons === false ? 'grid-cols-2 max-w-[150px]' : 'grid-cols-2 max-w-[210px]'} gap-3 mt-4 w-full`}>
         {/* Top-Left: Play / Pause */}
