@@ -40,7 +40,9 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   const dialRadius = radius - 18;
   const circumference = 2 * Math.PI * dialRadius;
   const activeProgress = dragProgress !== null ? dragProgress : Math.max(0, Math.min(1, progress));
-  const strokeDashoffset = circumference - activeProgress * circumference;
+  // SVG strokeDasharray and strokeDashoffset:
+  // When activeProgress = 0.5 (30m), dasharray is [halfCircumference, circumference]
+  const arcLength = activeProgress * circumference;
   // Knob coordinate calculations (-90 deg offset so 0 starts at top)
   const angle = activeProgress * 2 * Math.PI - Math.PI / 2;
   const knobX = radius + dialRadius * Math.cos(angle);
@@ -188,13 +190,13 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           r={dialRadius}
           stroke={theme.ringProgress}
           strokeWidth={strokeWidth}
-          strokeDasharray={circumference}
-          strokeDashoffset={strokeDashoffset}
+          strokeDasharray={`${arcLength} ${circumference}`}
+          strokeDashoffset={0}
           strokeLinecap="round"
           fill="none"
           transform={`rotate(-90 ${radius} ${radius})`}
           filter="url(#glow)"
-          style={{ transition: dragProgress !== null ? 'none' : 'stroke-dashoffset 0.8s ease' }}
+          style={{ transition: dragProgress !== null ? 'none' : 'stroke-dasharray 0.8s ease' }}
         />
 
         {/* Vintage Style: Roman Clock Hour Numerals / Chronograph ticks */}

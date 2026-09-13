@@ -1,4 +1,5 @@
 import { EdgeTtsService } from './edgeTts';
+import { ticking } from '../constants/defaults';
 
 export class SoundService {
   private ctx: AudioContext | null = null;
@@ -60,37 +61,20 @@ export class SoundService {
     }
   }
 
-  // Authentic acoustic escapement clock tick (dual-frequency woodblock / pallet fork click)
-  playClockTick(isTock = false) {
+  private tickingAudio: HTMLAudioElement | null = null;
+
+  // Play user-supplied FLAC clock tick audio
+  playClockTick(_isTock = false) {
     const enabled = localStorage.getItem('alarmer_clock_tick') !== 'false';
     if (!enabled) return;
     try {
-      const ctx = this.getContext();
-      const now = ctx.currentTime;
-      const clickVol = parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');
-
-      // "Tick" is slightly higher pitched, "Tock" is lower and rounder
-      const osc = ctx.createOscillator();
-      const gain = ctx.createGain();
-      const filter = ctx.createBiquadFilter();
-
-      osc.type = 'triangle';
-      osc.frequency.setValueAtTime(isTock ? 780 : 1150, now);
-      osc.frequency.exponentialRampToValueAtTime(isTock ? 300 : 500, now + 0.025);
-
-      filter.type = 'bandpass';
-      filter.frequency.setValueAtTime(isTock ? 650 : 1100, now);
-      filter.Q.setValueAtTime(3.0, now);
-
-      gain.gain.setValueAtTime(0.25 * clickVol, now);
-      gain.gain.exponentialRampToValueAtTime(0.001, now + 0.03);
-
-      osc.connect(filter);
-      filter.connect(gain);
-      gain.connect(ctx.destination);
-
-      osc.start(now);
-      osc.stop(now + 0.03);
+      const clickVol = parseFloat(localStorage.getItem('alarmer_click_volume') || '0.7');
+      if (!this.tickingAudio) {
+        this.tickingAudio = new Audio(ticking);
+      }
+      this.tickingAudio.volume = Math.max(0, Math.min(1, clickVol));
+      this.tickingAudio.currentTime = 0;
+      this.tickingAudio.play().catch(() => {});
     } catch (e) {
       console.warn('Clock tick error:', e);
     }
