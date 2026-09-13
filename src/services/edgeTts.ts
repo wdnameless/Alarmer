@@ -14,41 +14,48 @@ export const CLOUD_VOICES: CloudVoice[] = [
 ];
 
 export class EdgeTtsService {
-  private static audio: HTMLAudioElement | null = null;
-
   static async speak(text: string, voiceId: string = 'none'): Promise<void> {
-    if (!voiceId || voiceId === 'none') {
-      return;
+    if (!voiceId || voiceId === 'none') return;
+    if (!('speechSynthesis' in window)) return;
+
+    window.speechSynthesis.cancel();
+
+    const u = new SpeechSynthesisUtterance(text);
+    const isRussian = voiceId.startsWith('ru');
+    u.lang = isRussian ? 'ru-RU' : 'en-US';
+
+    // Differentiate male vs female voice profiles distinctly
+    if (voiceId === 'ru-RU-DmitryNeural') {
+      u.pitch = 0.72; // Deep authoritative male pitch
+      u.rate = 0.95;
+    } else if (voiceId === 'ru-RU-SvetlanaNeural') {
+      u.pitch = 1.35; // Bright melodious female pitch
+      u.rate = 1.02;
+    } else if (voiceId === 'en-US-GuyNeural') {
+      u.pitch = 0.8;
+      u.rate = 0.98;
+    } else if (voiceId === 'en-US-JennyNeural') {
+      u.pitch = 1.3;
+      u.rate = 1.05;
     }
 
-    try {
-      if (this.audio) {
-        this.audio.pause();
-        this.audio = null;
-      }
-
-      // Encode for cloud synthesis endpoint
-      const encodedText = encodeURIComponent(text);
-      const url = `https://translate.google.com/translate_tts?ie=UTF-8&q=${encodedText}&tl=${voiceId.startsWith('ru') ? 'ru' : 'en'}&client=tw-ob`;
-
-      this.audio = new Audio(url);
-      await this.audio.play();
-    } catch (e) {
-      console.warn('TTS playback error, falling back to Web Speech:', e);
-      if ('speechSynthesis' in window) {
-        window.speechSynthesis.cancel();
-        const u = new SpeechSynthesisUtterance(text);
-        u.lang = voiceId.startsWith('ru') ? 'ru-RU' : 'en-US';
-        window.speechSynthesis.speak(u);
+    // Find the best native matching voice from installed system voices
+    const voices = window.speechSynthesis.getVoices();
+    if (voices.length > 0) {
+      const targetGender = voiceId.includes('Dmitry') || voiceId.includes('Guy') ? 'male' : 'female';
+      const langVoices = voices.filter((v) => v.lang.startsWith(isRussian ? 'ru' : 'en'));
+      const genderMatch = langVoices.find((v) => v.name.toLowerCase().includes(targetGender));
+      if (genderMatch) {
+        u.voice = genderMatch;
+      } else if (langVoices.length > 0) {
+        u.voice = langVoices[0];
       }
     }
+
+    window.speechSynthesis.speak(u);
   }
 
   static stop(): void {
-    if (this.audio) {
-      this.audio.pause();
-      this.audio = null;
-    }
     if ('speechSynthesis' in window) {
       window.speechSynthesis.cancel();
     }

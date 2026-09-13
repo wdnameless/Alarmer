@@ -31,17 +31,16 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   stylePreset = 'neon',
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
-  const [isDragging, setIsDragging] = useState(false);
+  const [dragProgress, setDragProgress] = useState<number | null>(null);
 
   const radius = size / 2;
   const strokeWidth = 5;
   const dialRadius = radius - 18;
   const circumference = 2 * Math.PI * dialRadius;
-  const clampedProgress = Math.max(0, Math.min(1, progress));
-  const strokeDashoffset = circumference - clampedProgress * circumference;
-
+  const activeProgress = dragProgress !== null ? dragProgress : Math.max(0, Math.min(1, progress));
+  const strokeDashoffset = circumference - activeProgress * circumference;
   // Knob coordinate calculations (-90 deg offset so 0 starts at top)
-  const angle = clampedProgress * 2 * Math.PI - Math.PI / 2;
+  const angle = activeProgress * 2 * Math.PI - Math.PI / 2;
   const knobX = radius + dialRadius * Math.cos(angle);
   const knobY = radius + dialRadius * Math.sin(angle);
 
@@ -63,15 +62,15 @@ export const RadialDial: React.FC<RadialDialProps> = ({
       // atan2 returns angle in [-PI, PI], 0 is at (1, 0)
       let theta = Math.atan2(dy, dx) + Math.PI / 2;
       if (theta < 0) theta += 2 * Math.PI;
-      const p = theta / (2 * Math.PI);
-      onProgressChange?.(Math.round(p * 100) / 100);
+      const p = Math.max(0, Math.min(1, theta / (2 * Math.PI)));
+      setDragProgress(p);
+      onProgressChange?.(p);
     },
     [onProgressChange]
   );
 
   const handlePointerDown = (e: React.PointerEvent) => {
     if (!isInteractive) return;
-    setIsDragging(true);
     try {
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
     } catch {}
@@ -79,13 +78,14 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   };
 
   const handlePointerMove = (e: React.PointerEvent) => {
-    if (!isDragging || !isInteractive) return;
+    if (dragProgress === null || !isInteractive) return;
     calculateProgressFromEvent(e.clientX, e.clientY);
   };
-
   const handlePointerUp = (e: React.PointerEvent) => {
-    if (!isDragging) return;
-    setIsDragging(false);
+    if (dragProgress !== null) {
+      onProgressChange?.(dragProgress);
+      setDragProgress(null);
+    }
     try {
       (e.currentTarget as Element).releasePointerCapture(e.pointerId);
     } catch {}
@@ -106,7 +106,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
     const y2 = radius + innerR * Math.sin(tickAngle);
 
     const tickProgress = i / totalTicks;
-    const isActive = tickProgress <= clampedProgress;
+    const isActive = tickProgress <= activeProgress;
 
     return {
       id: i,
