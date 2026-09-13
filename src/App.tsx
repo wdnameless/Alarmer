@@ -140,14 +140,12 @@ export const App: React.FC = () => {
   };
 
   return (
-    <div className="w-screen h-screen flex items-center justify-center p-0 md:p-4 bg-transparent overflow-hidden">
+    <div className="w-screen h-screen m-0 p-0 bg-transparent overflow-hidden select-none">
       <div
-        className={`relative flex flex-col rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 border select-none ${
-          isCompact ? 'w-[250px] h-[410px]' : 'w-full max-w-[460px] h-full max-h-[640px]'
-        }`}
+        className="relative w-full h-full flex flex-col rounded-2xl overflow-hidden shadow-2xl border transition-colors duration-200"
         style={{
           backgroundColor: theme.bg,
-          borderColor: theme.accent,
+          borderColor: `${theme.accent}55`,
           color: theme.text,
           filter: dynamicUi.dial.glowIntensity === 'high' ? `drop-shadow(0 0 15px ${theme.accent}33)` : undefined,
         }}

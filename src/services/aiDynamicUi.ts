@@ -48,8 +48,10 @@ Return ONLY a valid JSON matching this TypeScript type:
   },
   "layout": {
     "showPresetButtons": boolean,
+    "showSubtimer": boolean,
     "buttonStyle": "rounded" | "square" | "pill",
-    "glassmorphism": boolean
+    "glassmorphism": boolean,
+    "contentAlignment": "center" | "top" | "compact"
   }
 }
 Do not write markdown formatting or explanations. Output pure JSON only.`;

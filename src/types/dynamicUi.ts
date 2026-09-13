@@ -25,8 +25,10 @@ export interface DynamicUIConfig {
   };
   layout: {
     showPresetButtons: boolean;
+    showSubtimer: boolean;
     buttonStyle: 'rounded' | 'square' | 'pill';
     glassmorphism: boolean;
+    contentAlignment: 'center' | 'top' | 'compact';
   };
 }
 
@@ -57,7 +59,9 @@ export const DEFAULT_DYNAMIC_UI: DynamicUIConfig = {
   },
   layout: {
     showPresetButtons: true,
+    showSubtimer: true,
     buttonStyle: 'rounded',
     glassmorphism: true,
+    contentAlignment: 'center',
   },
 };

@@ -20,9 +20,9 @@ export class WindowService {
     if (this.isTauri()) {
       try {
         const win = getCurrentWindow();
-        await win.close();
+        await win.hide();
       } catch (e) {
-        console.warn('Tauri close error:', e);
+        console.warn('Tauri hide error:', e);
       }
     }
   }

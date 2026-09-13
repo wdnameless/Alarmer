@@ -101,28 +101,35 @@ export const Timer: React.FC<TimerProps> = ({
     }
   };
 
+  const btnRounding =
+    dynamicUi?.layout?.buttonStyle === 'pill'
+      ? 'rounded-full'
+      : dynamicUi?.layout?.buttonStyle === 'square'
+      ? 'rounded-md'
+      : 'rounded-2xl';
+
   return (
-    <div className="flex flex-col items-center w-full">
+    <div className={`flex flex-col items-center w-full ${dynamicUi?.layout?.contentAlignment === 'compact' ? 'justify-center my-auto' : ''}`}>
       <RadialDial
         theme={theme}
         progress={progress}
         primaryText={formatPrimaryTime(remainingSeconds)}
-        secondaryText={formatSubDigital(remainingSeconds)}
+        secondaryText={dynamicUi?.layout?.showSubtimer !== false ? formatSubDigital(remainingSeconds) : undefined}
         isInteractive={!isRunning}
         onProgressChange={handleProgressChange}
         showTicks={dynamicUi?.dial?.showTicks ?? true}
         tickLength={dynamicUi?.dial?.tickLength ?? 'normal'}
         fontFamily={dynamicUi?.typography?.fontFamily ?? 'system-ui'}
         timeScale={dynamicUi?.typography?.timeScale ?? 1.0}
+        size={dynamicUi?.dial?.size ?? 200}
       />
 
       {/* Control Buttons matching reference image */}
-      {/* Control grid matching screenshot 1-to-1 */}
-      <div className="grid grid-cols-2 gap-3 mt-4 w-full max-w-[210px]">
+      <div className={`grid ${dynamicUi?.layout?.showPresetButtons === false ? 'grid-cols-2 max-w-[150px]' : 'grid-cols-2 max-w-[210px]'} gap-3 mt-4 w-full`}>
         {/* Top-Left: Play / Pause */}
         <button
           onClick={toggleRun}
-          className="h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-95 shadow-md"
+          className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 shadow-md`}
           style={{
             backgroundColor: theme.cardBg,
             border: `1.5px solid ${isRunning ? theme.accent : theme.border}`,
@@ -136,7 +143,7 @@ export const Timer: React.FC<TimerProps> = ({
         {/* Top-Right: Stopwatch / Lap icon */}
         <button
           onClick={reset}
-          className="h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-95 shadow-md"
+          className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 shadow-md`}
           style={{
             backgroundColor: theme.cardBg,
             border: `1.5px solid ${theme.border}`,
@@ -147,42 +154,47 @@ export const Timer: React.FC<TimerProps> = ({
           <RotateCcw size={22} />
         </button>
 
-        {/* Bottom-Left: SET button */}
-        <button
-          onClick={() => {
-            const nextMins = totalSeconds === 25 * 60 ? 15 : totalSeconds === 15 * 60 ? 5 : 25;
-            setPresetMinutes(nextMins);
-          }}
-          className="h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-95 font-black text-sm tracking-wider shadow-md"
-          style={{
-            backgroundColor: theme.cardBg,
-            border: `1.5px solid ${theme.border}`,
-            color: theme.text,
-          }}
-          title="Сменить пресет времени"
-        >
-          SET
-        </button>
+        {/* Optional Preset Buttons */}
+        {dynamicUi?.layout?.showPresetButtons !== false && (
+          <>
+            {/* Bottom-Left: SET button */}
+            <button
+              onClick={() => {
+                const nextMins = totalSeconds === 25 * 60 ? 15 : totalSeconds === 15 * 60 ? 5 : 25;
+                setPresetMinutes(nextMins);
+              }}
+              className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 font-black text-sm tracking-wider shadow-md`}
+              style={{
+                backgroundColor: theme.cardBg,
+                border: `1.5px solid ${theme.border}`,
+                color: theme.text,
+              }}
+              title="Сменить пресет времени"
+            >
+              SET
+            </button>
 
-        {/* Bottom-Right: Preset Number display (e.g. 25) */}
-        <button
-          onClick={() => {
-            const presets = [5, 10, 15, 20, 25, 30, 45, 60];
-            const curMins = Math.round(totalSeconds / 60);
-            const idx = presets.indexOf(curMins);
-            const next = presets[(idx + 1) % presets.length];
-            setPresetMinutes(next);
-          }}
-          className="h-14 rounded-2xl flex items-center justify-center transition-transform active:scale-95 font-mono font-extrabold text-2xl shadow-md hover:border-emerald-400/50"
-          style={{
-            backgroundColor: theme.cardBg,
-            border: `1.5px solid ${theme.border}`,
-            color: theme.text,
-          }}
-          title="Нажмите чтобы переключить минуты"
-        >
-          {Math.round(totalSeconds / 60)}
-        </button>
+            {/* Bottom-Right: Preset Number display (e.g. 25) */}
+            <button
+              onClick={() => {
+                const presets = [5, 10, 15, 20, 25, 30, 45, 60];
+                const curMins = Math.round(totalSeconds / 60);
+                const idx = presets.indexOf(curMins);
+                const next = presets[(idx + 1) % presets.length];
+                setPresetMinutes(next);
+              }}
+              className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 font-mono font-extrabold text-2xl shadow-md hover:border-emerald-400/50`}
+              style={{
+                backgroundColor: theme.cardBg,
+                border: `1.5px solid ${theme.border}`,
+                color: theme.text,
+              }}
+              title="Нажмите чтобы переключить минуты"
+            >
+              {Math.round(totalSeconds / 60)}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
