@@ -1,19 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import {
   Timer as TimerIcon,
-  Flame,
-  Watch,
-  Bell,
   Sparkles,
   Palette,
   Check,
   Settings as SettingsIcon,
 } from 'lucide-react';
 import { TitleBar } from './components/TitleBar';
-import { Timer } from './components/Timer';
-import { Stopwatch } from './components/Stopwatch';
-import { Alarms } from './components/Alarms';
-import { WorkoutPlayer } from './components/WorkoutPlayer';
+
 import { AITrainer } from './components/AITrainer';
 import { AppMode, ThemeKey, AISettings, AlarmItem, WorkoutRoutine, ThemeColors } from './types';
 import { THEMES } from './constants/themes';
@@ -22,6 +16,7 @@ import {
   DEFAULT_ALARMS,
   DEFAULT_WORKOUT_ROUTINES,
 } from './constants/defaults';
+import { DashboardView } from './components/DashboardView';
 import { SettingsView } from './components/SettingsView';
 import { windowService } from './services/window';
 import { soundService } from './services/sound';
@@ -32,7 +27,7 @@ import { DynamicUIConfig, DEFAULT_DYNAMIC_UI } from './types';
 
 export const App: React.FC = () => {
   // App state
-  const [activeTab, setActiveTab] = useState<AppMode>('timer');
+  const [activeTab, setActiveTab] = useState<AppMode>('dashboard');
   const [themeKey, setThemeKey] = useState<ThemeKey>('dark-neon');
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(true);
@@ -83,7 +78,6 @@ export const App: React.FC = () => {
 
   const [selectedRoutine, setSelectedRoutine] = useState<WorkoutRoutine>(routines[0]);
 
-  // Persist state
   useEffect(() => {
     localStorage.setItem('alarmer_ai_settings', JSON.stringify(aiSettings));
   }, [aiSettings]);
@@ -106,7 +100,7 @@ export const App: React.FC = () => {
     setIsCompact((prev) => {
       const next = !prev;
       if (next) {
-        setActiveTab('timer');
+        setActiveTab('dashboard');
       }
       windowService.toggleCompactMode(next).catch(console.error);
       return next;
@@ -131,7 +125,7 @@ export const App: React.FC = () => {
       setRoutines([routine, ...routines]);
     }
     setSelectedRoutine(routine);
-    setActiveTab('workout');
+    setActiveTab('dashboard');
   };
 
   // Effective theme computed from base theme + dynamic UI overrides
@@ -171,67 +165,26 @@ export const App: React.FC = () => {
             className="flex items-center justify-between w-full p-1 mb-2 rounded-xl border transition-colors"
             style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
           >
-            <div className="flex items-center space-x-1 flex-1">
+            <div className="flex items-center space-x-1.5 flex-1">
               <button
-                onClick={() => handleSelectTab('timer')}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center transition-all ${
-                  activeTab === 'timer' ? 'font-bold' : 'opacity-60 hover:opacity-100'
+                onClick={() => handleSelectTab('dashboard')}
+                className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                  activeTab === 'dashboard' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{
-                  backgroundColor: activeTab === 'timer' ? `${theme.accent}25` : 'transparent',
-                  color: activeTab === 'timer' ? theme.accent : theme.text,
+                  backgroundColor: activeTab === 'dashboard' ? `${theme.accent}25` : 'transparent',
+                  color: activeTab === 'dashboard' ? theme.accent : theme.text,
                 }}
-                title="Таймер Помодоро"
+                title="Единый дашборд: Таймеры, Секундомер, Тренировки, Будильники"
               >
                 <TimerIcon size={16} />
-              </button>
-
-              <button
-                onClick={() => handleSelectTab('workout')}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center transition-all ${
-                  activeTab === 'workout' ? 'font-bold' : 'opacity-60 hover:opacity-100'
-                }`}
-                style={{
-                  backgroundColor: activeTab === 'workout' ? `${theme.accent}25` : 'transparent',
-                  color: activeTab === 'workout' ? theme.accent : theme.text,
-                }}
-                title="Интервальные тренировки"
-              >
-                <Flame size={16} />
-              </button>
-
-              <button
-                onClick={() => handleSelectTab('stopwatch')}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center transition-all ${
-                  activeTab === 'stopwatch' ? 'font-bold' : 'opacity-60 hover:opacity-100'
-                }`}
-                style={{
-                  backgroundColor: activeTab === 'stopwatch' ? `${theme.accent}25` : 'transparent',
-                  color: activeTab === 'stopwatch' ? theme.accent : theme.text,
-                }}
-                title="Секундомер с кругами"
-              >
-                <Watch size={16} />
-              </button>
-
-              <button
-                onClick={() => handleSelectTab('alarm')}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center transition-all ${
-                  activeTab === 'alarm' ? 'font-bold' : 'opacity-60 hover:opacity-100'
-                }`}
-                style={{
-                  backgroundColor: activeTab === 'alarm' ? `${theme.accent}25` : 'transparent',
-                  color: activeTab === 'alarm' ? theme.accent : theme.text,
-                }}
-                title="Будильники и напоминания"
-              >
-                <Bell size={16} />
+                <span className="text-xs">Дашборд</span>
               </button>
 
               <button
                 onClick={() => handleSelectTab('ai')}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center transition-all ${
-                  activeTab === 'ai' ? 'font-bold' : 'opacity-60 hover:opacity-100'
+                className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                  activeTab === 'ai' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{
                   backgroundColor: activeTab === 'ai' ? `${theme.accent}25` : 'transparent',
@@ -240,19 +193,22 @@ export const App: React.FC = () => {
                 title="AI Co-Pilot"
               >
                 <Sparkles size={16} />
+                <span className="text-xs">AI Co-Pilot</span>
               </button>
+
               <button
                 onClick={() => handleSelectTab('settings')}
-                className={`flex-1 py-1.5 rounded-lg flex items-center justify-center transition-all ${
-                  activeTab === 'settings' ? 'font-bold' : 'opacity-60 hover:opacity-100'
+                className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-2 transition-all ${
+                  activeTab === 'settings' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{
                   backgroundColor: activeTab === 'settings' ? `${theme.accent}25` : 'transparent',
                   color: activeTab === 'settings' ? theme.accent : theme.text,
                 }}
-                title="Настройки озвучки и AI"
+                title="Настройки озвучки, звуков и AI"
               >
                 <SettingsIcon size={16} />
+                <span className="text-xs">Настройки</span>
               </button>
             </div>
 
@@ -314,30 +270,19 @@ export const App: React.FC = () => {
 
         {/* Content Area Rendering by active Tab */}
         <div className="w-full flex-1 flex flex-col items-center justify-center">
-          {activeTab === 'timer' && <Timer theme={theme} dynamicUi={dynamicUi} />}
-
-          {activeTab === 'workout' && (
-            <WorkoutPlayer
+          {activeTab === 'dashboard' && (
+            <DashboardView
               theme={theme}
-              routine={selectedRoutine}
-              onFinish={() => {
-                // Return to first step or alert
-              }}
-            />
-          )}
-
-          {activeTab === 'stopwatch' && <Stopwatch theme={theme} />}
-
-          {activeTab === 'alarm' && (
-            <Alarms
-              theme={theme}
+              dynamicUi={dynamicUi}
               alarms={alarms}
+              routines={routines}
+              selectedRoutine={selectedRoutine}
               aiSettings={aiSettings}
               onUpdateAlarms={setAlarms}
-              onOpenAISettings={() => setActiveTab('ai')}
+              onSelectRoutine={setSelectedRoutine}
+              onOpenAISettings={() => setActiveTab('settings')}
             />
           )}
-
           {activeTab === 'ai' && (
             <AITrainer
               theme={theme}

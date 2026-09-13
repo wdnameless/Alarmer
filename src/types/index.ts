@@ -1,4 +1,4 @@
-export type AppMode = 'timer' | 'alarm' | 'stopwatch' | 'workout' | 'ai' | 'settings';
+export type AppMode = 'dashboard' | 'ai' | 'settings';
 
 export type ThemeId = 'dark-neon' | 'cyberpunk' | 'amoled' | 'nordic' | 'sunset';
 export type ThemeKey = ThemeId;
