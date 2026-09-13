@@ -16,14 +16,23 @@ pub fn run() {
             let quit_i = MenuItem::with_id(app, "quit", "Выход", true, None::<&str>)?;
             let menu = Menu::with_items(app, &[&show_i, &hide_i, &quit_i])?;
 
+            let default_icon = app.default_window_icon().cloned();
+
             // Setup Tray Icon
-            let _tray = TrayIconBuilder::new()
+            let mut builder = TrayIconBuilder::new()
                 .menu(&menu)
-                .tooltip("Alarmer — Умный будильник и таймер")
+                .tooltip("Alarmer — Умный будильник и таймер");
+
+            if let Some(icon) = default_icon {
+                builder = builder.icon(icon);
+            }
+
+            let _tray = builder
                 .on_menu_event(|app, event| match event.id.as_ref() {
                     "show" => {
                         if let Some(window) = app.get_webview_window("main") {
                             let _ = window.show();
+                            let _ = window.unminimize();
                             let _ = window.set_focus();
                         }
                     }
@@ -46,8 +55,13 @@ pub fn run() {
                     {
                         let app = tray.app_handle();
                         if let Some(window) = app.get_webview_window("main") {
-                            let _ = window.show();
-                            let _ = window.set_focus();
+                            if window.is_visible().unwrap_or(false) {
+                                let _ = window.hide();
+                            } else {
+                                let _ = window.show();
+                                let _ = window.unminimize();
+                                let _ = window.set_focus();
+                            }
                         }
                     }
                 })

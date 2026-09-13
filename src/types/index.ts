@@ -2,6 +2,7 @@ export type AppMode = 'timer' | 'alarm' | 'stopwatch' | 'workout' | 'ai' | 'sett
 
 export type ThemeId = 'dark-neon' | 'cyberpunk' | 'amoled' | 'nordic' | 'sunset';
 export type ThemeKey = ThemeId;
+export * from './dynamicUi';
 
 export interface ThemeColors {
   id: ThemeId;

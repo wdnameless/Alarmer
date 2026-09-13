@@ -98,8 +98,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
 
         {/* Close (matches reference ✕) */}
         <button
-          onClick={() => WindowService.close()}
-          title="Закрыть"
+          onClick={async () => {
+            await WindowService.close();
+          }}
+          title="Скрыть в трей (фоновая работа)"
           className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-red-500/80 hover:text-white active:scale-95 transition-all text-white/80"
         >
           <X size={15} strokeWidth={2.5} />

@@ -1,18 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
-import { ThemeColors } from '../types';
+import { ThemeColors, DynamicUIConfig } from '../types';
 import { RadialDial } from './RadialDial';
 import { soundService } from '../services/sound';
 import confetti from 'canvas-confetti';
 
 interface TimerProps {
   theme: ThemeColors;
+  dynamicUi?: DynamicUIConfig;
   initialMinutes?: number;
   onFinish?: () => void;
 }
 
 export const Timer: React.FC<TimerProps> = ({
   theme,
+  dynamicUi,
   initialMinutes = 25,
   onFinish,
 }) => {
@@ -108,6 +110,10 @@ export const Timer: React.FC<TimerProps> = ({
         secondaryText={formatSubDigital(remainingSeconds)}
         isInteractive={!isRunning}
         onProgressChange={handleProgressChange}
+        showTicks={dynamicUi?.dial?.showTicks ?? true}
+        tickLength={dynamicUi?.dial?.tickLength ?? 'normal'}
+        fontFamily={dynamicUi?.typography?.fontFamily ?? 'system-ui'}
+        timeScale={dynamicUi?.typography?.timeScale ?? 1.0}
       />
 
       {/* Control Buttons matching reference image */}

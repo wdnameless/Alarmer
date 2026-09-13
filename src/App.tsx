@@ -14,7 +14,7 @@ import { Stopwatch } from './components/Stopwatch';
 import { Alarms } from './components/Alarms';
 import { WorkoutPlayer } from './components/WorkoutPlayer';
 import { AITrainer } from './components/AITrainer';
-import { AppMode, ThemeKey, AISettings, AlarmItem, WorkoutRoutine } from './types';
+import { AppMode, ThemeKey, AISettings, AlarmItem, WorkoutRoutine, ThemeColors } from './types';
 import { THEMES } from './constants/themes';
 import {
   DEFAULT_AI_SETTINGS,
@@ -24,6 +24,9 @@ import {
 import { windowService } from './services/window';
 import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
+import { ResizeHandles } from './components/ResizeHandles';
+import { AIDynamicUIBar } from './components/AIDynamicUIBar';
+import { DynamicUIConfig, DEFAULT_DYNAMIC_UI } from './types';
 
 export const App: React.FC = () => {
   // App state
@@ -32,6 +35,20 @@ export const App: React.FC = () => {
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(true);
   const [showThemePicker, setShowThemePicker] = useState(false);
+  // Dynamic AI-driven UI Configuration
+  const [dynamicUi, setDynamicUi] = useState<DynamicUIConfig>(() => {
+    try {
+      const saved = localStorage.getItem('alarmer_dynamic_ui');
+      return saved ? JSON.parse(saved) : DEFAULT_DYNAMIC_UI;
+    } catch {
+      return DEFAULT_DYNAMIC_UI;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('alarmer_dynamic_ui', JSON.stringify(dynamicUi));
+  }, [dynamicUi]);
+
 
   // Data state with localStorage persistence
   const [aiSettings, setAISettings] = useState<AISettings>(() => {
@@ -114,20 +131,28 @@ export const App: React.FC = () => {
     setActiveTab('workout');
   };
 
-  const theme = THEMES[themeKey];
+  // Effective theme computed from base theme + dynamic UI overrides
+  const baseTheme = THEMES[themeKey];
+  const theme: ThemeColors = {
+    ...baseTheme,
+    ...dynamicUi.colors,
+    id: themeKey,
+  };
 
   return (
     <div className="w-screen h-screen flex items-center justify-center p-0 md:p-4 bg-transparent overflow-hidden">
       <div
-        className={`flex flex-col rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 border select-none ${
+        className={`relative flex flex-col rounded-3xl overflow-hidden shadow-2xl transition-all duration-300 border select-none ${
           isCompact ? 'w-[250px] h-[410px]' : 'w-full max-w-[460px] h-full max-h-[640px]'
         }`}
         style={{
           backgroundColor: theme.bg,
-          borderColor: theme.border,
+          borderColor: theme.accent,
           color: theme.text,
+          filter: dynamicUi.dial.glowIntensity === 'high' ? `drop-shadow(0 0 15px ${theme.accent}33)` : undefined,
         }}
       >
+        <ResizeHandles />
       {/* Sleek Custom Windows / macOS Titlebar with Drag & Controls */}
       <TitleBar
         theme={theme}
@@ -275,7 +300,7 @@ export const App: React.FC = () => {
 
         {/* Content Area Rendering by active Tab */}
         <div className="w-full flex-1 flex flex-col items-center justify-center">
-          {activeTab === 'timer' && <Timer theme={theme} />}
+          {activeTab === 'timer' && <Timer theme={theme} dynamicUi={dynamicUi} />}
 
           {activeTab === 'workout' && (
             <WorkoutPlayer
@@ -310,11 +335,19 @@ export const App: React.FC = () => {
               onSwitchTab={setActiveTab}
             />
           )}
-          </div>
+
+          <AIDynamicUIBar
+            theme={theme}
+            currentConfig={dynamicUi}
+            aiSettings={aiSettings}
+            onApplyConfig={setDynamicUi}
+            onClose={() => {}}
+          />
         </div>
       </div>
     </div>
-  );
+  </div>
+);
 };
 
 export default App;
