@@ -39,7 +39,7 @@ export const Timer: React.FC<TimerProps> = ({
           if (prev > 1) {
             if (prev <= 4) {
               soundService.playCountdownTick();
-            } else if (localStorage.getItem('alarmer_clock_tick') === 'true') {
+            } else {
               soundService.playUiClick();
             }
             return prev - 1;
@@ -77,7 +77,8 @@ export const Timer: React.FC<TimerProps> = ({
   };
 
   // Dial progress 0..1
-  const progress = totalSeconds > 0 ? (totalSeconds - remainingSeconds) / totalSeconds : 0;
+  // Progress represents remaining time so arc shrinks counter-clockwise towards zero
+  const progress = totalSeconds > 0 ? remainingSeconds / totalSeconds : 0;
 
   // Format digital stopwatch format matching reference: 00:00:00
   const formatSubDigital = (sec: number) => {
@@ -94,13 +95,22 @@ export const Timer: React.FC<TimerProps> = ({
   };
 
   // Interactive dial progress adjustment
+  // Interactive dial progress adjustment during dragging
   const handleProgressChange = (newProgress: number) => {
     if (!isRunning) {
-      // 0..1 maps to 1..60 minutes
       const mins = Math.max(1, Math.round(newProgress * 60));
       setTotalSeconds(mins * 60);
       setRemainingSeconds(mins * 60);
     }
+  };
+
+  // Auto-start on knob drag release
+  const handleProgressCommit = (finalProgress: number) => {
+    const mins = Math.max(1, Math.round(finalProgress * 60));
+    setTotalSeconds(mins * 60);
+    setRemainingSeconds(mins * 60);
+    soundService.playCountdownTick();
+    setIsRunning(true);
   };
 
   const btnRounding =
@@ -119,6 +129,7 @@ export const Timer: React.FC<TimerProps> = ({
         secondaryText={dynamicUi?.layout?.showSubtimer !== false ? formatSubDigital(remainingSeconds) : undefined}
         isInteractive={!isRunning}
         onProgressChange={handleProgressChange}
+        onProgressCommit={handleProgressCommit}
         showTicks={dynamicUi?.dial?.showTicks ?? true}
         tickLength={dynamicUi?.dial?.tickLength ?? 'normal'}
         fontFamily={dynamicUi?.typography?.fontFamily ?? 'system-ui'}

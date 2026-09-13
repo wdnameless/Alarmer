@@ -8,6 +8,7 @@ interface RadialDialProps {
   secondaryText?: string;
   isInteractive?: boolean;
   onProgressChange?: (newProgress: number) => void;
+  onProgressCommit?: (finalProgress: number) => void;
   size?: number;
   showTicks?: boolean;
   tickLength?: 'short' | 'normal' | 'long';
@@ -23,6 +24,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   secondaryText,
   isInteractive = true,
   onProgressChange,
+  onProgressCommit,
   size = 180,
   showTicks = true,
   tickLength = 'normal',
@@ -84,11 +86,8 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   const handlePointerUp = (e: React.PointerEvent) => {
     if (dragProgress !== null) {
       const finalP = dragProgress;
-      onProgressChange?.(finalP);
-      // Keep dragProgress active briefly so parent state commits before clearing
-      setTimeout(() => {
-        setDragProgress(null);
-      }, 50);
+      onProgressCommit?.(finalP);
+      setDragProgress(null);
     }
     try {
       (e.currentTarget as Element).releasePointerCapture(e.pointerId);
