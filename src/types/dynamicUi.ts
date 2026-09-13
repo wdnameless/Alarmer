@@ -22,6 +22,7 @@ export interface DynamicUIConfig {
     showTicks: boolean;
     tickLength: 'short' | 'normal' | 'long';
     glowIntensity: 'none' | 'subtle' | 'high';
+    stylePreset?: 'neon' | 'vintage' | 'chronograph' | 'minimal';
   };
   layout: {
     showPresetButtons: boolean;
@@ -53,10 +54,11 @@ export const DEFAULT_DYNAMIC_UI: DynamicUIConfig = {
     timeScale: 1.0,
   },
   dial: {
-    size: 200,
+    size: 180,
     showTicks: true,
     tickLength: 'normal',
-    glowIntensity: 'high',
+    glowIntensity: 'subtle',
+    stylePreset: 'neon',
   },
   layout: {
     showPresetButtons: true,

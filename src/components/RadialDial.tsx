@@ -13,6 +13,7 @@ interface RadialDialProps {
   tickLength?: 'short' | 'normal' | 'long';
   fontFamily?: string;
   timeScale?: number;
+  stylePreset?: 'neon' | 'vintage' | 'chronograph' | 'minimal';
 }
 
 export const RadialDial: React.FC<RadialDialProps> = ({
@@ -27,6 +28,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   tickLength = 'normal',
   fontFamily = 'system-ui',
   timeScale = 1.0,
+  stylePreset = 'neon',
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -191,16 +193,28 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           filter="url(#glow)"
         />
 
+        {/* Vintage Style: Roman Clock Hour Numerals / Chronograph ticks */}
+        {stylePreset === 'vintage' && (
+          <g opacity={0.65} fontSize={10} fontFamily="Georgia, serif" fill={theme.text} textAnchor="middle" dominantBaseline="middle">
+            <text x={radius} y={radius - dialRadius + 24}>XII</text>
+            <text x={radius + dialRadius - 24} y={radius}>III</text>
+            <text x={radius} y={radius + dialRadius - 24}>VI</text>
+            <text x={radius - dialRadius + 24} y={radius}>IX</text>
+          </g>
+        )}
+
         {/* Reference marker at 9 o'clock (square indicator) */}
-        <rect
-          x={markerX - 4}
-          y={markerY - 4}
-          width={8}
-          height={8}
-          fill="#9ba3b4"
-          opacity={0.7}
-          rx={1}
-        />
+        {stylePreset !== 'vintage' && (
+          <rect
+            x={markerX - 4}
+            y={markerY - 4}
+            width={8}
+            height={8}
+            fill="#9ba3b4"
+            opacity={0.7}
+            rx={1}
+          />
+        )}
 
         {/* Active Draggable Circular Knob Handle */}
         <circle

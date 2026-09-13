@@ -39,6 +39,8 @@ export const Timer: React.FC<TimerProps> = ({
           if (prev > 1) {
             if (prev <= 4) {
               soundService.playCountdownTick();
+            } else if (localStorage.getItem('alarmer_clock_tick') === 'true') {
+              soundService.playUiClick();
             }
             return prev - 1;
           }
@@ -121,7 +123,8 @@ export const Timer: React.FC<TimerProps> = ({
         tickLength={dynamicUi?.dial?.tickLength ?? 'normal'}
         fontFamily={dynamicUi?.typography?.fontFamily ?? 'system-ui'}
         timeScale={dynamicUi?.typography?.timeScale ?? 1.0}
-        size={dynamicUi?.dial?.size ?? 200}
+        size={dynamicUi?.dial?.size ?? 190}
+        stylePreset={dynamicUi?.dial?.stylePreset ?? 'neon'}
       />
 
       {/* Control Buttons matching reference image */}

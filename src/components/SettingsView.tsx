@@ -37,7 +37,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [soundProfile, setSoundProfile] = useState<string>(() => {
     return localStorage.getItem('alarmer_sound_profile') || 'neon';
   });
+  const [clockTick, setClockTick] = useState<boolean>(() => {
+    return localStorage.getItem('alarmer_clock_tick') === 'true';
+  });
+  const [clickVolume, setClickVolume] = useState<number>(() => {
+    return parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');
+  });
+  const [alarmVolume, setAlarmVolume] = useState<number>(() => {
+    return parseFloat(localStorage.getItem('alarmer_alarm_volume') || '0.8');
+  });
 
+  const handleVoiceChange = (voiceId: string) => {
+    setSelectedVoice(voiceId);
+    localStorage.setItem('alarmer_voice_id', voiceId);
+    if (voiceId !== 'none') {
+      EdgeTtsService.speak('Голос успешно выбран!', voiceId);
+    } else {
+      EdgeTtsService.stop();
+    }
+  };
   const handleToggleUiClicks = () => {
     const next = !uiClicks;
     setUiClicks(next);
@@ -56,11 +74,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setSoundProfile(prof);
     localStorage.setItem('alarmer_sound_profile', prof);
     soundService.playUiClick();
-  };
-  const handleVoiceSelect = (voiceId: string) => {
-    setSelectedVoice(voiceId);
-    localStorage.setItem('alarmer_voice_id', voiceId);
-    soundService.playCountdownTick();
   };
 
   const handleTestVoice = async () => {
@@ -123,28 +136,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span>{testingVoice ? 'Воспроизведение...' : 'Тест голоса'}</span>
           </button>
         </div>
-
-        <div className="flex flex-col space-y-1.5">
-          {CLOUD_VOICES.map((v) => (
-            <button
-              key={v.id}
-              type="button"
-              onClick={() => handleVoiceSelect(v.id)}
-              className="flex items-center justify-between p-2.5 rounded-xl border text-left transition-all"
-              style={{
-                backgroundColor: selectedVoice === v.id ? `${theme.accent}18` : theme.cardBg,
-                borderColor: selectedVoice === v.id ? theme.accent : theme.border,
-              }}
-            >
-              <div>
-                <p className="text-xs font-medium">{v.name}</p>
-                <span className="text-[10px] opacity-50">{v.lang} • {v.gender}</span>
-              </div>
-              {selectedVoice === v.id && <Check size={14} style={{ color: theme.accent }} />}
-            </button>
-          ))}
+        <div className="flex flex-col space-y-2">
+          <select
+            value={selectedVoice}
+            onChange={(e) => handleVoiceChange(e.target.value)}
+            className="w-full px-3 py-2.5 rounded-xl border text-xs outline-none cursor-pointer transition-colors"
+            style={{
+              backgroundColor: theme.cardBg,
+              borderColor: theme.border,
+              color: theme.text,
+            }}
+          >
+            {CLOUD_VOICES.map((v) => (
+              <option key={v.id} value={v.id} className="bg-neutral-900 text-white">
+                {v.name} ({v.lang})
+              </option>
+            ))}
+          </select>
         </div>
-        <p className="text-[11px] opacity-50">
+        <p className="text-[11px] opacity-60 leading-relaxed">
           По умолчанию озвучка отключена (только звуковые сигналы). Вы можете в любой момент выбрать нейросетевой облачный голос.
         </p>
       </div>
@@ -184,8 +194,71 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <span>Тиканье таймера (3..2..1)</span>
             <span className="text-[10px] font-bold opacity-80">{countdownTicks ? 'ВКЛ' : 'ВЫКЛ'}</span>
           </button>
+          <button
+            type="button"
+            onClick={() => {
+              const next = !clockTick;
+              setClockTick(next);
+              localStorage.setItem('alarmer_clock_tick', String(next));
+              if (next) soundService.playUiClick();
+            }}
+            className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all col-span-2"
+            style={{
+              borderColor: clockTick ? theme.accent : theme.border,
+              backgroundColor: clockTick ? `${theme.accent}15` : 'transparent',
+              color: theme.text,
+            }}
+          >
+            <span>Звук тиканья часов (каждую секунду)</span>
+            <span className="text-[10px] font-bold opacity-80">{clockTick ? 'ВКЛ' : 'ВЫКЛ'}</span>
+          </button>
         </div>
 
+        {/* Volume Sliders */}
+        <div className="flex flex-col space-y-3 pt-2">
+          <div className="flex flex-col space-y-1">
+            <div className="flex justify-between text-[11px]">
+              <span className="opacity-80">Громкость кликов и тиков:</span>
+              <span className="font-mono font-bold" style={{ color: theme.accent }}>{Math.round(clickVolume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={clickVolume}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setClickVolume(val);
+                localStorage.setItem('alarmer_click_volume', String(val));
+                soundService.playUiClick();
+              }}
+              className="w-full accent-current h-1 rounded-lg cursor-pointer opacity-80"
+              style={{ accentColor: theme.accent }}
+            />
+          </div>
+
+          <div className="flex flex-col space-y-1">
+            <div className="flex justify-between text-[11px]">
+              <span className="opacity-80">Громкость будильников и сигналов:</span>
+              <span className="font-mono font-bold" style={{ color: theme.accent }}>{Math.round(alarmVolume * 100)}%</span>
+            </div>
+            <input
+              type="range"
+              min="0"
+              max="1"
+              step="0.05"
+              value={alarmVolume}
+              onChange={(e) => {
+                const val = parseFloat(e.target.value);
+                setAlarmVolume(val);
+                localStorage.setItem('alarmer_alarm_volume', String(val));
+              }}
+              className="w-full accent-current h-1 rounded-lg cursor-pointer opacity-80"
+              style={{ accentColor: theme.accent }}
+            />
+          </div>
+        </div>
         <div className="flex flex-col space-y-1.5 pt-1">
           <span className="text-[10px] opacity-60">Профиль звука кликов:</span>
           <div className="grid grid-cols-4 gap-1.5">

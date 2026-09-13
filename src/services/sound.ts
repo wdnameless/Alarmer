@@ -37,26 +37,35 @@ export class SoundService {
     }
   }
 
-  // UI click sound (tabs, buttons, presets) with mute check and profile support
+  // UI click sound (tabs, buttons, presets) with volume regulation
   playUiClick() {
     const enabled = localStorage.getItem('alarmer_ui_clicks') !== 'false';
     if (!enabled) return;
+    const clickVol = parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');
     const profile = localStorage.getItem('alarmer_sound_profile') || 'neon';
     switch (profile) {
       case 'mechanical':
-        this.playBeep(220, 0.04, 0.4);
+        this.playBeep(220, 0.04, 0.5 * clickVol);
         break;
       case 'soft':
-        this.playBeep(440, 0.06, 0.15);
+        this.playBeep(440, 0.06, 0.25 * clickVol);
         break;
       case 'arcade':
-        this.playBeep(980, 0.05, 0.25);
+        this.playBeep(980, 0.05, 0.35 * clickVol);
         break;
       case 'neon':
       default:
-        this.playBeep(600, 0.05, 0.2);
+        this.playBeep(600, 0.05, 0.3 * clickVol);
         break;
     }
+  }
+
+  // Real watch second tick (mechanical woodblock/pendulum tick)
+  playClockTick() {
+    const enabled = localStorage.getItem('alarmer_clock_tick') === 'true';
+    if (!enabled) return;
+    const clickVol = parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');
+    this.playBeep(1200, 0.015, 0.12 * clickVol);
   }
 
   playCountdownTick() {
@@ -64,29 +73,28 @@ export class SoundService {
     if (!enabled) return;
     this.playUiClick();
   }
-  // High pitch completion sound
+  // High pitch completion sound with alarm volume regulation
   playFinishAlarm() {
     try {
+      const alarmVol = parseFloat(localStorage.getItem('alarmer_alarm_volume') || '0.8');
       const ctx = this.getContext();
       const now = ctx.currentTime;
       [880, 1100, 1320, 1760].forEach((freq, i) => {
         const osc = ctx.createOscillator();
         const gain = ctx.createGain();
-        osc.frequency.setValueAtTime(freq, now + i * 0.12);
-        gain.gain.setValueAtTime(0.5, now + i * 0.12);
-        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.12 + 0.3);
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(freq, now + i * 0.1);
+        gain.gain.setValueAtTime(0.3 * alarmVol, now + i * 0.1);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + i * 0.1 + 0.25);
         osc.connect(gain);
         gain.connect(ctx.destination);
-        osc.start(now + i * 0.12);
-        osc.stop(now + i * 0.12 + 0.35);
+        osc.start(now + i * 0.1);
+        osc.stop(now + i * 0.1 + 0.25);
       });
     } catch (e) {
       console.warn('Finish alarm sound error:', e);
     }
   }
-
-  // TTS Speech Synthesis voice announcement
-  // Voice announcement: checks active voice setting. Defaults to 'none' (disabled)
   speak(text: string, voiceId?: string) {
     const savedVoice = voiceId || localStorage.getItem('alarmer_voice_id') || 'none';
     if (savedVoice === 'none') {
