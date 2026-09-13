@@ -34,7 +34,24 @@ export const AITrainer: React.FC<AITrainerProps> = ({
   const [apiKey, setApiKey] = useState(aiSettings.apiKey);
   const [baseUrl, setBaseUrl] = useState(aiSettings.baseUrl);
   const [model, setModel] = useState(aiSettings.model);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [fetchingModels, setFetchingModels] = useState(false);
 
+  const handleFetchModels = async () => {
+    if (!apiKey) return;
+    setFetchingModels(true);
+    try {
+      const list = await AIService.fetchModels(baseUrl || 'https://api.openai.com/v1', apiKey);
+      setAvailableModels(list);
+      if (list.length > 0 && !list.includes(model)) {
+        setModel(list[0]);
+      }
+    } catch (err: unknown) {
+      console.warn('Model fetch error:', err);
+    } finally {
+      setFetchingModels(false);
+    }
+  };
   const handleSaveConfig = (e: React.FormEvent) => {
     e.preventDefault();
     onUpdateAISettings({
@@ -164,17 +181,42 @@ export const AITrainer: React.FC<AITrainerProps> = ({
               />
             </div>
             <div className="flex flex-col space-y-1">
-              <label className="text-[10px] uppercase font-bold tracking-wider opacity-60">
-                Model
-              </label>
-              <input
-                type="text"
-                value={model}
-                onChange={(e) => setModel(e.target.value)}
-                placeholder="gpt-4o-mini"
-                className="bg-black/50 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
-                style={{ color: theme.text }}
-              />
+              <div className="flex items-center justify-between">
+                <label className="text-[10px] uppercase font-bold tracking-wider opacity-60">
+                  Model
+                </label>
+                <button
+                  type="button"
+                  onClick={handleFetchModels}
+                  disabled={fetchingModels || !apiKey}
+                  className="text-[10px] underline opacity-70 hover:opacity-100 disabled:opacity-30"
+                >
+                  {fetchingModels ? 'Загрузка...' : 'Загрузить список'}
+                </button>
+              </div>
+              {availableModels.length > 0 ? (
+                <select
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  className="bg-black/80 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
+                  style={{ color: theme.text }}
+                >
+                  {availableModels.map((m) => (
+                    <option key={m} value={m} className="bg-neutral-900 text-white">
+                      {m}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <input
+                  type="text"
+                  value={model}
+                  onChange={(e) => setModel(e.target.value)}
+                  placeholder="gpt-4o-mini"
+                  className="bg-black/50 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
+                  style={{ color: theme.text }}
+                />
+              )}
             </div>
           </div>
 

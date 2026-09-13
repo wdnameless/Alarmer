@@ -13,6 +13,37 @@ export class AIService {
       .replace(/```/g, '')
       .trim();
   }
+  /**
+   * Fetches available models from the OpenAI-compatible API endpoint
+   */
+  static async fetchModels(baseUrl: string, apiKey: string): Promise<string[]> {
+    if (!apiKey || !apiKey.trim()) {
+      return ['gpt-4o-mini', 'gpt-4o', 'deepseek-chat', 'claude-3-5-sonnet-20241022'];
+    }
+    const url = `${baseUrl.replace(/\/+$/, '')}/models`;
+    try {
+      const res = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${apiKey}`,
+        },
+      });
+      if (!res.ok) {
+        throw new Error(`Ошибка загрузки моделей (${res.status})`);
+      }
+      const data = await res.json();
+      if (Array.isArray(data?.data)) {
+        const models = data.data
+          .map((m: { id?: string }) => m?.id)
+          .filter((id: unknown): id is string => typeof id === 'string');
+        return models.sort();
+      }
+      return ['gpt-4o-mini', 'gpt-4o'];
+    } catch (err) {
+      console.warn('Failed to fetch models:', err);
+      throw err;
+    }
+  }
+
 
   private static async requestChat(
     messages: Array<{ role: 'system' | 'user'; content: string }>,

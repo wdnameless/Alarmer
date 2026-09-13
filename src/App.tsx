@@ -25,7 +25,6 @@ import { windowService } from './services/window';
 import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
-import { AIDynamicUIBar } from './components/AIDynamicUIBar';
 import { AIChatDrawer } from './components/AIChatDrawer';
 import { DynamicUIConfig, DEFAULT_DYNAMIC_UI } from './types';
 
@@ -335,14 +334,6 @@ export const App: React.FC = () => {
               onSwitchTab={setActiveTab}
             />
           )}
-
-          <AIDynamicUIBar
-            theme={theme}
-            currentConfig={dynamicUi}
-            aiSettings={aiSettings}
-            onApplyConfig={setDynamicUi}
-            onClose={() => {}}
-          />
 
           {/* Universal AI Co-Pilot & UI Compiler Drawer */}
           <AIChatDrawer
