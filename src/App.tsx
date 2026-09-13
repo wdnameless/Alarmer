@@ -26,6 +26,7 @@ import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { AIDynamicUIBar } from './components/AIDynamicUIBar';
+import { AIChatDrawer } from './components/AIChatDrawer';
 import { DynamicUIConfig, DEFAULT_DYNAMIC_UI } from './types';
 
 export const App: React.FC = () => {
@@ -35,6 +36,7 @@ export const App: React.FC = () => {
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(true);
   const [showThemePicker, setShowThemePicker] = useState(false);
+  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   // Dynamic AI-driven UI Configuration
   const [dynamicUi, setDynamicUi] = useState<DynamicUIConfig>(() => {
     try {
@@ -158,8 +160,8 @@ export const App: React.FC = () => {
         isPinned={isPinned}
         onToggleCompact={toggleCompact}
         onTogglePin={togglePin}
+        onOpenAIChat={() => setIsAiChatOpen(true)}
       />
-
       {/* Main App Container */}
       <div className="flex-1 flex flex-col items-center justify-between p-3 overflow-y-auto">
         {/* Navigation Tabs (Hidden in ultra-compact view for floating pill look) */}
@@ -340,6 +342,18 @@ export const App: React.FC = () => {
             aiSettings={aiSettings}
             onApplyConfig={setDynamicUi}
             onClose={() => {}}
+          />
+
+          {/* Universal AI Co-Pilot & UI Compiler Drawer */}
+          <AIChatDrawer
+            isOpen={isAiChatOpen}
+            onClose={() => setIsAiChatOpen(false)}
+            theme={theme}
+            currentUi={dynamicUi}
+            aiSettings={aiSettings}
+            onApplyUI={(newUi) => setDynamicUi(newUi)}
+            onApplyAlarms={(newAlarms) => setAlarms((prev) => [...prev, ...newAlarms])}
+            onApplyWorkout={(newWorkout) => handleSelectRoutine(newWorkout)}
           />
         </div>
       </div>

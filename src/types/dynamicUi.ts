@@ -29,6 +29,7 @@ export interface DynamicUIConfig {
     buttonStyle: 'rounded' | 'square' | 'pill';
     glassmorphism: boolean;
     contentAlignment: 'center' | 'top' | 'compact';
+    widgetsOrder: Array<'dial' | 'subtimer' | 'presets' | 'controls' | 'alarmsPreview'>;
   };
 }
 
@@ -63,5 +64,6 @@ export const DEFAULT_DYNAMIC_UI: DynamicUIConfig = {
     buttonStyle: 'rounded',
     glassmorphism: true,
     contentAlignment: 'center',
+    widgetsOrder: ['dial', 'subtimer', 'presets', 'controls'],
   },
 };
