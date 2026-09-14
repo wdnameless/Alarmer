@@ -50,9 +50,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClick={() => setSubModule("timer")}
           className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
           style={{
-            backgroundColor: subModule === "timer" ? theme.accent : "transparent",
-            color: subModule === "timer" ? "#000" : theme.text,
-            fontWeight: subModule === "timer" ? 700 : 500,
+            backgroundColor: subModule === "timer" ? "rgba(255,255,255,0.07)" : "transparent",
+            color: subModule === "timer" ? theme.text : theme.subtext,
+            fontWeight: subModule === "timer" ? 600 : 400,
           }}
           title="Таймер"
         >
@@ -64,9 +64,9 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           onClick={() => setSubModule("alarms")}
           className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
           style={{
-            backgroundColor: subModule === "alarms" ? theme.accent : "transparent",
-            color: subModule === "alarms" ? "#000" : theme.text,
-            fontWeight: subModule === "alarms" ? 700 : 500,
+            backgroundColor: subModule === "alarms" ? "rgba(255,255,255,0.07)" : "transparent",
+            color: subModule === "alarms" ? theme.text : theme.subtext,
+            fontWeight: subModule === "alarms" ? 600 : 400,
           }}
           title="Будильники"
         >

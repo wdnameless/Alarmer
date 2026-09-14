@@ -1,6 +1,24 @@
 import { ThemeColors, ThemeId } from '../types';
 
 export const THEMES: Record<ThemeId, ThemeColors> = {
+  // Winter (trywinter.app): near-monochrome, elevation as small lightness steps,
+  // hairline borders. The single warm colour marks the present moment only.
+  winter: {
+    id: 'winter',
+    name: 'Winter (Calm Mono)',
+    bg: '#050505',
+    surface: '#0a0a0a',
+    cardBg: '#0f0f0f',
+    border: '#27272a',
+    text: '#fafafa',
+    subtext: '#a1a1aa',
+    accent: '#ff7a1a',
+    accentGlow: 'rgba(255, 122, 26, 0.28)',
+    ringTrack: '#1c1c1f',
+    ringProgress: '#ff7a1a',
+    ticks: '#3f3f46',
+  },
+
   'dark-neon': {
     id: 'dark-neon',
     name: 'Dark Neon (Reference)',

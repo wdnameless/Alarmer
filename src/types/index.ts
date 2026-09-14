@@ -1,6 +1,6 @@
 export type AppMode = 'dashboard' | 'ai' | 'settings';
 
-export type ThemeId = 'dark-neon' | 'cyberpunk' | 'amoled' | 'nordic' | 'sunset';
+export type ThemeId = 'winter' | 'dark-neon' | 'cyberpunk' | 'amoled' | 'nordic' | 'sunset';
 export type ThemeKey = ThemeId;
 export * from './dynamicUi';
 

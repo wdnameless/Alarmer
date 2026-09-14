@@ -219,7 +219,7 @@ export const Timer: React.FC<TimerProps> = ({
         fontFamily={dynamicUi?.typography?.fontFamily ?? 'system-ui'}
         timeScale={dynamicUi?.typography?.timeScale ?? 1.0}
         size={dynamicUi?.dial?.size ?? 180}
-        stylePreset={dynamicUi?.dial?.stylePreset ?? 'neon'}
+        stylePreset={dynamicUi?.dial?.stylePreset ?? 'minimal'}
       />
       {/* Control Buttons matching reference image */}
       <div className={`grid ${dynamicUi?.layout?.showPresetButtons === false ? 'grid-cols-2 max-w-[150px]' : 'grid-cols-2 max-w-[210px]'} gap-3 mt-4 w-full`}>

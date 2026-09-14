@@ -36,7 +36,8 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   const [dragProgress, setDragProgress] = useState<number | null>(null);
 
   const radius = size / 2;
-  const strokeWidth = 5;
+  // Winter uses hairline geometry: the ring reads as a drawn line, not a tube.
+  const strokeWidth = stylePreset === 'minimal' ? 2 : 5;
   const dialRadius = radius - 18;
   const circumference = 2 * Math.PI * dialRadius;
   const activeProgress = dragProgress !== null ? dragProgress : Math.max(0, Math.min(1, progress));
@@ -140,26 +141,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
         onPointerUp={handlePointerUp}
       >
         <defs>
-          <radialGradient id="dialInnerGlow" cx="50%" cy="50%" r="50%">
-            <stop offset="60%" stopColor="#000000" stopOpacity="0.4" />
-            <stop offset="100%" stopColor={theme.accent} stopOpacity="0.08" />
-          </radialGradient>
-          <filter id="glow">
-            <feGaussianBlur stdDeviation="3.5" result="coloredBlur" />
-            <feMerge>
-              <feMergeNode in="coloredBlur" />
-              <feMergeNode in="SourceGraphic" />
-            </feMerge>
-          </filter>
         </defs>
-
-        {/* Inner shadow/glow circle */}
-        <circle
-          cx={radius}
-          cy={radius}
-          r={dialRadius - 2}
-          fill="url(#dialInnerGlow)"
-        />
 
         {/* Outer Background Track */}
         <circle
@@ -180,9 +162,9 @@ export const RadialDial: React.FC<RadialDialProps> = ({
               y1={t.y1}
               x2={t.x2}
               y2={t.y2}
-              stroke={t.isActive ? theme.accent : "#ffffff"}
-              strokeWidth={t.isMajor ? 2.0 : 0.9}
-              strokeOpacity={t.isActive ? 1.0 : t.isMajor ? 0.45 : 0.20}
+              stroke={theme.ticks}
+              strokeWidth={t.isMajor ? 1.2 : 0.75}
+              strokeOpacity={t.isActive ? (t.isMajor ? 0.85 : 0.5) : t.isMajor ? 0.4 : 0.18}
               strokeLinecap="round"
             />
           ))}
@@ -199,12 +181,11 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           strokeLinecap="round"
           fill="none"
           transform={`rotate(-90 ${radius} ${radius})`}
-          filter="url(#glow)"
           style={{ transition: dragProgress !== null ? 'none' : 'stroke-dasharray 0.8s ease' }}
         />
 
         {/* Dieter Rams Swiss Precision Numerals: 12, 3, 6, 9 */}
-        <g opacity={0.45} fontSize={11} fontWeight={600} fontFamily="Inter, -apple-system, sans-serif" fill="#ffffff" textAnchor="middle" dominantBaseline="middle">
+        <g opacity={0.5} fontSize={10} fontWeight={500} fontFamily="'JetBrains Mono', ui-monospace, monospace" fill={theme.subtext} textAnchor="middle" dominantBaseline="middle">
           <text x={radius} y={radius - dialRadius + 22}>12</text>
           <text x={radius + dialRadius - 22} y={radius}>3</text>
           <text x={radius} y={radius + dialRadius - 22}>6</text>
@@ -218,8 +199,8 @@ export const RadialDial: React.FC<RadialDialProps> = ({
             y={markerY - 4}
             width={8}
             height={8}
-            fill="#9ba3b4"
-            opacity={0.7}
+            fill={theme.subtext}
+            opacity={0.55}
             rx={1}
           />
         )}
@@ -229,29 +210,23 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           cx={knobX}
           cy={knobY}
           r={7.5}
-          fill="#e2e8f0"
+          fill={theme.bg}
           stroke={theme.accent}
-          strokeWidth={2.5}
-          className="transition-transform duration-75 shadow-lg"
-          style={{
-            filter: `drop-shadow(0 0 6px ${theme.accentGlow})`,
-          }}
+          strokeWidth={2}
+          className="transition-transform duration-75"
         />
       </svg>
 
       {/* Center Labels */}
       <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
         <span
-          className="font-extrabold tracking-tight"
+          className="font-semibold tracking-tight tabular-nums"
           style={{
             color: theme.text,
-            fontSize: `${36 * timeScale}px`,
-            fontFamily:
-              fontFamily === 'mono'
-                ? 'ui-monospace, monospace'
-                : fontFamily === 'cyber'
-                ? 'Courier New, monospace'
-                : 'system-ui, -apple-system, sans-serif',
+            fontSize: `${34 * timeScale}px`,
+            fontFamily: fontFamily === 'cyber'
+              ? 'Courier New, monospace'
+              : "'JetBrains Mono', ui-monospace, monospace",
           }}
         >
           {primaryText}

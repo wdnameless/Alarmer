@@ -29,7 +29,7 @@ function welcomeMessage(): ChatMessage {
 export const App: React.FC = () => {
   // App state
   const [activeTab, setActiveTab] = useState<AppMode>('dashboard');
-  const [themeKey] = useState<ThemeKey>('dark-neon');
+  const [themeKey] = useState<ThemeKey>('winter');
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
   const [aiTimerMinutes] = useState<number | undefined>(undefined);
@@ -186,12 +186,12 @@ export const App: React.FC = () => {
                   activeTab === 'dashboard' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{
-                  backgroundColor: activeTab === 'dashboard' ? `${theme.accent}25` : 'transparent',
-                  color: activeTab === 'dashboard' ? theme.accent : theme.text,
+                  backgroundColor: activeTab === 'dashboard' ? 'rgba(255,255,255,0.07)' : 'transparent',
+                  color: activeTab === 'dashboard' ? theme.text : theme.subtext,
                 }}
                 title={t.dashboard}
               >
-                <HandClock size={15} color={activeTab === 'dashboard' ? theme.accent : theme.text} />
+                <HandClock size={15} color={activeTab === 'dashboard' ? theme.text : theme.subtext} />
                 <span className="text-xs truncate">{t.dashboard}</span>
               </button>
 
@@ -201,12 +201,12 @@ export const App: React.FC = () => {
                   activeTab === 'settings' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
                 }`}
                 style={{
-                  backgroundColor: activeTab === 'settings' ? `${theme.accent}25` : 'transparent',
-                  color: activeTab === 'settings' ? theme.accent : theme.text,
+                  backgroundColor: activeTab === 'settings' ? 'rgba(255,255,255,0.07)' : 'transparent',
+                  color: activeTab === 'settings' ? theme.text : theme.subtext,
                 }}
                 title={t.settings}
               >
-                <HandGear size={15} color={activeTab === 'settings' ? theme.accent : theme.text} />
+                <HandGear size={15} color={activeTab === 'settings' ? theme.text : theme.subtext} />
                 <span className="text-xs truncate">{t.settings}</span>
               </button>
             </div>
@@ -318,11 +318,14 @@ export const App: React.FC = () => {
             }}
             title="Раскрыть монолитный блок AI Co-Pilot"
           >
-            <div className="flex flex-col items-center space-y-1.5">
-              <HandSparkle size={15} color={theme.accent} className="animate-pulse" />
+            {/* Calm at rest: the warm marker is reserved for the present moment
+                in time, so this trigger only warms on hover. */}
+            <div className="flex flex-col items-center space-y-1.5 opacity-55 group-hover:opacity-100 transition-opacity">
+              <HandSparkle size={15} color={theme.subtext} className="group-hover:hidden" />
+              <HandSparkle size={15} color={theme.accent} className="hidden group-hover:block" />
               <span
-                className="text-[10px] font-bold tracking-wider uppercase opacity-80 group-hover:opacity-100 transition-opacity"
-                style={{ color: theme.accent }}
+                className="text-[10px] font-bold tracking-wider uppercase"
+                style={{ color: theme.subtext }}
               >
                 AI
               </span>
