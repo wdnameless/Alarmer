@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { AIChatDrawer } from './AIChatDrawer';
-import { TitleBar } from './TitleBar';
 import { ResizeHandles } from './ResizeHandles';
 import { THEMES } from '../constants/themes';
 import { DEFAULT_AI_SETTINGS } from '../constants/defaults';
@@ -90,18 +89,47 @@ export const AICompanionWindow: React.FC = () => {
       >
         <ResizeHandles />
         {/* Native custom titlebar for AI Companion */}
-        <TitleBar
-          theme={theme}
-          isCompact={true}
-          isPinned={false}
-          onToggleCompact={() => {}}
-          onTogglePin={() => {}}
-        />
-
+        {/* Drag Region Header for AI Companion Window */}
+        <div
+          data-tauri-drag-region
+          className="w-full flex items-center justify-between px-3.5 py-2.5 border-b select-none shrink-0"
+          style={{ borderColor: `${theme.border}` }}
+        >
+          <div className="flex items-center space-x-2 pointer-events-none">
+            <div
+              className="w-5 h-5 rounded-md flex items-center justify-center"
+              style={{ backgroundColor: `${theme.accent}25`, color: theme.accent }}
+            >
+              <span className="text-xs">✨</span>
+            </div>
+            <span className="text-[11px] font-bold tracking-wider uppercase" style={{ color: theme.text }}>
+              AI Co-Pilot
+            </span>
+          </div>
+          <div className="flex items-center space-x-1">
+            <button
+              type="button"
+              onClick={() => WindowService.minimize()}
+              title="Свернуть"
+              className="w-6 h-6 rounded-md flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 transition-colors text-white/50 hover:text-white"
+            >
+              <span className="text-xs leading-none">─</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => WindowService.closeAiCompanionWindow()}
+              title="Закрыть"
+              className="w-6 h-6 rounded-md flex items-center justify-center bg-white/5 hover:bg-rose-500/30 hover:text-rose-300 active:scale-95 transition-colors text-white/50"
+            >
+              <span className="text-xs leading-none">✕</span>
+            </button>
+          </div>
+        </div>
         {/* AI Chat Body filling entire companion window */}
         <div className="flex-1 flex flex-col w-full h-full overflow-hidden">
           <AIChatDrawer
             isOpen={true}
+            hideHeader={true}
             onClose={() => WindowService.closeAiCompanionWindow()}
             theme={theme}
             currentUi={dynamicUi}

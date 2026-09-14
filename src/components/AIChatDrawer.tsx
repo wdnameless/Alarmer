@@ -6,6 +6,7 @@ import { ThemeColors, DynamicUIConfig, AISettings, AlarmItem, WorkoutRoutine } f
 import { ChatMessage, AICompilerService } from '../services/aiCompiler';
 interface AIChatDrawerProps {
   isOpen: boolean;
+  hideHeader?: boolean;
   onClose: () => void;
   theme: ThemeColors;
   currentUi: DynamicUIConfig;
@@ -21,6 +22,7 @@ interface AIChatDrawerProps {
 
 export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   isOpen,
+  hideHeader = false,
   onClose,
   theme,
   currentUi,
@@ -124,14 +126,14 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
   return (
     <div
-      className="w-80 h-full border-l flex flex-col backdrop-blur-xl transition-all duration-300 select-none z-30 flex-shrink-0"
+      className="w-full h-full flex flex-col backdrop-blur-xl transition-all duration-300 select-none z-30 flex-shrink-0"
       style={{
         backgroundColor: `${theme.cardBg}F0`,
-        borderColor: theme.border,
         color: theme.text,
       }}
     >
       {/* Drawer Header */}
+      {!hideHeader && (
       <div
         className="flex items-center justify-between px-4 py-3 border-b"
         style={{ borderColor: `${theme.accent}30` }}
@@ -158,7 +160,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           <HandClose size={13} />
         </button>
       </div>
-
+      )}
       {/* Messages Feed */}
       <div className="flex-1 overflow-y-auto p-3 space-y-3">
         {messages.map((m) => (
