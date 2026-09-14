@@ -85,9 +85,23 @@ export class SoundService {
     this.playUiClick();
   }
   // High pitch completion sound with alarm volume regulation
+  private customAlarmAudio: HTMLAudioElement | null = null;
+
   playFinishAlarm() {
     try {
       const alarmVol = parseFloat(localStorage.getItem('alarmer_alarm_volume') || '0.8');
+      const customAudio = localStorage.getItem('alarmer_custom_alarm_sound');
+      if (customAudio) {
+        if (!this.customAlarmAudio) {
+          this.customAlarmAudio = new Audio();
+        }
+        this.customAlarmAudio.src = customAudio;
+        this.customAlarmAudio.volume = Math.max(0, Math.min(1, alarmVol));
+        this.customAlarmAudio.currentTime = 0;
+        this.customAlarmAudio.play().catch(() => {});
+        return;
+      }
+
       const ctx = this.getContext();
       const now = ctx.currentTime;
       [880, 1100, 1320, 1760].forEach((freq, i) => {

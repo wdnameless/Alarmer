@@ -28,6 +28,11 @@ export const App: React.FC = () => {
   const [aiTimerMinutes] = useState<number | undefined>(undefined);
   const [dashboardSubModule, setDashboardSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
   const [isAiWingOpen, setIsAiWingOpen] = useState<boolean>(false);
+  const [leftPaneWidth, setLeftPaneWidth] = useState<number>(() => {
+    const saved = localStorage.getItem('alarmer_left_pane_width');
+    return saved ? parseInt(saved, 10) : 340;
+  });
+  const [isResizingSplit, setIsResizingSplit] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem('alarmer_chat_history');
@@ -140,6 +145,31 @@ export const App: React.FC = () => {
     await windowService.setCompanionWing(next);
   };
 
+  // Mouse drag handlers for splitter between Dashboard and AI Wing
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizingSplit) return;
+      const clamped = Math.max(260, Math.min(540, e.clientX));
+      setLeftPaneWidth(clamped);
+      localStorage.setItem('alarmer_left_pane_width', clamped.toString());
+    };
+
+    const handleMouseUp = () => {
+      if (isResizingSplit) {
+        setIsResizingSplit(false);
+      }
+    };
+
+    if (isResizingSplit) {
+      window.addEventListener('mousemove', handleMouseMove);
+      window.addEventListener('mouseup', handleMouseUp);
+    }
+    return () => {
+      window.removeEventListener('mousemove', handleMouseMove);
+      window.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizingSplit]);
+
   const handleSelectTab = (tab: AppMode) => {
     soundService.playUiClick();
     setActiveTab(tab);
@@ -186,8 +216,8 @@ export const App: React.FC = () => {
       <div className="flex-1 flex w-full h-full overflow-hidden relative">
         {/* Left Pane: Timer / Settings (Clean, Fixed 340px primary surface) */}
         <div
-          className="flex flex-col items-center justify-between p-3 overflow-y-auto shrink-0 transition-all duration-300"
-          style={{ width: isAiWingOpen ? '340px' : '100%' }}
+          className="flex flex-col items-center justify-between p-3 overflow-y-auto shrink-0 transition-all"
+          style={{ width: isAiWingOpen ? `${leftPaneWidth}px` : '100%' }}
         >
           <div
             className="flex items-center justify-between w-full max-w-[340px] p-1 mb-2 rounded-xl border transition-colors"
@@ -258,8 +288,19 @@ export const App: React.FC = () => {
 
         {/* Right Wing: Attached Companion AI Module */}
         {isAiWingOpen && (
-          <div className="flex-1 h-full flex flex-row items-stretch border-l overflow-hidden" style={{ borderColor: `${theme.accent}30` }}>
-            <div className="w-[3px] bg-gradient-to-b from-transparent via-current to-transparent opacity-40" style={{ color: theme.accent }} />
+          <div className="flex-1 h-full flex flex-row items-stretch border-l overflow-hidden relative" style={{ borderColor: `${theme.accent}30` }}>
+            {/* Interactive Drag Handle to resize panels */}
+            <div
+              onMouseDown={(e) => {
+                e.preventDefault();
+                setIsResizingSplit(true);
+              }}
+              className="w-2 hover:w-2.5 -ml-1 h-full cursor-col-resize z-50 flex items-center justify-center group transition-all"
+              title="Потяните, чтобы изменить ширину колонок"
+            >
+              <div className="w-[2px] h-12 rounded-full bg-white/20 group-hover:bg-white/80 transition-colors" />
+            </div>
+            <div className="w-[2px] bg-gradient-to-b from-transparent via-current to-transparent opacity-30" style={{ color: theme.accent }} />
             <div className="flex-1 h-full flex flex-col overflow-hidden">
               <AIChatDrawer
                 isOpen={true}
