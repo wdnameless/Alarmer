@@ -90,10 +90,16 @@ export class AICompilerService {
     currentUi: DynamicUIConfig,
     settings: AISettings
   ): Promise<AIPlatformMutation> {
-    if (!settings.apiKey || settings.apiKey.trim() === '') {
+    const lowerPrompt = prompt.toLowerCase();
+    const isDirectUiCommand = lowerPrompt.includes('убери') || lowerPrompt.includes('скрой')
+      || lowerPrompt.includes('верни') || lowerPrompt.includes('покажи')
+      || lowerPrompt.includes('ко сну') || lowerPrompt.includes('засечк')
+      || lowerPrompt.includes('тему') || lowerPrompt.includes('киберпанк')
+      || lowerPrompt.includes('амолед') || lowerPrompt.includes('пресет');
+
+    if (isDirectUiCommand || !settings.apiKey || settings.apiKey.trim() === '') {
       return this.offlineFallbackCompiler(prompt, currentUi);
     }
-
     try {
       const url = `${settings.baseUrl.replace(/\/+$/, '')}/chat/completions`;
       const response = await fetch(url, {
@@ -197,20 +203,24 @@ export class AICompilerService {
       cloned.dial.showTicks = true;
       changes.push('включены засечки циферблата');
     }
-    if (lower.includes('ко сну') && (lower.includes('убери') || lower.includes('скрой') || lower.includes('отключи'))) {
-      cloned.layout.showSleepButton = false;
-      changes.push('скрыта кнопка «Ко сну»');
-    } else if (lower.includes('ко сну') && (lower.includes('верни') || lower.includes('покажи') || lower.includes('включи'))) {
-      cloned.layout.showSleepButton = true;
-      changes.push('возвращена кнопка «Ко сну»');
+    if (lower.includes('ко сну') || lower.includes('сна')) {
+      if (lower.includes('убери') || lower.includes('скрой') || lower.includes('отключи') || lower.includes('удалить') || lower.includes('выключи')) {
+        cloned.layout.showSleepButton = false;
+        changes.push('скрыта кнопка «Ко сну»');
+      } else if (lower.includes('верни') || lower.includes('покажи') || lower.includes('включи') || lower.includes('добавь')) {
+        cloned.layout.showSleepButton = true;
+        changes.push('возвращена кнопка «Ко сну»');
+      }
     }
 
-    if ((lower.includes('кнопк') || lower.includes('виджет') || lower.includes('ии')) && (lower.includes('ии') || lower.includes('ai')) && (lower.includes('убери') || lower.includes('скрой') || lower.includes('отключи'))) {
-      cloned.layout.showAiScheduleButton = false;
-      changes.push('скрыта кнопка «ИИ» в будильниках');
-    } else if ((lower.includes('кнопк') || lower.includes('виджет') || lower.includes('ии')) && (lower.includes('ии') || lower.includes('ai')) && (lower.includes('верни') || lower.includes('покажи') || lower.includes('включи'))) {
-      cloned.layout.showAiScheduleButton = true;
-      changes.push('возвращена кнопка «ИИ» в будильниках');
+    if (lower.includes('ии') || lower.includes('ai') || lower.includes('ассистент')) {
+      if (lower.includes('убери') || lower.includes('скрой') || lower.includes('отключи') || lower.includes('удалить') || lower.includes('выключи')) {
+        cloned.layout.showAiScheduleButton = false;
+        changes.push('скрыта кнопка «ИИ» в будильниках');
+      } else if (lower.includes('верни') || lower.includes('покажи') || lower.includes('включи') || lower.includes('добавь')) {
+        cloned.layout.showAiScheduleButton = true;
+        changes.push('возвращена кнопка «ИИ» в будильниках');
+      }
     }
 
     if (lower.includes('убери пресет') || lower.includes('без нижних кнопок') || lower.includes('минимал')) {

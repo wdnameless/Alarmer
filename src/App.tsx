@@ -309,18 +309,17 @@ export const App: React.FC = () => {
                 currentUi={dynamicUi}
                 aiSettings={aiSettings}
                 onApplyUI={(newUi: DynamicUIConfig) => {
-                  setDynamicUi((prev) => ({
-                    ...prev,
+                  setDynamicUi({
                     ...newUi,
                     layout: {
-                      ...prev.layout,
+                      ...dynamicUi.layout,
                       ...(newUi.layout || {}),
                     },
                     colors: {
-                      ...prev.colors,
+                      ...dynamicUi.colors,
                       ...(newUi.colors || {}),
                     },
-                  }));
+                  });
                 }}
                 onApplyAlarms={(newAlarms: AlarmItem[]) => setAlarms((prev) => [...prev, ...newAlarms])}
                 onApplyWorkout={(newWorkout: WorkoutRoutine) => handleSelectRoutine(newWorkout)}
