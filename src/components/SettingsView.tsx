@@ -462,7 +462,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
 
-        {/* Data Management: Export / Import JSON */}
+          {/* Global hotkeys reference */}
+        <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
+          <label className="text-xs font-bold uppercase tracking-wider opacity-60">
+            Горячие клавиши (работают из любой программы)
+          </label>
+          <div className="flex flex-col space-y-1 text-[11px]" style={{ color: theme.subtext }}>
+            <div className="flex justify-between"><span>Пауза / продолжить</span><span className="font-mono" style={{ color: theme.text }}>Alt + S</span></div>
+            <div className="flex justify-between"><span>Сбросить таймер</span><span className="font-mono" style={{ color: theme.text }}>Alt + R</span></div>
+            <div className="flex justify-between"><span>Прибавить 5 минут</span><span className="font-mono" style={{ color: theme.text }}>Alt + Shift + U</span></div>
+            <div className="flex justify-between"><span>Убавить 5 минут</span><span className="font-mono" style={{ color: theme.text }}>Alt + Shift + D</span></div>
+          </div>
+        </div>
+
+      {/* Data Management: Export / Import JSON */}
         <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
           <label className="text-xs font-bold uppercase tracking-wider opacity-60">
             Управление данными (Резервная копия)

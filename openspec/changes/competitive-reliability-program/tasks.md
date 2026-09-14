@@ -5,5 +5,5 @@
 - [x] W1: Native notification when window hidden + reveal window without stealing focus <!-- id: 2 -->
 - [x] W2: Ramp-up volume, repeat until acknowledged, Snooze 5/10/15 <!-- id: 3 -->
 - [x] W2: Per-alarm sound resolution (alarm.sound + custom file per alarm) <!-- id: 4 -->
-- [ ] W3: Global shortcuts + mini overlay <!-- id: 5 -->
+- [x] W3: Global shortcuts + mini overlay <!-- id: 5 -->
 - [ ] Verify: tsc, eslint, vitest, cargo check, live alarm test <!-- id: 6 -->

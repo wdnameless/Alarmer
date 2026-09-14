@@ -14,6 +14,7 @@ import { I18nService } from './services/i18n';
 import { AppMode, ThemeKey, AISettings, AlarmItem, ThemeColors, DynamicUIConfig } from './types';
 import { StoreService } from './services/store';
 import { ErrorBoundary } from './components/ErrorBoundary';
+import { invoke } from '@tauri-apps/api/core';
 
 /** First message shown in a brand-new conversation. */
 function welcomeMessage(): ChatMessage {
@@ -93,6 +94,14 @@ export const App: React.FC = () => {
     setIsPinned(newPin);
     await windowService.setAlwaysOnTop(newPin);
   };
+  /** Opens the compact always-on-top overlay window. */
+  const toggleMiniOverlay = () => {
+    soundService.playUiClick();
+    void invoke('toggle_mini_overlay', { open: true }).catch((e) =>
+      console.warn('mini overlay unavailable:', e),
+    );
+  };
+
   const toggleAiWing = async () => {
     soundService.playUiClick();
     const next = !isAiWingOpen;
@@ -156,6 +165,7 @@ export const App: React.FC = () => {
         isPinned={isPinned}
         onToggleCompact={toggleCompact}
         onTogglePin={togglePin}
+        onToggleOverlay={toggleMiniOverlay}
       />
       {/* Main App Container */}
       {/* Main Split Layout: Left Primary Surface + Right Side AI Sidebar */}

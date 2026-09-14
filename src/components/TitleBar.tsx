@@ -1,5 +1,5 @@
 import React from 'react';
-import { Minus, X, Maximize2, Minimize2, Pin, PinOff, Hourglass } from 'lucide-react';
+import { Minus, X, Maximize2, Minimize2, Pin, PinOff, Hourglass, PictureInPicture2 } from 'lucide-react';
 import { ThemeColors } from '../types';
 import { WindowService } from '../services/window';
 
@@ -9,6 +9,7 @@ interface TitleBarProps {
   isPinned: boolean;
   onToggleCompact: () => void;
   onTogglePin: () => void;
+  onToggleOverlay?: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -17,6 +18,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   isPinned,
   onToggleCompact,
   onTogglePin,
+  onToggleOverlay,
 }) => {
   return (
     <div
@@ -53,6 +55,18 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
             >
               <Maximize2 size={12} />
+            </button>
+
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onToggleOverlay?.();
+              }}
+              title="Мини-оверлей поверх всех окон"
+              className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
+            >
+              <PictureInPicture2 size={12} />
             </button>
           </div>
         )}

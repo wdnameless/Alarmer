@@ -97,6 +97,93 @@ async fn set_companion_mode(app: tauri::AppHandle, open: bool) -> Result<(), Str
     Ok(())
 }
 
+/// Shows or hides the compact always-on-top mini overlay.
+#[tauri::command]
+async fn toggle_mini_overlay(app: tauri::AppHandle, open: bool) -> Result<(), String> {
+    const LABEL: &str = "mini-overlay";
+
+    if !open {
+        if let Some(win) = app.get_webview_window(LABEL) {
+            let _ = win.close();
+        }
+        return Ok(());
+    }
+
+    if let Some(win) = app.get_webview_window(LABEL) {
+        let _ = win.show();
+        let _ = win.set_focus();
+        return Ok(());
+    }
+
+    // Anchor bottom-right of the primary monitor so it never covers the main dial.
+    let (x, y) = if let Some(main) = app.get_webview_window("main") {
+        match (main.primary_monitor(), main.outer_position()) {
+            (Ok(Some(monitor)), Ok(_)) => {
+                let size = monitor.size();
+                let scale = monitor.scale_factor();
+                let logical_w = size.width as f64 / scale;
+                let logical_h = size.height as f64 / scale;
+                (logical_w - 220.0, logical_h - 120.0)
+            }
+            _ => (40.0, 40.0),
+        }
+    } else {
+        (40.0, 40.0)
+    };
+
+    tauri::WebviewWindowBuilder::new(
+        &app,
+        LABEL,
+        tauri::WebviewUrl::App("index.html?window=mini-overlay".into()),
+    )
+    .title("Alarmer — Мини")
+    .inner_size(200.0, 100.0)
+    .position(x, y)
+    .resizable(false)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(true)
+    .skip_taskbar(true)
+    .shadow(false)
+    .build()
+    .map_err(|e| format!("Failed to create mini overlay: {e}"))?;
+
+    Ok(())
+}
+
+/// Registers process-wide shortcuts so the timer can be driven from any app.
+#[tauri::command]
+async fn register_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
+    use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
+
+    let bindings: Vec<(&str, Shortcut)> = vec![
+        ("timer://toggle", Shortcut::new(Some(Modifiers::ALT), Code::KeyS)),
+        ("timer://reset", Shortcut::new(Some(Modifiers::ALT), Code::KeyR)),
+        ("timer://add-five", Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyU)),
+        ("timer://sub-five", Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyD)),
+    ];
+
+    let mut bound = 0usize;
+    for (event, shortcut) in bindings {
+        let emit_event = event.to_string();
+        let handle = app.clone();
+        // A combo already owned by another program must not disable the rest.
+        match app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, press| {
+            if press.state() == ShortcutState::Pressed {
+                let _ = handle.emit(&emit_event, ());
+            }
+        }) {
+            Ok(()) => bound += 1,
+            Err(e) => eprintln!("shortcut {event} unavailable: {e}"),
+        }
+    }
+    if bound == 0 {
+        return Err("no global shortcuts could be bound".to_string());
+    }
+    Ok(())
+}
+
 /// Replaces the alarm schedule enforced by the backend.
 #[tauri::command]
 async fn sync_alarms(alarms: Vec<ScheduledAlarm>) -> Result<(), String> {
@@ -128,12 +215,15 @@ pub fn run() {
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
             None,
         ))
+        .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
             synthesize_speech,
             set_companion_mode,
             sync_alarms,
             snooze_alarm,
             dismiss_alarm,
+            register_shortcuts,
+            toggle_mini_overlay,
         ])
         .setup(|app| {
             // Build Tray Menu
@@ -200,6 +290,14 @@ pub fn run() {
 
             // Alarms must fire even with the window hidden or another tab open.
             scheduler::spawn(app.handle().clone());
+
+            // Timer control from any application, no window focus needed.
+            let handle = app.handle().clone();
+            tauri::async_runtime::spawn(async move {
+                if let Err(e) = register_shortcuts(handle).await {
+                    eprintln!("global shortcuts unavailable: {e}");
+                }
+            });
 
             Ok(())
         })

@@ -4,6 +4,7 @@ import { ThemeColors, DynamicUIConfig } from '../types';
 import { RadialDial } from './RadialDial';
 import { soundService } from '../services/sound';
 import confetti from 'canvas-confetti';
+import { listen, emit } from '@tauri-apps/api/event';
 
 interface TimerProps {
   theme: ThemeColors;
@@ -88,6 +89,48 @@ export const Timer: React.FC<TimerProps> = ({
     setIsRunning(false);
     setRemainingSeconds(totalSeconds);
   };
+
+  /** Nudges the armed duration by ±5 minutes while the timer is idle. */
+  const shiftMinutes = (delta: number) => {
+    if (isRunning) return;
+    const next = Math.max(1, Math.min(180, Math.round(totalSeconds / 60) + delta));
+    const seconds = next * 60;
+    setTotalSeconds(seconds);
+    setRemainingSeconds(seconds);
+    soundService.playCountdownTick();
+  };
+
+  // Mirror the clock to the mini overlay whenever it changes.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+    void emit('timer://tick', { remaining: remainingSeconds, total: totalSeconds, running: isRunning });
+  }, [remainingSeconds, totalSeconds, isRunning]);
+
+  // Global shortcuts fire from any application; Rust forwards them as events.
+  useEffect(() => {
+    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
+
+    const unlisteners: Array<() => void> = [];
+    let cancelled = false;
+
+    const bind = (event: string, handler: () => void) => {
+      void listen(event, handler).then((fn) => {
+        if (cancelled) fn();
+        else unlisteners.push(fn);
+      });
+    };
+
+    bind('timer://toggle', toggleRun);
+    bind('timer://reset', reset);
+    bind('timer://add-five', () => shiftMinutes(5));
+    bind('timer://sub-five', () => shiftMinutes(-5));
+
+    return () => {
+      cancelled = true;
+      unlisteners.forEach((fn) => fn());
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isRunning, totalSeconds]);
 
   const setPresetMinutes = (min: number) => {
     soundService.playCountdownTick();
