@@ -33,6 +33,7 @@ export interface DynamicUIConfig {
     widgetsOrder: Array<'dial' | 'subtimer' | 'presets' | 'controls' | 'alarmsPreview'>;
     showSleepButton?: boolean;
     showAiScheduleButton?: boolean;
+    showCurrentTimeBadge?: boolean;
   };
 }
 

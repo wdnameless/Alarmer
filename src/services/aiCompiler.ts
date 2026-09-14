@@ -223,6 +223,16 @@ export class AICompilerService {
       }
     }
 
+    if (lower.includes('время') || lower.includes('часы') || lower.includes('плашку времени')) {
+      if (lower.includes('убери') || lower.includes('скрой') || lower.includes('отключи') || lower.includes('выключи')) {
+        cloned.layout.showCurrentTimeBadge = false;
+        changes.push('скрыта плашка текущего времени');
+      } else if (lower.includes('верни') || lower.includes('покажи') || lower.includes('включи')) {
+        cloned.layout.showCurrentTimeBadge = true;
+        changes.push('возвращена плашка текущего времени');
+      }
+    }
+
     if (lower.includes('убери пресет') || lower.includes('без нижних кнопок') || lower.includes('минимал')) {
       cloned.layout.showPresetButtons = false;
       changes.push('скрыты кнопки быстрых пресетов');

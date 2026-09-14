@@ -214,9 +214,11 @@ export const Alarms: React.FC<AlarmsProps> = ({
               <span>ИИ</span>
             </button>
           )}
-          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/40 border border-white/5 shrink-0">
-            {currentTime || '--:--'}
-          </span>
+          {dynamicUi?.layout?.showCurrentTimeBadge !== false && (
+            <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/40 border border-white/5 shrink-0">
+              {currentTime || '--:--'}
+            </span>
+          )}
         </div>
       </div>
       {/* AI Orchestration Modal Banner */}
