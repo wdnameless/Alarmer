@@ -26,6 +26,10 @@
     "core:webview:allow-create-webview-window",
     "opener:default",
     "notification:default",
-    "store:default"
+    "store:default",
+    "autostart:default",
+    "autostart:allow-enable",
+    "autostart:allow-disable",
+    "autostart:allow-is-enabled"
   ]
 }

@@ -7,7 +7,9 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager,
 };
+use scheduler::ScheduledAlarm;
 use base64::Engine;
+mod scheduler;
 use msedge_tts::{tts::client::connect, tts::SpeechConfig, voice::{get_voices_list, Voice}};
 
 static AUDIO_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -95,13 +97,44 @@ async fn set_companion_mode(app: tauri::AppHandle, open: bool) -> Result<(), Str
     Ok(())
 }
 
+/// Replaces the alarm schedule enforced by the backend.
+#[tauri::command]
+async fn sync_alarms(alarms: Vec<ScheduledAlarm>) -> Result<(), String> {
+    scheduler::sync(alarms);
+    Ok(())
+}
+
+/// Defers an alarm by N minutes.
+#[tauri::command]
+async fn snooze_alarm(id: String, minutes: u32) -> Result<(), String> {
+    scheduler::snooze(&id, minutes);
+    Ok(())
+}
+
+/// Marks an alarm as acknowledged.
+#[tauri::command]
+async fn dismiss_alarm(id: String) -> Result<(), String> {
+    scheduler::dismiss(&id);
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
         .plugin(tauri_plugin_store::Builder::new().build())
-        .invoke_handler(tauri::generate_handler![synthesize_speech, set_companion_mode])
+        .plugin(tauri_plugin_autostart::init(
+            tauri_plugin_autostart::MacosLauncher::LaunchAgent,
+            None,
+        ))
+        .invoke_handler(tauri::generate_handler![
+            synthesize_speech,
+            set_companion_mode,
+            sync_alarms,
+            snooze_alarm,
+            dismiss_alarm,
+        ])
         .setup(|app| {
             // Build Tray Menu
             let show_i = MenuItem::with_id(app, "show", "Показать Alarmer", true, None::<&str>)?;
@@ -164,6 +197,9 @@ pub fn run() {
                     }
                 })
                 .build(app)?;
+
+            // Alarms must fire even with the window hidden or another tab open.
+            scheduler::spawn(app.handle().clone());
 
             Ok(())
         })

@@ -1,9 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Bell, BellOff, Volume2, Sparkles, Loader2 } from 'lucide-react';
 import { ThemeColors, AlarmItem, AISettings, DynamicUIConfig } from '../types';
-import { NotificationService } from '../services/notification';
 import { soundService } from '../services/sound';
 import { AIService } from '../services/ai';
+import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
+
+/** True when running inside the Tauri shell (the scheduler is only available there). */
+function isTauri(): boolean {
+  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
+}
 
 interface AlarmsProps {
   theme: ThemeColors;
@@ -26,58 +32,101 @@ export const Alarms: React.FC<AlarmsProps> = ({
   const [newLabel, setNewLabel] = useState('Утренняя разминка');
   const [currentTime, setCurrentTime] = useState('');
   const [ringingAlarm, setRingingAlarm] = useState<AlarmItem | null>(null);
-  const triggeredAlarmsRef = useRef<Set<string>>(new Set());
   
   // AI Smart Setup state
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('Вот моя тренировка: в 7:00 подъем, в 7:15 силовая разминка, в 19:30 вечерняя растяжка');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
-  // Clock ticker & trigger check
-  // Clock ticker & trigger check with deduplication and ringing screen
+  // Display clock only. Firing is owned by the Rust scheduler so alarms ring
+  // with this tab closed, the window hidden, or the app in the tray.
   useEffect(() => {
     const updateTime = () => {
       const now = new Date();
-      const currentDay = now.getDay(); // 0-6
       const timeStr = `${now.getHours().toString().padStart(2, '0')}:${now
         .getMinutes()
         .toString()
         .padStart(2, '0')}`;
       setCurrentTime(timeStr);
-
-      // Clear triggered cache on minute change
-      if (now.getSeconds() === 0) {
-        triggeredAlarmsRef.current.clear();
-      }
-
-      alarms.forEach((alarm) => {
-        if (!alarm.enabled || alarm.time !== timeStr) return;
-        
-        // Check day match (if days array is specified and not empty)
-        if (alarm.days && alarm.days.length > 0 && !alarm.days.includes(currentDay)) {
-          return;
-        }
-
-        // Trigger once per minute per alarm
-        const key = `${alarm.id}_${timeStr}`;
-        if (!triggeredAlarmsRef.current.has(key)) {
-          triggeredAlarmsRef.current.add(key);
-          setRingingAlarm(alarm);
-          soundService.playFinishAlarm();
-          const announcement = alarm.voicePrompt || `Внимание! Будильник: ${alarm.label || alarm.title}`;
-          soundService.speak(announcement);
-          NotificationService.notify(alarm.label || alarm.title || 'Будильник Alarmer', announcement).catch(console.error);
-        }
-      });
     };
 
     updateTime();
     const interval = window.setInterval(updateTime, 1000);
     return () => window.clearInterval(interval);
+  }, []);
+
+  // Push the schedule down to the backend whenever it changes.
+  useEffect(() => {
+    if (!isTauri()) return;
+    void invoke('sync_alarms', {
+      alarms: alarms.map((a) => ({
+        id: a.id,
+        label: a.label || a.title,
+        time: a.time,
+        days: a.days ?? [],
+        enabled: a.enabled,
+        voice_prompt: a.voicePrompt ?? null,
+      })),
+    }).catch((e) => console.warn('Failed to sync alarms to scheduler:', e));
+  }, [alarms]);
+
+  // Ring when the backend says it is time.
+  useEffect(() => {
+    if (!isTauri()) return;
+
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    listen<{ id: string; label: string; time: string; voice_prompt: string | null }>(
+      'alarm://fired',
+      (event) => {
+        const payload = event.payload;
+        const alarm = alarms.find((a) => a.id === payload.id) ?? {
+          id: payload.id,
+          title: payload.label,
+          label: payload.label,
+          time: payload.time,
+          days: [],
+          enabled: true,
+          sound: 'gentle',
+          voicePrompt: payload.voice_prompt ?? undefined,
+        };
+        setRingingAlarm(alarm);
+
+        // Escalating signal: quiet start that swells until acknowledged.
+        soundService.startAlarmRamp(alarm.sound, alarm.id);
+        const announcement = payload.voice_prompt || `Внимание! Будильник: ${payload.label}`;
+        soundService.speak(announcement);
+      },
+    ).then((fn) => {
+      if (cancelled) {
+        fn();
+      } else {
+        unlisten = fn;
+      }
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }, [alarms]);
 
   const dismissRingingAlarm = () => {
     soundService.playCountdownTick();
+    soundService.stopAlarmRamp();
+    if (isTauri() && ringingAlarm) {
+      void invoke('dismiss_alarm', { id: ringingAlarm.id }).catch(() => {});
+    }
+    setRingingAlarm(null);
+  };
+
+  const snoozeRingingAlarm = (minutes: number) => {
+    soundService.playCountdownTick();
+    soundService.stopAlarmRamp();
+    if (isTauri() && ringingAlarm) {
+      void invoke('snooze_alarm', { id: ringingAlarm.id, minutes }).catch(() => {});
+    }
     setRingingAlarm(null);
   };
 
@@ -161,6 +210,20 @@ export const Alarms: React.FC<AlarmsProps> = ({
               "{ringingAlarm.voicePrompt}"
             </p>
           )}
+          {/* Snooze: defer by 5 / 10 / 15 minutes */}
+          <div className="flex items-center space-x-2 mb-3">
+            {[5, 10, 15].map((mins) => (
+              <button
+                key={mins}
+                onClick={() => snoozeRingingAlarm(mins)}
+                className="px-3.5 py-2 rounded-xl border text-xs font-bold active:scale-95 transition-all"
+                style={{ borderColor: theme.border, color: theme.text }}
+                title={`Отложить на ${mins} минут`}
+              >
+                +{mins} мин
+              </button>
+            ))}
+          </div>
           <button
             onClick={dismissRingingAlarm}
             className="w-full max-w-xs py-3 rounded-xl font-black text-xs uppercase tracking-wider bg-red-500 hover:bg-red-600 text-white shadow-xl active:scale-95 transition-all"
