@@ -1,5 +1,7 @@
+import type { SoundProfileId } from '../types';
 import { EdgeTtsService } from './edgeTts';
 import { ticking } from '../constants/defaults';
+import { StoreService } from '../services/store';
 
 export class SoundService {
   private ctx: AudioContext | null = null;
@@ -40,10 +42,10 @@ export class SoundService {
 
   // UI click sound (tabs, buttons, presets) with volume regulation
   playUiClick() {
-    const enabled = localStorage.getItem('alarmer_ui_clicks') !== 'false';
+    const enabled = StoreService.getPreference('alarmer_ui_clicks', true);
     if (!enabled) return;
-    const clickVol = parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');
-    const profile = localStorage.getItem('alarmer_sound_profile') || 'neon';
+    const clickVol = StoreService.getPreference('alarmer_click_volume', 0.5);
+    const profile = StoreService.getPreference('alarmer_sound_profile', 'neon') as SoundProfileId;
     switch (profile) {
       case 'mechanical':
         this.playBeep(220, 0.04, 0.5 * clickVol);
@@ -64,11 +66,11 @@ export class SoundService {
   private tickingAudio: HTMLAudioElement | null = null;
 
   // Play user-supplied FLAC clock tick audio
-  playClockTick(_isTock = false) {
-    const enabled = localStorage.getItem('alarmer_clock_tick') !== 'false';
+  playClockTick() {
+    const enabled = StoreService.getPreference('alarmer_clock_tick', true);
     if (!enabled) return;
     try {
-      const clickVol = parseFloat(localStorage.getItem('alarmer_click_volume') || '0.7');
+      const clickVol = StoreService.getPreference('alarmer_click_volume', 0.7);
       if (!this.tickingAudio) {
         this.tickingAudio = new Audio(ticking);
       }
@@ -80,7 +82,7 @@ export class SoundService {
     }
   }
   playCountdownTick() {
-    const enabled = localStorage.getItem('alarmer_countdown_ticks') !== 'false';
+    const enabled = StoreService.getPreference('alarmer_countdown_ticks', true);
     if (!enabled) return;
     this.playUiClick();
   }
@@ -89,8 +91,8 @@ export class SoundService {
 
   playFinishAlarm() {
     try {
-      const alarmVol = parseFloat(localStorage.getItem('alarmer_alarm_volume') || '0.8');
-      const customAudio = localStorage.getItem('alarmer_custom_alarm_sound');
+      const alarmVol = StoreService.getPreference('alarmer_alarm_volume', 0.8);
+      const customAudio = StoreService.getPreference('alarmer_custom_alarm_sound', '') || null;
       if (customAudio) {
         if (!this.customAlarmAudio) {
           this.customAlarmAudio = new Audio();
@@ -121,7 +123,7 @@ export class SoundService {
     }
   }
   speak(text: string, voiceId?: string) {
-    const savedVoice = voiceId || localStorage.getItem('alarmer_voice_id') || 'none';
+    const savedVoice = voiceId || StoreService.getPreference('alarmer_voice_id', 'none');
     if (savedVoice === 'none') {
       return; // Disabled by default
     }
@@ -130,36 +132,6 @@ export class SoundService {
 
   stopSpeaking() {
     EdgeTtsService.stop();
-  }
-
-  legacySpeak(text: string, volume = 0.9) {
-    try {
-      window.speechSynthesis.cancel(); // stop current
-      const utterance = new SpeechSynthesisUtterance(text);
-      utterance.volume = volume;
-      utterance.rate = 1.0;
-      utterance.pitch = 1.0;
-
-      const doSpeak = () => {
-        const voices = window.speechSynthesis.getVoices();
-        const ruVoice = voices.find(v => v.lang.toLowerCase().includes('ru'));
-        if (ruVoice) {
-          utterance.voice = ruVoice;
-        }
-        window.speechSynthesis.speak(utterance);
-      };
-
-      if (window.speechSynthesis.getVoices().length === 0) {
-        window.speechSynthesis.onvoiceschanged = () => {
-          window.speechSynthesis.onvoiceschanged = null;
-          doSpeak();
-        };
-      } else {
-        doSpeak();
-      }
-    } catch (e) {
-      console.warn('TTS voice error:', e);
-    }
   }
 }
 

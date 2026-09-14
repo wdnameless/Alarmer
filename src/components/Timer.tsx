@@ -25,14 +25,15 @@ export const Timer: React.FC<TimerProps> = ({
   const [overtimeSec, setOvertimeSec] = useState(0);
   const [flowMode] = useState(true);
 
-  // Synchronize when initialMinutes preset changes
-  useEffect(() => {
-    if (!isRunning) {
-      const s = initialMinutes * 60;
-      setTotalSeconds(s);
-      setRemainingSeconds(s);
-    }
-  }, [initialMinutes]);
+  // Re-arm the dial whenever the preset changes while the timer is idle.
+  // Derived during render instead of in an effect to avoid a cascading re-render.
+  const [armedMinutes, setArmedMinutes] = useState(initialMinutes);
+  if (!isRunning && armedMinutes !== initialMinutes) {
+    const seconds = initialMinutes * 60;
+    setArmedMinutes(initialMinutes);
+    setTotalSeconds(seconds);
+    setRemainingSeconds(seconds);
+  }
 
   useEffect(() => {
     let timer: number | undefined;
@@ -43,7 +44,7 @@ export const Timer: React.FC<TimerProps> = ({
             if (prev <= 4) {
               soundService.playCountdownTick();
             } else {
-              soundService.playClockTick(prev % 2 === 0);
+              soundService.playClockTick();
             }
             return prev - 1;
           }
@@ -69,7 +70,7 @@ export const Timer: React.FC<TimerProps> = ({
     } else if (isOvertime) {
       timer = window.setInterval(() => {
         setOvertimeSec((prev) => {
-          soundService.playClockTick(prev % 2 === 0);
+          soundService.playClockTick();
           return prev + 1;
         });
       }, 1000);

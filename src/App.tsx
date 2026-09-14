@@ -2,14 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { ChatMessage } from './services/aiCompiler';
 import { HandClock, HandGear, HandSparkle } from './components/CustomIcons';
-import { AppMode, ThemeKey, AISettings, AlarmItem, WorkoutRoutine, ThemeColors, DynamicUIConfig } from './types';
 import { AIChatDrawer } from './components/AIChatDrawer';
 import { THEMES } from './constants/themes';
-import {
-  DEFAULT_AI_SETTINGS,
-  DEFAULT_ALARMS,
-  DEFAULT_WORKOUT_ROUTINES,
-} from './constants/defaults';
 import { DashboardView } from './components/DashboardView';
 import { SettingsView } from './components/SettingsView';
 import { windowService } from './services/window';
@@ -17,7 +11,19 @@ import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { I18nService } from './services/i18n';
-import { DEFAULT_DYNAMIC_UI } from './types';
+import { AppMode, ThemeKey, AISettings, AlarmItem, ThemeColors, DynamicUIConfig } from './types';
+import { StoreService } from './services/store';
+import { ErrorBoundary } from './components/ErrorBoundary';
+
+/** First message shown in a brand-new conversation. */
+function welcomeMessage(): ChatMessage {
+  return {
+    id: 'welcome',
+    sender: 'assistant',
+    text: 'Привет! Я твой AI Co-Pilot. Я умею управлять будильниками, настраивать таймеры и динамически менять интерфейс приложения. Чем могу помочь?',
+    timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+  };
+}
 
 export const App: React.FC = () => {
   // App state
@@ -28,93 +34,42 @@ export const App: React.FC = () => {
   const [aiTimerMinutes] = useState<number | undefined>(undefined);
   const [dashboardSubModule, setDashboardSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
   const [isAiWingOpen, setIsAiWingOpen] = useState<boolean>(false);
-  const [leftPaneWidth, setLeftPaneWidth] = useState<number>(() => {
-    const saved = localStorage.getItem('alarmer_left_pane_width');
-    return saved ? parseInt(saved, 10) : 340;
-  });
+  const [leftPaneWidth, setLeftPaneWidth] = useState<number>(() =>
+    StoreService.getPreference('alarmer_left_pane_width', 340),
+  );
   const [isResizingSplit, setIsResizingSplit] = useState<boolean>(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
-    try {
-      const saved = localStorage.getItem('alarmer_chat_history');
-      return saved ? JSON.parse(saved) : [
-        {
-          id: '1',
-          sender: 'assistant',
-          text: 'Привет! Я твой AI Co-Pilot. Я умею управлять будильниками, создавать программы тренировок (HIIT, Табата), настраивать таймеры и динамически менять интерфейс приложения. Чем могу помочь?',
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ];
-    } catch {
-      return [
-        {
-          id: '1',
-          sender: 'assistant',
-          text: 'Привет! Я твой AI Co-Pilot. Я умею управлять будильниками, создавать программы тренировок (HIIT, Табата), настраивать таймеры и динамически менять интерфейс приложения. Чем могу помочь?',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ];
-    }
+    const stored = StoreService.snapshot().chatMessages;
+    if (stored.length > 0) return stored as unknown as ChatMessage[];
+    return [welcomeMessage()];
   });
-
-  useEffect(() => {
-    localStorage.setItem('alarmer_chat_history', JSON.stringify(chatMessages));
-  }, [chatMessages]);
   // Dynamic AI-driven UI Configuration
-  const [dynamicUi, setDynamicUi] = useState<DynamicUIConfig>(() => {
-    try {
-      const saved = localStorage.getItem('alarmer_dynamic_ui');
-      return saved ? JSON.parse(saved) : DEFAULT_DYNAMIC_UI;
-    } catch {
-      return DEFAULT_DYNAMIC_UI;
-    }
-  });
+  const [dynamicUi, setDynamicUi] = useState<DynamicUIConfig>(() => StoreService.snapshot().dynamicUi);
 
+
+  const [aiSettings, setAISettings] = useState<AISettings>(() => StoreService.snapshot().aiSettings);
+
+  const [alarms, setAlarms] = useState<AlarmItem[]>(() => StoreService.snapshot().alarms);
+
+  // Single persistence funnel: structured state goes to the native store file.
   useEffect(() => {
-    localStorage.setItem('alarmer_dynamic_ui', JSON.stringify(dynamicUi));
-  }, [dynamicUi]);
+    void StoreService.persist({ aiSettings, alarms, dynamicUi, chatMessages: chatMessages as never });
+  }, [aiSettings, alarms, dynamicUi, chatMessages]);
 
-
-  // Data state with localStorage persistence
-  const [aiSettings, setAISettings] = useState<AISettings>(() => {
-    try {
-      const saved = localStorage.getItem('alarmer_ai_settings');
-      return saved ? JSON.parse(saved) : DEFAULT_AI_SETTINGS;
-    } catch {
-      return DEFAULT_AI_SETTINGS;
-    }
-  });
-
-  const [alarms, setAlarms] = useState<AlarmItem[]>(() => {
-    try {
-      const saved = localStorage.getItem('alarmer_alarms');
-      return saved ? JSON.parse(saved) : DEFAULT_ALARMS;
-    } catch {
-      return DEFAULT_ALARMS;
-    }
-  });
-
-  const [routines, setRoutines] = useState<WorkoutRoutine[]>(() => {
-    try {
-      const saved = localStorage.getItem('alarmer_routines');
-      return saved ? JSON.parse(saved) : DEFAULT_WORKOUT_ROUTINES;
-    } catch {
-      return DEFAULT_WORKOUT_ROUTINES;
-    }
-  });
-
-  const [selectedRoutine, setSelectedRoutine] = useState<WorkoutRoutine>(routines[0]);
-
+  // Adopt the persisted store file on first mount (native file, not localStorage).
   useEffect(() => {
-    localStorage.setItem('alarmer_ai_settings', JSON.stringify(aiSettings));
-  }, [aiSettings]);
+    StoreService.hydrate()
+      .then((state) => {
+        setAlarms(state.alarms);
+        setAISettings(state.aiSettings);
+        setDynamicUi(state.dynamicUi);
+        if (state.chatMessages.length > 0) {
+          setChatMessages(state.chatMessages as unknown as ChatMessage[]);
+        }
+      })
+      .catch((e) => console.warn('Failed to hydrate store:', e));
+  }, []);
 
-  useEffect(() => {
-    localStorage.setItem('alarmer_alarms', JSON.stringify(alarms));
-  }, [alarms]);
-
-  useEffect(() => {
-    localStorage.setItem('alarmer_routines', JSON.stringify(routines));
-  }, [routines]);
   // Initialize notification permissions on mount
   useEffect(() => {
     NotificationService.init().catch(console.error);
@@ -151,7 +106,7 @@ export const App: React.FC = () => {
       if (!isResizingSplit) return;
       const clamped = Math.max(260, Math.min(540, e.clientX));
       setLeftPaneWidth(clamped);
-      localStorage.setItem('alarmer_left_pane_width', clamped.toString());
+      StoreService.setPreference('alarmer_left_pane_width', clamped);
     };
 
     const handleMouseUp = () => {
@@ -173,15 +128,6 @@ export const App: React.FC = () => {
   const handleSelectTab = (tab: AppMode) => {
     soundService.playUiClick();
     setActiveTab(tab);
-  };
-
-  const handleSelectRoutine = (routine: WorkoutRoutine) => {
-    // Add to routines list if not present
-    if (!routines.find((r) => r.id === routine.id)) {
-      setRoutines([routine, ...routines]);
-    }
-    setSelectedRoutine(routine);
-    setActiveTab('dashboard');
   };
 
   // Effective theme computed from base theme + dynamic UI overrides
@@ -259,29 +205,29 @@ export const App: React.FC = () => {
           {/* Content Area Rendering */}
           <div className="w-full flex-1 flex flex-col items-center justify-center">
             {activeTab === 'dashboard' && (
+              <ErrorBoundary theme={theme} fallbackTitle="Модуль таймера">
               <DashboardView
                 theme={theme}
                 dynamicUi={dynamicUi}
                 alarms={alarms}
-                routines={routines}
-                selectedRoutine={selectedRoutine}
                 aiSettings={aiSettings}
                 onUpdateAlarms={setAlarms}
-                onSelectRoutine={handleSelectRoutine}
                 onOpenAISettings={() => setActiveTab('settings')}
                 timerMinutes={aiTimerMinutes}
                 activeSubModule={dashboardSubModule}
                 onSubModuleChange={setDashboardSubModule}
               />
+              </ErrorBoundary>
             )}
             {activeTab === 'settings' && (
+              <ErrorBoundary theme={theme} fallbackTitle="Модуль настроек">
               <SettingsView
                 theme={theme}
                 aiSettings={aiSettings}
-                currentUi={dynamicUi}
                 onUpdateAISettings={setAISettings}
                 onUpdateUI={setDynamicUi}
               />
+              </ErrorBoundary>
             )}
           </div>
         </div>
@@ -302,6 +248,7 @@ export const App: React.FC = () => {
             </div>
             <div className="w-[2px] bg-gradient-to-b from-transparent via-current to-transparent opacity-30" style={{ color: theme.accent }} />
             <div className="flex-1 h-full flex flex-col overflow-hidden">
+              <ErrorBoundary theme={theme} fallbackTitle="AI Co-Pilot">
               <AIChatDrawer
                 isOpen={true}
                 onClose={toggleAiWing}
@@ -322,8 +269,7 @@ export const App: React.FC = () => {
                   });
                 }}
                 onApplyAlarms={(newAlarms: AlarmItem[]) => setAlarms((prev) => [...prev, ...newAlarms])}
-                onApplyWorkout={(newWorkout: WorkoutRoutine) => handleSelectRoutine(newWorkout)}
-                onSetTimerMinutes={(_mins: number) => {
+                onSetTimerMinutes={() => {
                   setDashboardSubModule('timer');
                   setActiveTab('dashboard');
                 }}
@@ -343,9 +289,10 @@ export const App: React.FC = () => {
                     },
                   ];
                   setChatMessages(cleanChat);
-                  localStorage.setItem('alarmer_chat_history', JSON.stringify(cleanChat));
+                  void StoreService.persist({ chatMessages: cleanChat as never });
                 }}
               />
+              </ErrorBoundary>
             </div>
           </div>
         )}

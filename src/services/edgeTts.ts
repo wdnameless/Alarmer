@@ -1,4 +1,5 @@
 import { invoke } from '@tauri-apps/api/core';
+import { StoreService } from './store';
 
 export interface CloudVoice {
   id: string;
@@ -17,13 +18,31 @@ export const CLOUD_VOICES: CloudVoice[] = [
 
 export class EdgeTtsService {
   private static audioEl: HTMLAudioElement | null = null;
+  private static audioCache = new Map<string, string>();
 
   static async speak(text: string, voiceId: string = 'none'): Promise<void> {
     if (!voiceId || voiceId === 'none' || !text.trim()) return;
 
     this.stop();
 
-    const voiceVol = parseFloat(localStorage.getItem('alarmer_voice_volume') || '0.8');
+    const voiceVol = StoreService.getPreference('alarmer_voice_volume', 0.8);
+    const cacheKey = `${voiceId}::${text}`;
+
+    // 0. In-memory data-URI cache (instant replay without IPC)
+    const cachedUri = this.audioCache.get(cacheKey);
+    if (cachedUri) {
+      try {
+        if (!this.audioEl) {
+          this.audioEl = new Audio();
+        }
+        this.audioEl.src = cachedUri;
+        this.audioEl.volume = Math.max(0, Math.min(1, voiceVol));
+        await this.audioEl.play();
+        return;
+      } catch (err) {
+        console.warn('Cached Edge TTS playback failed:', err);
+      }
+    }
 
     // 1. Native Rust Microsoft Edge Neural TTS
     try {
@@ -33,6 +52,7 @@ export class EdgeTtsService {
       });
 
       if (dataUri && dataUri.startsWith('data:audio/')) {
+        this.audioCache.set(cacheKey, dataUri);
         if (!this.audioEl) {
           this.audioEl = new Audio();
         }
@@ -44,7 +64,6 @@ export class EdgeTtsService {
     } catch (err) {
       console.warn('Native Edge TTS synthesis failed, trying fallback:', err);
     }
-
     // 2. Fallback: Google TTS remote stream
     const isEnglish = voiceId.includes('en-US');
     const lang = isEnglish ? 'en' : 'ru';

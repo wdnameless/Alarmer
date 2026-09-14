@@ -4,11 +4,11 @@ import { ThemeColors, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '..
 import { CLOUD_VOICES, EdgeTtsService } from '../services/edgeTts';
 import { soundService } from '../services/sound';
 import { I18nService, Language } from '../services/i18n';
+import { StoreService } from '../services/store';
 
 interface SettingsViewProps {
   theme: ThemeColors;
   aiSettings: AISettings;
-  currentUi: DynamicUIConfig;
   onUpdateAISettings: (settings: AISettings) => void;
   onUpdateUI: (ui: DynamicUIConfig) => void;
 }
@@ -16,12 +16,11 @@ interface SettingsViewProps {
 export const SettingsView: React.FC<SettingsViewProps> = ({
   theme,
   aiSettings,
-  currentUi: _currentUi,
   onUpdateAISettings,
   onUpdateUI,
 }) => {
   const [selectedVoice, setSelectedVoice] = useState<string>(() => {
-    return localStorage.getItem('alarmer_voice_id') || 'none';
+    return StoreService.getPreference('alarmer_voice_id', 'none');
   });
 
   const [apiKey, setApiKey] = useState(aiSettings.apiKey);
@@ -29,29 +28,29 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [model, setModel] = useState(aiSettings.model);
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [testingVoice, setTestingVoice] = useState(false);
+  const [importError, setImportError] = useState<string | null>(null);
   const [uiClicks, setUiClicks] = useState<boolean>(() => {
-    return localStorage.getItem('alarmer_ui_clicks') !== 'false';
+    return StoreService.getPreference('alarmer_ui_clicks', true);
   });
   const [countdownTicks, setCountdownTicks] = useState<boolean>(() => {
-    return localStorage.getItem('alarmer_countdown_ticks') !== 'false';
+    return StoreService.getPreference('alarmer_countdown_ticks', true);
   });
   const [soundProfile, setSoundProfile] = useState<string>(() => {
-    return localStorage.getItem('alarmer_sound_profile') || 'neon';
+    return StoreService.getPreference('alarmer_sound_profile', 'neon');
   });
   const [clockTick, setClockTick] = useState<boolean>(() => {
-    return localStorage.getItem('alarmer_clock_tick') !== 'false';
+    return StoreService.getPreference('alarmer_clock_tick', true);
   });
   const [clickVolume, setClickVolume] = useState<number>(() => {
-    return parseFloat(localStorage.getItem('alarmer_click_volume') || '0.5');
+    return StoreService.getPreference('alarmer_click_volume', 0.5);
   });
   const [alarmVolume, setAlarmVolume] = useState<number>(() => {
-    return parseFloat(localStorage.getItem('alarmer_alarm_volume') || '0.8');
+    return StoreService.getPreference('alarmer_alarm_volume', 0.8);
   });
   const [voiceVolume, setVoiceVolume] = useState<number>(() => {
-    return parseFloat(localStorage.getItem('alarmer_voice_volume') || '0.8');
+    return StoreService.getPreference('alarmer_voice_volume', 0.8);
   });
   const [currentLang, setCurrentLang] = useState<Language>(() => I18nService.getLang());
-  const [_activeTab] = useState<'sound' | 'ai' | 'backup'>('sound');
 
   const handleLangChange = (lang: Language) => {
     I18nService.setLang(lang);
@@ -61,7 +60,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   const handleVoiceChange = (voiceId: string) => {
     setSelectedVoice(voiceId);
-    localStorage.setItem('alarmer_voice_id', voiceId);
+    StoreService.setPreference('alarmer_voice_id', voiceId);
     if (voiceId !== 'none') {
       EdgeTtsService.speak('Голос успешно выбран!', voiceId);
     } else {
@@ -71,20 +70,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const handleToggleUiClicks = () => {
     const next = !uiClicks;
     setUiClicks(next);
-    localStorage.setItem('alarmer_ui_clicks', String(next));
+    StoreService.setPreference('alarmer_ui_clicks', next);
     if (next) soundService.playUiClick();
   };
 
   const handleToggleCountdownTicks = () => {
     const next = !countdownTicks;
     setCountdownTicks(next);
-    localStorage.setItem('alarmer_countdown_ticks', String(next));
+    StoreService.setPreference('alarmer_countdown_ticks', next);
     if (next) soundService.playCountdownTick();
   };
 
   const handleSelectProfile = (prof: string) => {
     setSoundProfile(prof);
-    localStorage.setItem('alarmer_sound_profile', prof);
+    StoreService.setPreference('alarmer_sound_profile', prof);
     soundService.playUiClick();
   };
 
@@ -206,7 +205,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             onChange={(e) => {
               const val = parseFloat(e.target.value);
               setVoiceVolume(val);
-              localStorage.setItem('alarmer_voice_volume', val.toString());
+              StoreService.setPreference('alarmer_voice_volume', val);
             }}
             className="w-full accent-current h-1.5 rounded-lg cursor-pointer bg-white/10"
             style={{ accentColor: theme.accent }}
@@ -258,7 +257,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             onClick={() => {
               const next = !clockTick;
               setClockTick(next);
-              localStorage.setItem('alarmer_clock_tick', String(next));
+              StoreService.setPreference('alarmer_clock_tick', next);
               if (next) soundService.playUiClick();
             }}
             className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all col-span-2"
@@ -289,7 +288,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
                 setClickVolume(val);
-                localStorage.setItem('alarmer_click_volume', String(val));
+                StoreService.setPreference('alarmer_click_volume', val);
                 soundService.playUiClick();
               }}
               className="w-full accent-current h-1 rounded-lg cursor-pointer opacity-80"
@@ -311,7 +310,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onChange={(e) => {
                 const val = parseFloat(e.target.value);
                 setAlarmVolume(val);
-                localStorage.setItem('alarmer_alarm_volume', String(val));
+                StoreService.setPreference('alarmer_alarm_volume', val);
               }}
               className="w-full accent-current h-1 rounded-lg cursor-pointer opacity-80"
               style={{ accentColor: theme.accent }}
@@ -417,18 +416,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="button"
             onClick={() => {
-              const data: Record<string, unknown> = {};
-              for (let i = 0; i < localStorage.length; i++) {
-                const key = localStorage.key(i);
-                if (key && key.startsWith('alarmer_')) {
-                  try {
-                    data[key] = JSON.parse(localStorage.getItem(key) || '""');
-                  } catch {
-                    data[key] = localStorage.getItem(key);
-                  }
-                }
-              }
-              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+              const blob = new Blob([StoreService.exportJson()], { type: 'application/json' });
               const url = URL.createObjectURL(blob);
               const a = document.createElement('a');
               a.href = url;
@@ -457,19 +445,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 const file = e.target.files?.[0];
                 if (!file) return;
                 const reader = new FileReader();
-                reader.onload = (event) => {
+                reader.onload = async (event) => {
                   try {
-                    const parsed = JSON.parse(event.target?.result as string);
-                    Object.entries(parsed).forEach(([k, v]) => {
-                      if (typeof v === 'object') {
-                        localStorage.setItem(k, JSON.stringify(v));
-                      } else {
-                        localStorage.setItem(k, String(v));
-                      }
-                    });
+                    setImportError(null);
+                    await StoreService.importJson(String(event.target?.result ?? ''));
                     window.location.reload();
                   } catch (err) {
-                    console.error('Import failed', err);
+                    // Surface a readable message instead of silently resetting state.
+                    setImportError(err instanceof Error ? err.message : 'Не удалось импортировать файл');
                   }
                 };
                 reader.readAsText(file);
@@ -477,6 +460,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             />
           </label>
         </div>
+        {importError && (
+          <p className="text-[11px] text-red-400 leading-snug">Ошибка импорта: {importError}</p>
+        )}
       </div>
     </div>
   );

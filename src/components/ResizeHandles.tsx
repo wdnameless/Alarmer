@@ -17,7 +17,9 @@ export const ResizeHandles: React.FC = () => {
       const target = e.currentTarget as HTMLElement;
       try {
         target.setPointerCapture(e.pointerId);
-      } catch {}
+      } catch {
+        // Pointer capture is best-effort: resizing still tracks pointermove.
+      }
 
       const onPointerMove = async (moveEvent: PointerEvent) => {
         const deltaX = moveEvent.clientX - startX;
@@ -51,7 +53,9 @@ export const ResizeHandles: React.FC = () => {
       const onPointerUp = (upEvent: PointerEvent) => {
         try {
           target.releasePointerCapture(upEvent.pointerId);
-        } catch {}
+        } catch {
+          // Capture may already be gone if the pointer left the window.
+        }
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
       };

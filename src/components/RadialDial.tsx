@@ -77,7 +77,9 @@ export const RadialDial: React.FC<RadialDialProps> = ({
     if (!isInteractive) return;
     try {
       (e.currentTarget as Element).setPointerCapture(e.pointerId);
-    } catch {}
+    } catch {
+      // Pointer capture is best-effort: dragging still works without it.
+    }
     calculateProgressFromEvent(e.clientX, e.clientY);
   };
 
@@ -93,7 +95,9 @@ export const RadialDial: React.FC<RadialDialProps> = ({
     }
     try {
       (e.currentTarget as Element).releasePointerCapture(e.pointerId);
-    } catch {}
+    } catch {
+      // Capture may already be gone if the pointer left the window.
+    }
   };
 
   // Generate 60 tick marks radiating inward

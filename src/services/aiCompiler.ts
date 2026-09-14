@@ -1,11 +1,10 @@
-import { AISettings, DynamicUIConfig, AlarmItem, WorkoutRoutine } from '../types';
+import { AISettings, DynamicUIConfig, AlarmItem } from '../types';
 
 export interface AIPlatformMutation {
   type: 'ui_change' | 'alarm_schedule' | 'workout_plan' | 'hybrid';
   explanation: string;
   ui?: Partial<DynamicUIConfig>;
   alarms?: AlarmItem[];
-  workout?: WorkoutRoutine;
   autoApply: boolean;
 }
 
@@ -136,7 +135,6 @@ export class AICompilerService {
         explanation: parsed.explanation || 'Интерфейс и расписание обновлены ИИ',
         ui: parsed.ui,
         alarms: parsed.alarms,
-        workout: parsed.workout,
         autoApply: parsed.autoApply ?? true,
       };
     } catch (e) {

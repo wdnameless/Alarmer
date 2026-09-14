@@ -1,15 +1,45 @@
+use std::collections::hash_map::DefaultHasher;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use std::sync::{Mutex, OnceLock};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
     Manager,
 };
 use base64::Engine;
-use msedge_tts::{tts::client::connect, tts::SpeechConfig, voice::get_voices_list};
+use msedge_tts::{tts::client::connect, tts::SpeechConfig, voice::{get_voices_list, Voice}};
+
+static AUDIO_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
+static VOICES_CACHE: OnceLock<Mutex<Option<Vec<Voice>>>> = OnceLock::new();
+
+fn get_or_fetch_voices() -> Result<Vec<Voice>, String> {
+    let cell = VOICES_CACHE.get_or_init(|| Mutex::new(None));
+    let mut guard = cell.lock().map_err(|e| format!("Voices lock error: {e}"))?;
+    if let Some(voices) = &*guard {
+        return Ok(voices.clone());
+    }
+    let voices = get_voices_list().map_err(|e| format!("Failed to fetch voices: {e}"))?;
+    *guard = Some(voices.clone());
+    Ok(voices)
+}
 
 #[tauri::command]
 async fn synthesize_speech(text: String, voice_id: String) -> Result<String, String> {
-    tauri::async_runtime::spawn_blocking(move || {
-        let voices = get_voices_list().map_err(|e| format!("Failed to fetch voices: {e}"))?;
+    let mut hasher = DefaultHasher::new();
+    text.hash(&mut hasher);
+    let text_hash = hasher.finish();
+    let cache_key = format!("{voice_id}::{text_hash:x}");
+
+    let cache_mutex = AUDIO_CACHE.get_or_init(|| Mutex::new(HashMap::new()));
+    if let Ok(guard) = cache_mutex.lock() {
+        if let Some(cached_data) = guard.get(&cache_key) {
+            return Ok(cached_data.clone());
+        }
+    }
+
+    let audio_uri = tauri::async_runtime::spawn_blocking(move || {
+        let voices = get_or_fetch_voices()?;
         
         // Match voice by ID or name substring
         let target_voice = voices
@@ -47,7 +77,13 @@ async fn synthesize_speech(text: String, voice_id: String) -> Result<String, Str
         Ok(format!("data:audio/mp3;base64,{b64}"))
     })
     .await
-    .map_err(|e| format!("Task join error: {e}"))?
+    .map_err(|e| format!("Task join error: {e}"))??;
+
+    if let Ok(mut guard) = cache_mutex.lock() {
+        guard.insert(cache_key, audio_uri.clone());
+    }
+
+    Ok(audio_uri)
 }
 
 #[tauri::command]
@@ -64,6 +100,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .plugin(tauri_plugin_store::Builder::new().build())
         .invoke_handler(tauri::generate_handler![synthesize_speech, set_companion_mode])
         .setup(|app| {
             // Build Tray Menu

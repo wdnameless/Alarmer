@@ -1,3 +1,5 @@
+import { StoreService } from './store';
+
 export type Language = 'en' | 'ru';
 
 export interface Translations {
@@ -84,11 +86,11 @@ export const TRANSLATIONS: Record<Language, Translations> = {
 
 export class I18nService {
   static getLang(): Language {
-    return (localStorage.getItem('alarmer_lang') as Language) || 'ru';
+    return StoreService.getPreference('alarmer_lang', 'ru') as Language;
   }
 
   static setLang(lang: Language) {
-    localStorage.setItem('alarmer_lang', lang);
+    StoreService.setPreference('alarmer_lang', lang);
   }
 
   static t(): Translations {
