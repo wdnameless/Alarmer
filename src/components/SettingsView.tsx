@@ -51,6 +51,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return parseFloat(localStorage.getItem('alarmer_voice_volume') || '0.8');
   });
   const [currentLang, setCurrentLang] = useState<Language>(() => I18nService.getLang());
+  const [_activeTab] = useState<'sound' | 'ai' | 'backup'>('sound');
 
   const handleLangChange = (lang: Language) => {
     I18nService.setLang(lang);
