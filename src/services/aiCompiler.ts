@@ -197,6 +197,21 @@ export class AICompilerService {
       cloned.dial.showTicks = true;
       changes.push('включены засечки циферблата');
     }
+    if (lower.includes('ко сну') && (lower.includes('убери') || lower.includes('скрой') || lower.includes('отключи'))) {
+      cloned.layout.showSleepButton = false;
+      changes.push('скрыта кнопка «Ко сну»');
+    } else if (lower.includes('ко сну') && (lower.includes('верни') || lower.includes('покажи') || lower.includes('включи'))) {
+      cloned.layout.showSleepButton = true;
+      changes.push('возвращена кнопка «Ко сну»');
+    }
+
+    if ((lower.includes('кнопк') || lower.includes('виджет') || lower.includes('ии')) && (lower.includes('ии') || lower.includes('ai')) && (lower.includes('убери') || lower.includes('скрой') || lower.includes('отключи'))) {
+      cloned.layout.showAiScheduleButton = false;
+      changes.push('скрыта кнопка «ИИ» в будильниках');
+    } else if ((lower.includes('кнопк') || lower.includes('виджет') || lower.includes('ии')) && (lower.includes('ии') || lower.includes('ai')) && (lower.includes('верни') || lower.includes('покажи') || lower.includes('включи'))) {
+      cloned.layout.showAiScheduleButton = true;
+      changes.push('возвращена кнопка «ИИ» в будильниках');
+    }
 
     if (lower.includes('убери пресет') || lower.includes('без нижних кнопок') || lower.includes('минимал')) {
       cloned.layout.showPresetButtons = false;
