@@ -138,47 +138,46 @@ export const Alarms: React.FC<AlarmsProps> = ({
   };
 
   return (
-    <div className="flex flex-col w-full px-2 py-1 space-y-3">
+    <div className="flex flex-col w-full max-w-[340px] px-1 py-1 space-y-2.5 overflow-hidden">
       {/* Ringing Overlay */}
       {ringingAlarm && (
         <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-6 backdrop-blur-xl animate-pulse"
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 backdrop-blur-xl animate-pulse"
           style={{ backgroundColor: `${theme.bg}F0` }}
         >
-          <div className="w-20 h-20 rounded-full flex items-center justify-center mb-6 bg-red-500/20 text-red-400 border border-red-500/40">
-            <Bell size={40} className="animate-bounce" />
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-red-500/20 text-red-400 border border-red-500/40">
+            <Bell size={32} className="animate-bounce" />
           </div>
-          <h2 className="text-3xl font-black mb-2 tracking-tight" style={{ color: theme.text }}>
+          <h2 className="text-2xl font-black mb-1 tracking-tight" style={{ color: theme.text }}>
             {ringingAlarm.time}
           </h2>
-          <p className="text-lg font-bold mb-4 text-center" style={{ color: theme.accent }}>
+          <p className="text-base font-bold mb-3 text-center" style={{ color: theme.accent }}>
             {ringingAlarm.label || ringingAlarm.title}
           </p>
           {ringingAlarm.voicePrompt && (
-            <p className="text-xs text-center opacity-80 mb-6 italic max-w-xs" style={{ color: theme.subtext }}>
+            <p className="text-xs text-center opacity-80 mb-4 italic max-w-xs" style={{ color: theme.subtext }}>
               "{ringingAlarm.voicePrompt}"
             </p>
           )}
           <button
             onClick={dismissRingingAlarm}
-            className="w-full max-w-xs py-4 rounded-2xl font-black text-sm uppercase tracking-wider bg-red-500 hover:bg-red-600 text-white shadow-xl active:scale-95 transition-all"
+            className="w-full max-w-xs py-3 rounded-xl font-black text-xs uppercase tracking-wider bg-red-500 hover:bg-red-600 text-white shadow-xl active:scale-95 transition-all"
           >
             Остановить будильник
           </button>
         </div>
       )}
-      {/* Header bar */}
-      <div className="flex items-center justify-between px-1">
-        <div className="flex items-center space-x-2">
-          <Bell size={18} style={{ color: theme.accent }} />
-          <span className="text-sm font-semibold tracking-wider uppercase opacity-80">
-            Будильники и Напоминания
+      {/* Responsive Header bar */}
+      <div className="flex flex-wrap items-center justify-between gap-1.5 w-full">
+        <div className="flex items-center space-x-1.5 shrink-0">
+          <Bell size={15} style={{ color: theme.accent }} />
+          <span className="text-xs font-bold tracking-wider uppercase opacity-90 truncate">
+            Будильники
           </span>
         </div>
-        <div className="flex items-center space-x-2">
+        <div className="flex items-center space-x-1 shrink-0">
           <button
             onClick={() => {
-              // Reverse Sleep Alarm shortcut
               const sleepAlarm: AlarmItem = {
                 id: 'sleep_' + Date.now(),
                 title: 'Отход ко сну (Wind-down)',
@@ -192,29 +191,28 @@ export const Alarms: React.FC<AlarmsProps> = ({
               soundService.playUiClick();
               soundService.speak('Будильник ко сну установлен на 23:00');
             }}
-            className="flex items-center space-x-1 px-2 py-1 text-[11px] font-semibold rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 transition-all"
-            title="Reverse Alarm: Будильник ко сну (за 45 мин до отдыха)"
+            className="px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 transition-all shrink-0"
+            title="Reverse Alarm: Будильник ко сну"
           >
-            <span>🌙 Ко сну</span>
+            🌙 Ко сну
           </button>
           <button
             onClick={() => setShowAiModal(true)}
-            className="flex items-center space-x-1 px-2.5 py-1 text-xs font-bold rounded-lg transition-all shadow-sm"
+            className="flex items-center space-x-1 px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all shadow-sm shrink-0"
             style={{
               backgroundColor: `${theme.accent}20`,
               color: theme.accent,
               border: `1px solid ${theme.accent}40`,
             }}
           >
-            <Sparkles size={13} className="animate-pulse" />
-            <span>ИИ Настройка</span>
+            <Sparkles size={11} className="animate-pulse" />
+            <span>ИИ</span>
           </button>
-          <span className="text-xs font-mono font-bold px-2 py-0.5 rounded bg-black/40 border border-white/5">
+          <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/40 border border-white/5 shrink-0">
             {currentTime || '--:--'}
           </span>
         </div>
       </div>
-
       {/* AI Orchestration Modal Banner */}
       {showAiModal && (
         <div
@@ -281,35 +279,35 @@ export const Alarms: React.FC<AlarmsProps> = ({
       )}
 
       {/* Quick Add Form */}
+      {/* Responsive Quick Add Form */}
       <form
         onSubmit={addAlarm}
-        className="flex items-center space-x-2 p-2 rounded-xl bg-black/20 border border-white/5"
+        className="flex items-center gap-1.5 p-1.5 rounded-xl bg-black/20 border border-white/5 w-full"
       >
         <input
           type="time"
           value={newTime}
           onChange={(e) => setNewTime(e.target.value)}
-          className="bg-black/40 text-sm font-mono px-2 py-1 rounded-lg border border-white/10 focus:outline-none"
+          className="bg-black/40 text-xs font-mono px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none w-[80px] shrink-0"
           style={{ color: theme.text }}
         />
         <input
           type="text"
-          placeholder="Название или упражнение..."
+          placeholder="Название будильника..."
           value={newLabel}
           onChange={(e) => setNewLabel(e.target.value)}
-          className="flex-1 bg-black/40 text-xs px-2.5 py-1.5 rounded-lg border border-white/10 focus:outline-none"
+          className="min-w-0 flex-1 bg-black/40 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
           style={{ color: theme.text }}
         />
         <button
           type="submit"
-          className="p-1.5 rounded-lg transition-transform active:scale-95 flex items-center justify-center"
+          className="w-7 h-7 rounded-lg transition-transform active:scale-95 flex items-center justify-center shrink-0"
           style={{ backgroundColor: theme.accent, color: theme.bg }}
           title="Добавить будильник"
         >
-          <Plus size={16} />
+          <Plus size={15} />
         </button>
       </form>
-
       {/* Alarm List */}
       <div className="flex flex-col space-y-2 max-h-[300px] overflow-y-auto pr-1">
         {alarms.length === 0 ? (
