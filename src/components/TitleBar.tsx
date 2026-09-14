@@ -1,5 +1,5 @@
 import React from 'react';
-import { Minus, X, Maximize2, Minimize2, Pin, PinOff, Bot, Hourglass } from 'lucide-react';
+import { Minus, X, Maximize2, Minimize2, Pin, PinOff, Hourglass } from 'lucide-react';
 import { ThemeColors } from '../types';
 import { WindowService } from '../services/window';
 
@@ -9,7 +9,6 @@ interface TitleBarProps {
   isPinned: boolean;
   onToggleCompact: () => void;
   onTogglePin: () => void;
-  onOpenAIChat?: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -18,7 +17,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   isPinned,
   onToggleCompact,
   onTogglePin,
-  onOpenAIChat,
 }) => {
   return (
     <div
@@ -55,19 +53,6 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/40 hover:text-white transition-colors"
             >
               <Maximize2 size={12} />
-            </button>
-
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onOpenAIChat?.();
-              }}
-              title="AI Co-Pilot (Дизайн и расписание)"
-              className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors"
-              style={{ color: theme.accent }}
-            >
-              <Bot size={13} />
             </button>
           </div>
         )}

@@ -1,12 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import {
-  Timer as TimerIcon,
-  Sparkles,
-  Settings as SettingsIcon,
-} from 'lucide-react';
+import { Timer as TimerIcon, Settings as SettingsIcon, Sparkles } from 'lucide-react';
 import { TitleBar } from './components/TitleBar';
-
-import { AITrainer } from './components/AITrainer';
+import { ChatMessage } from './services/aiCompiler';
 import { AppMode, ThemeKey, AISettings, AlarmItem, WorkoutRoutine, ThemeColors } from './types';
 import { THEMES } from './constants/themes';
 import {
@@ -33,7 +28,7 @@ export const App: React.FC = () => {
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [aiTimerMinutes, setAiTimerMinutes] = useState<number | undefined>(undefined);
   const [dashboardSubModule, setDashboardSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
-  const [chatMessages, setChatMessages] = useState<Array<{ id: string; sender: 'user' | 'assistant'; text: string; time: string }>>(() => {
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem('alarmer_chat_history');
       return saved ? JSON.parse(saved) : [
@@ -41,7 +36,7 @@ export const App: React.FC = () => {
           id: '1',
           sender: 'assistant',
           text: 'Привет! Я твой AI Co-Pilot. Я умею управлять будильниками, создавать программы тренировок (HIIT, Табата), настраивать таймеры и динамически менять интерфейс приложения. Чем могу помочь?',
-          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
         },
       ];
     } catch {
@@ -179,7 +174,6 @@ export const App: React.FC = () => {
         isPinned={isPinned}
         onToggleCompact={toggleCompact}
         onTogglePin={togglePin}
-        onOpenAIChat={() => setIsAiChatOpen(true)}
       />
       {/* Main App Container */}
       <div className="flex-1 flex flex-col items-center justify-between p-3 overflow-y-auto">
@@ -203,21 +197,6 @@ export const App: React.FC = () => {
               >
                 <TimerIcon size={15} />
                 <span className="text-xs hidden min-[280px]:inline truncate">{t.dashboard}</span>
-              </button>
-
-              <button
-                onClick={() => handleSelectTab('ai')}
-                className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
-                  activeTab === 'ai' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
-                }`}
-                style={{
-                  backgroundColor: activeTab === 'ai' ? `${theme.accent}25` : 'transparent',
-                  color: activeTab === 'ai' ? theme.accent : theme.text,
-                }}
-                title={t.aiCopilot}
-              >
-                <Sparkles size={15} />
-                <span className="text-xs hidden min-[280px]:inline truncate">{t.aiCopilot}</span>
               </button>
 
               <button
@@ -255,30 +234,6 @@ export const App: React.FC = () => {
               onSubModuleChange={setDashboardSubModule}
             />
           )}
-          {activeTab === 'ai' && (
-            <AITrainer
-              theme={theme}
-              aiSettings={aiSettings}
-              currentUi={dynamicUi}
-              alarms={alarms}
-              onUpdateAISettings={setAISettings}
-              onSelectRoutine={handleSelectRoutine}
-              onApplyAlarms={setAlarms}
-              onApplyUI={(newUi) => setDynamicUi(newUi)}
-              onSetTimerMinutes={(mins) => {
-                setAiTimerMinutes(mins);
-                setDashboardSubModule('timer');
-                setActiveTab('dashboard');
-              }}
-              onSwitchTab={(_tab) => setActiveTab('dashboard')}
-              messages={chatMessages}
-              onSendMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
-              onNavigateToModule={(mod) => {
-                setDashboardSubModule(mod);
-                setActiveTab('dashboard');
-              }}
-            />
-          )}
           {activeTab === 'settings' && (
             <SettingsView
               theme={theme}
@@ -300,7 +255,37 @@ export const App: React.FC = () => {
             onApplyUI={(newUi) => setDynamicUi(newUi)}
             onApplyAlarms={(newAlarms) => setAlarms((prev) => [...prev, ...newAlarms])}
             onApplyWorkout={(newWorkout) => handleSelectRoutine(newWorkout)}
+            onSetTimerMinutes={(mins) => {
+              setAiTimerMinutes(mins);
+              setDashboardSubModule('timer');
+              setActiveTab('dashboard');
+            }}
+            onNavigateToModule={(mod) => {
+              setDashboardSubModule(mod);
+              setActiveTab('dashboard');
+            }}
+            messages={chatMessages}
+            onSendMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
           />
+          {/* Sleek Side Floating AI Drawer Button */}
+          <button
+            onClick={() => {
+              soundService.playUiClick();
+              setIsAiChatOpen((prev) => !prev);
+            }}
+            className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center py-2 px-1.5 rounded-l-xl border border-r-0 shadow-lg backdrop-blur-md transition-all group ${
+              isAiChatOpen ? 'bg-white/20' : 'bg-black/60 hover:bg-black/80'
+            }`}
+            style={{ borderColor: theme.border }}
+            title="Открыть AI Co-Pilot"
+          >
+            <div className="flex flex-col items-center space-y-1">
+              <Sparkles size={14} style={{ color: theme.accent }} className="animate-pulse" />
+              <span className="text-[9px] font-mono tracking-widest uppercase writing-mode-vertical rotate-180 opacity-70 group-hover:opacity-100" style={{ color: theme.text }}>
+                AI
+              </span>
+            </div>
+          </button>
         </div>
       </div>
     </div>

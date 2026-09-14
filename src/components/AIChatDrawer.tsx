@@ -13,6 +13,10 @@ interface AIChatDrawerProps {
   onApplyUI: (newUi: DynamicUIConfig) => void;
   onApplyAlarms?: (alarms: AlarmItem[]) => void;
   onApplyWorkout?: (workout: WorkoutRoutine) => void;
+  onSetTimerMinutes?: (minutes: number) => void;
+  onNavigateToModule?: (module: 'timer' | 'workout' | 'stopwatch' | 'alarms') => void;
+  messages: ChatMessage[];
+  onSendMessage: (msg: ChatMessage) => void;
 }
 
 export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
@@ -24,15 +28,11 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   onApplyUI,
   onApplyAlarms,
   onApplyWorkout,
+  onSetTimerMinutes,
+  onNavigateToModule,
+  messages,
+  onSendMessage,
 }) => {
-  const [messages, setMessages] = useState<ChatMessage[]>([
-    {
-      id: 'init_1',
-      sender: 'assistant',
-      text: 'Привет! Я твой AI-Архитектор. Напиши мне, как изменить интерфейс, какие сценарии или будильники настроить. Я скомпилирую всё на лету!',
-      timestamp: 'сейчас',
-    },
-  ]);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -55,7 +55,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    onSendMessage(userMsg);
     if (!customPrompt) setInput('');
     setLoading(true);
 
@@ -75,10 +75,20 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
       if (mutation.alarms && onApplyAlarms) {
         onApplyAlarms(mutation.alarms);
+        onNavigateToModule?.('alarms');
       }
 
       if (mutation.workout && onApplyWorkout) {
         onApplyWorkout(mutation.workout);
+        onNavigateToModule?.('workout');
+      }
+
+      // Check for timer intent in text
+      const timerMatch = textToSend.match(/таймер.*?(\d+)\s*(мин|m)/i) || textToSend.match(/(\d+)\s*(мин|m).*?таймер/i);
+      if (timerMatch && onSetTimerMinutes) {
+        const mins = parseInt(timerMatch[1], 10);
+        onSetTimerMinutes(mins);
+        onNavigateToModule?.('timer');
       }
 
       soundService.speak(mutation.explanation);
@@ -91,18 +101,15 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         mutation,
       };
 
-      setMessages((prev) => [...prev, assistantMsg]);
+      onSendMessage(assistantMsg);
     } catch (e: unknown) {
       const errMsg = e instanceof Error ? e.message : 'Ошибка компиляции интерфейса';
-      setMessages((prev) => [
-        ...prev,
-        {
-          id: `err_${Date.now()}`,
-          sender: 'assistant',
-          text: `Не удалось применить: ${errMsg}`,
-          timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        },
-      ]);
+      onSendMessage({
+        id: `err_${Date.now()}`,
+        sender: 'assistant',
+        text: `Не удалось применить: ${errMsg}`,
+        timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+      });
     } finally {
       setLoading(false);
     }
