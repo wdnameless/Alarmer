@@ -3,12 +3,59 @@ use tauri::{
     tray::TrayIconBuilder,
     Manager,
 };
+use base64::Engine;
+use msedge_tts::{tts::client::connect, tts::SpeechConfig, voice::get_voices_list};
+
+#[tauri::command]
+async fn synthesize_speech(text: String, voice_id: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        let voices = get_voices_list().map_err(|e| format!("Failed to fetch voices: {e}"))?;
+        
+        // Match voice by ID or name substring
+        let target_voice = voices
+            .iter()
+            .find(|v| {
+                v.name.contains(&voice_id)
+                    || v.short_name.as_deref().map_or(false, |s| s.contains(&voice_id))
+            })
+            .or_else(|| {
+                if voice_id.contains("Jenny") {
+                    voices.iter().find(|v| v.name.contains("JennyNeural"))
+                } else if voice_id.contains("Guy") {
+                    voices.iter().find(|v| v.name.contains("GuyNeural"))
+                } else if voice_id.contains("Dmitry") {
+                    voices.iter().find(|v| v.name.contains("DmitryNeural"))
+                } else if voice_id.contains("Svetlana") {
+                    voices.iter().find(|v| v.name.contains("SvetlanaNeural"))
+                } else {
+                    None
+                }
+            })
+            .ok_or_else(|| format!("Voice {voice_id} not found in Edge TTS voice catalog"))?;
+
+        let config = SpeechConfig::from(target_voice);
+        let mut client = connect().map_err(|e| format!("WebSocket connect failed: {e}"))?;
+        let audio = client
+            .synthesize(&text, &config)
+            .map_err(|e| format!("Synthesis failed: {e}"))?;
+
+        if audio.audio_bytes.is_empty() {
+            return Err("Synthesized 0 bytes".to_string());
+        }
+
+        let b64 = base64::engine::general_purpose::STANDARD.encode(&audio.audio_bytes);
+        Ok(format!("data:audio/mp3;base64,{b64}"))
+    })
+    .await
+    .map_err(|e| format!("Task join error: {e}"))?
+}
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
+        .invoke_handler(tauri::generate_handler![synthesize_speech])
         .setup(|app| {
             // Build Tray Menu
             let show_i = MenuItem::with_id(app, "show", "Показать Alarmer", true, None::<&str>)?;
