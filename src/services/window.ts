@@ -55,10 +55,25 @@ export class WindowService {
     if (this.isTauri()) {
       try {
         const win = getCurrentWindow();
-        const size = compact ? new LogicalSize(300, 420) : new LogicalSize(480, 680);
+        const size = compact ? new LogicalSize(340, 480) : new LogicalSize(520, 680);
         await win.setSize(size);
       } catch (e) {
         console.warn('Tauri setSize error:', e);
+      }
+    }
+  }
+
+  static async setAiSidebarOpen(open: boolean): Promise<void> {
+    if (this.isTauri()) {
+      try {
+        const win = getCurrentWindow();
+        const currentSize = await win.innerSize();
+        const factor = await win.scaleFactor();
+        const logicalHeight = Math.round(currentSize.height / factor);
+        const targetWidth = open ? 680 : 340;
+        await win.setSize(new LogicalSize(targetWidth, Math.max(480, logicalHeight)));
+      } catch (e) {
+        console.warn('Tauri setAiSidebarOpen error:', e);
       }
     }
   }

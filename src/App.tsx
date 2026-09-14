@@ -133,6 +133,11 @@ export const App: React.FC = () => {
     setIsPinned(newPin);
     await windowService.setAlwaysOnTop(newPin);
   };
+  const toggleAiChat = () => {
+    const next = !isAiChatOpen;
+    setIsAiChatOpen(next);
+    windowService.setAiSidebarOpen(next).catch(console.error);
+  };
 
   const handleSelectTab = (tab: AppMode) => {
     soundService.playUiClick();
@@ -178,9 +183,11 @@ export const App: React.FC = () => {
       {/* Main App Container */}
       {/* Main Split Layout: Left Primary Surface + Right Side AI Sidebar */}
       <div className="flex-1 flex w-full h-full overflow-hidden relative">
-        {/* Left Pane: Timer / Settings */}
-        <div className="flex-1 flex flex-col items-center justify-between p-3 overflow-y-auto min-w-0 transition-all duration-300">
-          {/* Navigation Tabs */}
+        {/* Left Pane: Timer / Settings (Clean, Fixed 340px primary surface) */}
+        <div
+          className="flex flex-col items-center justify-between p-3 overflow-y-auto shrink-0 transition-all duration-300"
+          style={{ width: isAiChatOpen ? '340px' : '100%' }}
+        >
           <div
             className="flex items-center justify-between w-full max-w-[340px] p-1 mb-2 rounded-xl border transition-colors"
             style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
@@ -253,7 +260,7 @@ export const App: React.FC = () => {
           <div className="w-[320px] max-w-[85vw] h-full border-l flex flex-col z-30 transition-all duration-300" style={{ borderColor: theme.border }}>
             <AIChatDrawer
               isOpen={isAiChatOpen}
-              onClose={() => setIsAiChatOpen(false)}
+              onClose={() => toggleAiChat()}
               theme={theme}
               currentUi={dynamicUi}
               aiSettings={aiSettings}
@@ -280,7 +287,7 @@ export const App: React.FC = () => {
           <button
             onClick={() => {
               soundService.playUiClick();
-              setIsAiChatOpen(true);
+              toggleAiChat();
             }}
             className="absolute right-0 top-1/2 -translate-y-1/2 z-40 flex items-center space-x-1.5 py-3 px-2 rounded-l-xl border border-r-0 shadow-2xl backdrop-blur-md transition-all active:scale-95 group hover:px-2.5"
             style={{
