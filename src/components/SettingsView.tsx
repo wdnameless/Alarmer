@@ -47,6 +47,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [alarmVolume, setAlarmVolume] = useState<number>(() => {
     return parseFloat(localStorage.getItem('alarmer_alarm_volume') || '0.8');
   });
+  const [voiceVolume, setVoiceVolume] = useState<number>(() => {
+    return parseFloat(localStorage.getItem('alarmer_voice_volume') || '0.8');
+  });
   const [currentLang, setCurrentLang] = useState<Language>(() => I18nService.getLang());
 
   const handleLangChange = (lang: Language) => {
@@ -184,6 +187,31 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             ))}
           </select>
         </div>
+
+        {/* Voice Volume Slider */}
+        <div className="flex flex-col space-y-1.5 pt-1">
+          <div className="flex justify-between text-xs">
+            <span style={{ color: theme.subtext }}>Громкость голоса озвучки:</span>
+            <span className="font-mono font-bold" style={{ color: theme.accent }}>
+              {Math.round(voiceVolume * 100)}%
+            </span>
+          </div>
+          <input
+            type="range"
+            min="0"
+            max="1"
+            step="0.05"
+            value={voiceVolume}
+            onChange={(e) => {
+              const val = parseFloat(e.target.value);
+              setVoiceVolume(val);
+              localStorage.setItem('alarmer_voice_volume', val.toString());
+            }}
+            className="w-full accent-current h-1.5 rounded-lg cursor-pointer bg-white/10"
+            style={{ accentColor: theme.accent }}
+          />
+        </div>
+
         <p className="text-[11px] opacity-60 leading-relaxed">
           По умолчанию озвучка отключена (только звуковые сигналы). Вы можете в любой момент выбрать нейросетевой облачный голос.
         </p>

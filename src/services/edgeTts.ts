@@ -23,10 +23,12 @@ export class EdgeTtsService {
 
     this.stop();
 
-    // 1. Primary: Native Rust Edge TTS via Tauri IPC (Real Microsoft Neural Voices)
+    const voiceVol = parseFloat(localStorage.getItem('alarmer_voice_volume') || '0.8');
+
+    // 1. Native Rust Microsoft Edge Neural TTS
     try {
       const dataUri = await invoke<string>('synthesize_speech', {
-        text: text.trim(),
+        text,
         voiceId,
       });
 
@@ -35,6 +37,7 @@ export class EdgeTtsService {
           this.audioEl = new Audio();
         }
         this.audioEl.src = dataUri;
+        this.audioEl.volume = Math.max(0, Math.min(1, voiceVol));
         await this.audioEl.play();
         return;
       }
@@ -53,6 +56,7 @@ export class EdgeTtsService {
         this.audioEl = new Audio();
       }
       this.audioEl.src = url;
+      this.audioEl.volume = Math.max(0, Math.min(1, voiceVol));
       await this.audioEl.play();
       return;
     } catch (e) {
@@ -63,6 +67,7 @@ export class EdgeTtsService {
     if ('speechSynthesis' in window) {
       const u = new SpeechSynthesisUtterance(text);
       u.lang = isEnglish ? 'en-US' : 'ru-RU';
+      u.volume = Math.max(0, Math.min(1, voiceVol));
       window.speechSynthesis.speak(u);
     }
   }
