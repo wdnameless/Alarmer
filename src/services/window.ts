@@ -1,4 +1,5 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
+import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 
 export class WindowService {
   private static isTauri(): boolean {
@@ -8,10 +9,9 @@ export class WindowService {
   static async minimize(): Promise<void> {
     if (this.isTauri()) {
       try {
-        const win = getCurrentWindow();
-        await win.minimize();
+        await getCurrentWindow().minimize();
       } catch (e) {
-        console.warn('Tauri minimize error:', e);
+        console.warn('Window minimize error:', e);
       }
     }
   }
@@ -20,10 +20,16 @@ export class WindowService {
     if (this.isTauri()) {
       try {
         const win = getCurrentWindow();
-        await win.toggleMaximize();
-        return await win.isMaximized();
+        const max = await win.isMaximized();
+        if (max) {
+          await win.unmaximize();
+          return false;
+        } else {
+          await win.maximize();
+          return true;
+        }
       } catch (e) {
-        console.warn('Tauri toggleMaximize error:', e);
+        console.warn('Window maximize error:', e);
       }
     }
     return false;
@@ -32,21 +38,20 @@ export class WindowService {
   static async isMaximized(): Promise<boolean> {
     if (this.isTauri()) {
       try {
-        const win = getCurrentWindow();
-        return await win.isMaximized();
+        return await getCurrentWindow().isMaximized();
       } catch (e) {
-        console.warn('Tauri isMaximized error:', e);
+        console.warn('Window isMaximized error:', e);
       }
     }
     return false;
   }
+
   static async close(): Promise<void> {
     if (this.isTauri()) {
       try {
-        const win = getCurrentWindow();
-        await win.hide();
+        await getCurrentWindow().close();
       } catch (e) {
-        console.warn('Tauri hide error:', e);
+        console.warn('Window close error:', e);
       }
     }
   }
@@ -58,23 +63,64 @@ export class WindowService {
         const size = compact ? new LogicalSize(340, 480) : new LogicalSize(520, 680);
         await win.setSize(size);
       } catch (e) {
-        console.warn('Tauri setSize error:', e);
+        console.warn('Window setCompact error:', e);
       }
     }
   }
 
-  static async setAiSidebarOpen(open: boolean): Promise<void> {
-    if (this.isTauri()) {
-      try {
-        const win = getCurrentWindow();
-        const currentSize = await win.innerSize();
-        const factor = await win.scaleFactor();
-        const logicalHeight = Math.round(currentSize.height / factor);
-        const targetWidth = open ? 680 : 340;
-        await win.setSize(new LogicalSize(targetWidth, Math.max(480, logicalHeight)));
-      } catch (e) {
-        console.warn('Tauri setAiSidebarOpen error:', e);
+  static async openAiCompanionWindow(): Promise<void> {
+    if (!this.isTauri()) return;
+    try {
+      // Check if existing companion window is already open
+      const existing = await WebviewWindow.getByLabel('ai-copilot');
+      if (existing) {
+        const isVis = await existing.isVisible();
+        if (isVis) {
+          await existing.setFocus();
+          return;
+        } else {
+          await existing.show();
+          await existing.setFocus();
+          return;
+        }
       }
+
+      // Calculate position directly to the right of the main window
+      const mainWin = getCurrentWindow();
+      const mainPos = await mainWin.outerPosition();
+      const mainSize = await mainWin.outerSize();
+
+      // Open new dedicated native OS window docked next to main window
+      const companion = new WebviewWindow('ai-copilot', {
+        url: 'index.html?window=ai-copilot',
+        title: 'Alarmer — AI Co-Pilot',
+        width: 340,
+        height: 480,
+        x: mainPos.x + mainSize.width + 12,
+        y: mainPos.y,
+        resizable: true,
+        decorations: false,
+        transparent: true,
+        alwaysOnTop: false,
+      });
+
+      companion.once('tauri://error', (e) => {
+        console.error('Failed to create AI companion window:', e);
+      });
+    } catch (e) {
+      console.error('Companion window error:', e);
+    }
+  }
+
+  static async closeAiCompanionWindow(): Promise<void> {
+    if (!this.isTauri()) return;
+    try {
+      const existing = await WebviewWindow.getByLabel('ai-copilot');
+      if (existing) {
+        await existing.close();
+      }
+    } catch (e) {
+      console.warn('Close companion window error:', e);
     }
   }
 
@@ -85,10 +131,9 @@ export class WindowService {
   static async setAlwaysOnTop(alwaysOnTop: boolean): Promise<void> {
     if (this.isTauri()) {
       try {
-        const win = getCurrentWindow();
-        await win.setAlwaysOnTop(alwaysOnTop);
+        await getCurrentWindow().setAlwaysOnTop(alwaysOnTop);
       } catch (e) {
-        console.warn('Tauri setAlwaysOnTop error:', e);
+        console.warn('Window setAlwaysOnTop error:', e);
       }
     }
   }
@@ -96,12 +141,12 @@ export class WindowService {
   static async startDragging(): Promise<void> {
     if (this.isTauri()) {
       try {
-        const win = getCurrentWindow();
-        await win.startDragging();
+        await getCurrentWindow().startDragging();
       } catch (e) {
-        console.warn('Tauri startDragging error:', e);
+        console.warn('Window dragging error:', e);
       }
     }
   }
 }
+
 export const windowService = WindowService;

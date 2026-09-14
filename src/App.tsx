@@ -15,7 +15,6 @@ import { windowService } from './services/window';
 import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
-import { AIChatDrawer } from './components/AIChatDrawer';
 import { I18nService } from './services/i18n';
 import { DynamicUIConfig, DEFAULT_DYNAMIC_UI } from './types';
 
@@ -25,10 +24,9 @@ export const App: React.FC = () => {
   const [themeKey] = useState<ThemeKey>('dark-neon');
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
-  const [isAiChatOpen, setIsAiChatOpen] = useState(false);
-  const [aiTimerMinutes, setAiTimerMinutes] = useState<number | undefined>(undefined);
+  const [aiTimerMinutes] = useState<number | undefined>(undefined);
   const [dashboardSubModule, setDashboardSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
-  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
+  const [chatMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem('alarmer_chat_history');
       return saved ? JSON.parse(saved) : [
@@ -133,10 +131,8 @@ export const App: React.FC = () => {
     setIsPinned(newPin);
     await windowService.setAlwaysOnTop(newPin);
   };
-  const toggleAiChat = () => {
-    const next = !isAiChatOpen;
-    setIsAiChatOpen(next);
-    windowService.setAiSidebarOpen(next).catch(console.error);
+  const openAiWindow = async () => {
+    await windowService.openAiCompanionWindow();
   };
 
   const handleSelectTab = (tab: AppMode) => {
@@ -184,10 +180,7 @@ export const App: React.FC = () => {
       {/* Main Split Layout: Left Primary Surface + Right Side AI Sidebar */}
       <div className="flex-1 flex w-full h-full overflow-hidden relative">
         {/* Left Pane: Timer / Settings (Clean, Fixed 340px primary surface) */}
-        <div
-          className="flex flex-col items-center justify-between p-3 overflow-y-auto shrink-0 transition-all duration-300"
-          style={{ width: isAiChatOpen ? '340px' : '100%' }}
-        >
+        <div className="flex flex-col items-center justify-between p-3 overflow-y-auto w-full">
           <div
             className="flex items-center justify-between w-full max-w-[340px] p-1 mb-2 rounded-xl border transition-colors"
             style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
@@ -255,58 +248,29 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Right Pane: Split Sidebar for AI Chat */}
-        {isAiChatOpen && (
-          <div className="w-[320px] max-w-[85vw] h-full border-l flex flex-col z-30 transition-all duration-300" style={{ borderColor: theme.border }}>
-            <AIChatDrawer
-              isOpen={isAiChatOpen}
-              onClose={() => toggleAiChat()}
-              theme={theme}
-              currentUi={dynamicUi}
-              aiSettings={aiSettings}
-              onApplyUI={(newUi) => setDynamicUi(newUi)}
-              onApplyAlarms={(newAlarms) => setAlarms((prev) => [...prev, ...newAlarms])}
-              onApplyWorkout={(newWorkout) => handleSelectRoutine(newWorkout)}
-              onSetTimerMinutes={(mins) => {
-                setAiTimerMinutes(mins);
-                setDashboardSubModule('timer');
-                setActiveTab('dashboard');
-              }}
-              onNavigateToModule={(mod) => {
-                setDashboardSubModule(mod);
-                setActiveTab('dashboard');
-              }}
-              messages={chatMessages}
-              onSendMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
-            />
+        {/* Sleek Upright Side Toggle Button on Right Edge to open Companion Window */}
+        <button
+          onClick={() => {
+            soundService.playUiClick();
+            openAiWindow();
+          }}
+          className="absolute right-0 top-1/2 -translate-y-1/2 z-40 flex items-center space-x-1.5 py-3 px-2 rounded-l-xl border border-r-0 shadow-2xl backdrop-blur-md transition-all active:scale-95 group hover:px-2.5"
+          style={{
+            backgroundColor: `${theme.cardBg}F2`,
+            borderColor: theme.border,
+          }}
+          title="Открыть отдельное окно AI Co-Pilot рядом"
+        >
+          <div className="flex flex-col items-center space-y-1.5">
+            <HandSparkle size={15} color={theme.accent} className="animate-pulse" />
+            <span
+              className="text-[10px] font-bold tracking-wider uppercase opacity-80 group-hover:opacity-100 transition-opacity"
+              style={{ color: theme.accent }}
+            >
+              AI
+            </span>
           </div>
-        )}
-
-        {/* Sleek Upright Side Toggle Button on Right Edge */}
-        {!isAiChatOpen && (
-          <button
-            onClick={() => {
-              soundService.playUiClick();
-              toggleAiChat();
-            }}
-            className="absolute right-0 top-1/2 -translate-y-1/2 z-40 flex items-center space-x-1.5 py-3 px-2 rounded-l-xl border border-r-0 shadow-2xl backdrop-blur-md transition-all active:scale-95 group hover:px-2.5"
-            style={{
-              backgroundColor: `${theme.cardBg}F2`,
-              borderColor: theme.border,
-            }}
-            title="Открыть AI Co-Pilot"
-          >
-            <div className="flex flex-col items-center space-y-1.5">
-              <HandSparkle size={15} color={theme.accent} className="animate-pulse" />
-              <span
-                className="text-[10px] font-bold tracking-wider uppercase opacity-80 group-hover:opacity-100 transition-opacity"
-                style={{ color: theme.accent }}
-              >
-                AI
-              </span>
-            </div>
-          </button>
-        )}
+        </button>
       </div>
     </div>
   </div>
