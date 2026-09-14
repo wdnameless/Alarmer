@@ -91,6 +91,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             aiSettings={aiSettings}
             onUpdateAlarms={onUpdateAlarms}
             onOpenAISettings={onOpenAISettings}
+            dynamicUi={dynamicUi}
           />
         )}
       </div>

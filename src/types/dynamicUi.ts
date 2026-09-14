@@ -31,6 +31,8 @@ export interface DynamicUIConfig {
     glassmorphism: boolean;
     contentAlignment: 'center' | 'top' | 'compact';
     widgetsOrder: Array<'dial' | 'subtimer' | 'presets' | 'controls' | 'alarmsPreview'>;
+    showSleepButton?: boolean;
+    showAiScheduleButton?: boolean;
   };
 }
 

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Plus, Trash2, Bell, BellOff, Volume2, Sparkles, Loader2 } from 'lucide-react';
-import { ThemeColors, AlarmItem, AISettings } from '../types';
+import { ThemeColors, AlarmItem, AISettings, DynamicUIConfig } from '../types';
 import { NotificationService } from '../services/notification';
 import { soundService } from '../services/sound';
 import { AIService } from '../services/ai';
@@ -11,6 +11,7 @@ interface AlarmsProps {
   aiSettings?: AISettings;
   onUpdateAlarms: (alarms: AlarmItem[]) => void;
   onOpenAISettings?: () => void;
+  dynamicUi?: DynamicUIConfig;
 }
 
 export const Alarms: React.FC<AlarmsProps> = ({
@@ -19,6 +20,7 @@ export const Alarms: React.FC<AlarmsProps> = ({
   aiSettings,
   onUpdateAlarms,
   onOpenAISettings,
+  dynamicUi,
 }) => {
   const [newTime, setNewTime] = useState('08:00');
   const [newLabel, setNewLabel] = useState('Утренняя разминка');
@@ -176,38 +178,42 @@ export const Alarms: React.FC<AlarmsProps> = ({
           </span>
         </div>
         <div className="flex items-center space-x-1 shrink-0">
-          <button
-            onClick={() => {
-              const sleepAlarm: AlarmItem = {
-                id: 'sleep_' + Date.now(),
-                title: 'Отход ко сну (Wind-down)',
-                time: '23:00',
-                days: [0, 1, 2, 3, 4, 5, 6],
-                enabled: true,
-                sound: 'gentle',
-                voicePrompt: 'Пора готовиться ко сну. Закрой рабочие вкладки и отдохни.',
-              };
-              onUpdateAlarms([sleepAlarm, ...alarms]);
-              soundService.playUiClick();
-              soundService.speak('Будильник ко сну установлен на 23:00');
-            }}
-            className="px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 transition-all shrink-0"
-            title="Reverse Alarm: Будильник ко сну"
-          >
-            🌙 Ко сну
-          </button>
-          <button
-            onClick={() => setShowAiModal(true)}
-            className="flex items-center space-x-1 px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all shadow-sm shrink-0"
-            style={{
-              backgroundColor: `${theme.accent}20`,
-              color: theme.accent,
-              border: `1px solid ${theme.accent}40`,
-            }}
-          >
-            <Sparkles size={11} className="animate-pulse" />
-            <span>ИИ</span>
-          </button>
+          {dynamicUi?.layout?.showSleepButton !== false && (
+            <button
+              onClick={() => {
+                const sleepAlarm: AlarmItem = {
+                  id: 'sleep_' + Date.now(),
+                  title: 'Отход ко сну (Wind-down)',
+                  time: '23:00',
+                  days: [0, 1, 2, 3, 4, 5, 6],
+                  enabled: true,
+                  sound: 'gentle',
+                  voicePrompt: 'Пора готовиться ко сну. Закрой рабочие вкладки и отдохни.',
+                };
+                onUpdateAlarms([sleepAlarm, ...alarms]);
+                soundService.playUiClick();
+                soundService.speak('Будильник ко сну установлен на 23:00');
+              }}
+              className="px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 transition-all shrink-0"
+              title="Reverse Alarm: Будильник ко сну"
+            >
+              🌙 Ко сну
+            </button>
+          )}
+          {dynamicUi?.layout?.showAiScheduleButton !== false && (
+            <button
+              onClick={() => setShowAiModal(true)}
+              className="flex items-center space-x-1 px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all shadow-sm shrink-0"
+              style={{
+                backgroundColor: `${theme.accent}20`,
+                color: theme.accent,
+                border: `1px solid ${theme.accent}40`,
+              }}
+            >
+              <Sparkles size={11} className="animate-pulse" />
+              <span>ИИ</span>
+            </button>
+          )}
           <span className="text-[10px] font-mono font-bold px-1.5 py-0.5 rounded bg-black/40 border border-white/5 shrink-0">
             {currentTime || '--:--'}
           </span>

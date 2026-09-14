@@ -27,6 +27,35 @@ export class AIAssistantService {
     }
 
     const lower = q.toLowerCase();
+    // 0. Granular UI button toggle commands (e.g. "убери кнопки ко сну и ии", "скрой кнопку сна", "верни кнопки")
+    if (lower.includes('убери') || lower.includes('скрой') || lower.includes('отключи') || lower.includes('верни') || lower.includes('покажи')) {
+      const hideSleep = lower.includes('сну') || lower.includes('сон') || lower.includes('спать');
+      const hideAi = lower.includes('ии') || lower.includes('ai') || lower.includes('настройка');
+      const isRestore = lower.includes('верни') || lower.includes('покажи') || lower.includes('включи');
+
+      if (hideSleep || hideAi) {
+        const updatedLayout = { ...currentUi.layout };
+        if (hideSleep) {
+          updatedLayout.showSleepButton = isRestore;
+        }
+        if (hideAi) {
+          updatedLayout.showAiScheduleButton = isRestore;
+        }
+
+        const actionDesc = isRestore ? 'Восстановил' : 'Убрал';
+        const targets = [
+          hideSleep ? '«Ко сну»' : null,
+          hideAi ? '«ИИ»' : null,
+        ].filter(Boolean).join(' и ');
+
+        return {
+          message: `${actionDesc} кнопки ${targets} с панели будильников для максимальной чистоты интерфейса.`,
+          ui: {
+            layout: updatedLayout
+          }
+        };
+      }
+    }
 
     // 1. Direct timer commands (e.g. "поставь таймер на 15 минут", "таймер 45м")
     const timerMatch = lower.match(/(?:таймер|поставь таймер|запусти таймер|timer)\s+(?:на\s+)?(\d+)\s*(?:мин|минут|m|min)?/i);
