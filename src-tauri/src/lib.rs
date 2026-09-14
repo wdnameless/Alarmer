@@ -66,7 +66,7 @@ async fn toggle_ai_companion_window(app: tauri::AppHandle) -> Result<(), String>
     let (x, y) = if let Some(main_win) = app.get_webview_window("main") {
         let pos = main_win.outer_position().unwrap_or_default();
         let size = main_win.outer_size().unwrap_or_default();
-        (pos.x as f64 + size.width as f64 + 12.0, pos.y as f64)
+        (pos.x as f64 + size.width as f64 + 4.0, pos.y as f64)
     } else {
         (100.0, 100.0)
     };
@@ -160,10 +160,41 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                // Prevent exit, hide window to tray instead
-                api.prevent_close();
-                let _ = window.hide();
+            match event {
+                tauri::WindowEvent::CloseRequested { api, .. } => {
+                    if window.label() == "main" {
+                        api.prevent_close();
+                        let _ = window.hide();
+                        if let Some(companion) = window.app_handle().get_webview_window("ai-copilot") {
+                            let _ = companion.hide();
+                        }
+                    } else if window.label() == "ai-copilot" {
+                        let _ = window.close();
+                    }
+                }
+                tauri::WindowEvent::Moved(new_pos) => {
+                    if window.label() == "main" {
+                        if let Some(companion) = window.app_handle().get_webview_window("ai-copilot") {
+                            if companion.is_visible().unwrap_or(false) {
+                                let main_size = window.outer_size().unwrap_or_default();
+                                let target_x = new_pos.x + main_size.width as i32 + 4;
+                                let target_y = new_pos.y;
+                                let _ = companion.set_position(tauri::PhysicalPosition::new(target_x, target_y));
+                            }
+                        }
+                    }
+                }
+                tauri::WindowEvent::Focused(focused) => {
+                    if *focused && window.label() == "main" {
+                        if let Some(companion) = window.app_handle().get_webview_window("ai-copilot") {
+                            if companion.is_visible().unwrap_or(false) {
+                                // Bring companion to top along with main
+                                let _ = companion.show();
+                            }
+                        }
+                    }
+                }
+                _ => {}
             }
         })
         .run(tauri::generate_context!())
