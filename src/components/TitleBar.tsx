@@ -1,5 +1,5 @@
 import React from 'react';
-import { Minus, X, Maximize2, Minimize2, Pin, PinOff, Bot } from 'lucide-react';
+import { Minus, X, Maximize2, Minimize2, Pin, PinOff, Bot, Hourglass } from 'lucide-react';
 import { ThemeColors } from '../types';
 import { WindowService } from '../services/window';
 
@@ -37,13 +37,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       <div className="flex items-center space-x-1.5 cursor-pointer" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
         {!isCompact && (
           <>
-            <div
-              className="w-2.5 h-2.5 rounded-full"
-              style={{
-                backgroundColor: theme.accent,
-                boxShadow: `0 0 6px ${theme.accentGlow}`,
-              }}
-            />
+            <Hourglass size={13} className="text-white/80" />
             <span className="text-xs font-bold tracking-wider uppercase opacity-75 hover:opacity-100" style={{ color: theme.subtext }}>
               Alarmer
             </span>

@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512">
+  <defs>
+    <linearGradient id="sandGlow" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#ffffff" />
+      <stop offset="100%" stop-color="#a3a3a3" />
+    </linearGradient>
+  </defs>
+  <!-- Background circular base for desktop app icon -->
+  <rect width="512" height="512" rx="115" fill="#0c0c0e" />
+  <rect width="504" height="504" x="4" y="4" rx="111" fill="none" stroke="#262626" stroke-width="6" />
+
+  <!-- Top bar of hourglass -->
+  <rect x="136" y="96" width="240" height="28" rx="8" fill="#ffffff" />
+  <rect x="156" y="124" width="200" height="12" rx="4" fill="#a3a3a3" />
+
+  <!-- Glass bulb contours -->
+  <path d="M 166 136 
+           C 166 230, 226 246, 246 256 
+           C 226 266, 166 282, 166 376 
+           L 346 376 
+           C 346 282, 286 266, 266 256 
+           C 286 246, 346 230, 346 136 
+           Z" 
+        fill="none" 
+        stroke="#525252" 
+        stroke-width="12" 
+        stroke-linejoin="round" />
+
+  <!-- Glass inner shadow/sheen -->
+  <path d="M 180 148 C 180 224, 230 240, 248 252 L 248 250 C 236 238, 192 216, 192 148 Z" fill="#ffffff" opacity="0.15" />
+
+  <!-- Top chamber sand (half full, draining) -->
+  <path d="M 186 186 
+           C 200 226, 236 242, 252 248 
+           C 268 242, 304 226, 318 186 
+           C 280 196, 224 196, 186 186 Z" 
+        fill="url(#sandGlow)" />
+
+  <!-- Falling sand trickle -->
+  <line x1="256" y1="248" x2="256" y2="354" stroke="#ffffff" stroke-width="6" stroke-linecap="round" stroke-dasharray="8 6" />
+
+  <!-- Bottom chamber accumulated sand mound -->
+  <path d="M 180 372 
+           C 205 342, 240 332, 256 332 
+           C 272 332, 307 342, 332 372 
+           Z" 
+        fill="url(#sandGlow)" />
+
+  <!-- Bottom bar of hourglass -->
+  <rect x="156" y="376" width="200" height="12" rx="4" fill="#a3a3a3" />
+  <rect x="136" y="388" width="240" height="28" rx="8" fill="#ffffff" />
+</svg>
