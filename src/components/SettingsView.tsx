@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload } from 'lucide-react';
 import { ThemeColors, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '../types';
 import { CLOUD_VOICES, EdgeTtsService } from '../services/edgeTts';
@@ -29,6 +30,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [savedSuccess, setSavedSuccess] = useState(false);
   const [testingVoice, setTestingVoice] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
+  const [autostartEnabled, setAutostartEnabled] = useState(false);
   const [activeTab, setActiveTab] = useState<'sound' | 'ai' | 'data'>('sound');
   const [uiClicks, setUiClicks] = useState<boolean>(() => {
     return StoreService.getPreference('alarmer_ui_clicks', true);
@@ -121,6 +123,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     onUpdateUI(DEFAULT_DYNAMIC_UI);
     soundService.playCountdownTick();
   };
+
+  // Reflect the real OS-level autostart state rather than a cached flag.
+  useEffect(() => {
+    if (!('__TAURI_INTERNALS__' in window)) return;
+    void isEnabled()
+      .then(setAutostartEnabled)
+      .catch(() => setAutostartEnabled(false));
+  }, []);
 
   const t = I18nService.t();
 
@@ -462,7 +472,43 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </button>
         </div>
 
-          {/* Global hotkeys reference */}
+          {/* Autostart with the operating system */}
+        <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
+          <label className="text-xs font-bold uppercase tracking-wider opacity-60">
+            Запуск вместе с системой
+          </label>
+          <button
+            type="button"
+            onClick={async () => {
+              soundService.playUiClick();
+              try {
+                if (autostartEnabled) {
+                  await disable();
+                  setAutostartEnabled(false);
+                } else {
+                  await enable();
+                  setAutostartEnabled(true);
+                }
+              } catch (e) {
+                console.warn('autostart toggle failed:', e);
+              }
+            }}
+            className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all"
+            style={{
+              borderColor: autostartEnabled ? theme.accent : theme.border,
+              backgroundColor: autostartEnabled ? `${theme.accent}15` : 'transparent',
+              color: theme.text,
+            }}
+          >
+            <span>Запускать Alarmer при входе в систему</span>
+            <span className="text-[10px] font-bold opacity-80">{autostartEnabled ? 'ВКЛ' : 'ВЫКЛ'}</span>
+          </button>
+          <p className="text-[11px] opacity-60 leading-relaxed">
+            Приложение стартует свёрнутым в трей — будильники срабатывают даже без открытого окна.
+          </p>
+        </div>
+
+        {/* Global hotkeys reference */}
         <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
           <label className="text-xs font-bold uppercase tracking-wider opacity-60">
             Горячие клавиши (работают из любой программы)
