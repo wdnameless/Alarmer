@@ -5,14 +5,13 @@ import { AIPlanResult } from '../services/ai';
 import { AIAssistantService } from '../services/aiAssistant';
 import { soundService } from '../services/sound';
 
-interface ChatMessage {
+export interface ChatMessage {
   id: string;
   sender: 'user' | 'assistant';
   text: string;
   result?: AIPlanResult;
   time: string;
 }
-
 interface AITrainerProps {
   theme: ThemeColors;
   aiSettings: AISettings;
@@ -24,6 +23,9 @@ interface AITrainerProps {
   onApplyUI?: (ui: DynamicUIConfig) => void;
   onSetTimerMinutes?: (minutes: number) => void;
   onSwitchTab?: (tab: 'workout' | 'alarm' | 'dashboard') => void;
+  messages: ChatMessage[];
+  onSendMessage: (msg: ChatMessage) => void;
+  onNavigateToModule?: (module: 'timer' | 'workout' | 'stopwatch' | 'alarms') => void;
 }
 export const AITrainer: React.FC<AITrainerProps> = ({
   theme,
@@ -35,21 +37,13 @@ export const AITrainer: React.FC<AITrainerProps> = ({
   onApplyUI,
   onSetTimerMinutes,
   onSwitchTab: _onSwitchTab,
+  messages,
+  onSendMessage,
+  onNavigateToModule,
 }) => {
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
-
-  const [messages, setMessages] = useState<ChatMessage[]>(() => {
-    return [
-      {
-        id: '1',
-        sender: 'assistant',
-        text: 'Привет! Я твой AI Co-Pilot. Я умею управлять будильниками, создавать программы тренировок (HIIT, Табата), настраивать таймеры и динамически менять интерфейс приложения. Чем могу помочь?',
-        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-      },
-    ];
-  });
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -73,7 +67,7 @@ export const AITrainer: React.FC<AITrainerProps> = ({
       time: timeStr,
     };
 
-    setMessages((prev) => [...prev, userMsg]);
+    onSendMessage(userMsg);
     setInput('');
     setLoading(true);
 
@@ -98,15 +92,19 @@ export const AITrainer: React.FC<AITrainerProps> = ({
       }
       if (result.timerMinutes && onSetTimerMinutes) {
         onSetTimerMinutes(result.timerMinutes);
+        onNavigateToModule?.('timer');
+      } else if (result.alarms && result.alarms.length > 0) {
+        onNavigateToModule?.('alarms');
+      } else if (result.workout) {
+        onNavigateToModule?.('workout');
       }
-
       const assistantMsg: ChatMessage = {
         id: (Date.now() + 1).toString(),
         sender: 'assistant',
         text: result.message,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, assistantMsg]);
+      onSendMessage(assistantMsg);
       if (result.message && !result.unsupportedReason) {
         soundService.speak(result.message);
       }
@@ -119,7 +117,7 @@ export const AITrainer: React.FC<AITrainerProps> = ({
         text: `Ошибка: ${errMessage}. Проверьте подключение или API ключ в Настройках.`,
         time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       };
-      setMessages((prev) => [...prev, errMsg]);
+      onSendMessage(errMsg);
     } finally {
       setLoading(false);
     }

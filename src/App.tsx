@@ -32,6 +32,33 @@ export const App: React.FC = () => {
   const [isPinned, setIsPinned] = useState(false);
   const [isAiChatOpen, setIsAiChatOpen] = useState(false);
   const [aiTimerMinutes, setAiTimerMinutes] = useState<number | undefined>(undefined);
+  const [dashboardSubModule, setDashboardSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
+  const [chatMessages, setChatMessages] = useState<Array<{ id: string; sender: 'user' | 'assistant'; text: string; time: string }>>(() => {
+    try {
+      const saved = localStorage.getItem('alarmer_chat_history');
+      return saved ? JSON.parse(saved) : [
+        {
+          id: '1',
+          sender: 'assistant',
+          text: 'Привет! Я твой AI Co-Pilot. Я умею управлять будильниками, создавать программы тренировок (HIIT, Табата), настраивать таймеры и динамически менять интерфейс приложения. Чем могу помочь?',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ];
+    } catch {
+      return [
+        {
+          id: '1',
+          sender: 'assistant',
+          text: 'Привет! Я твой AI Co-Pilot. Я умею управлять будильниками, создавать программы тренировок (HIIT, Табата), настраивать таймеры и динамически менять интерфейс приложения. Чем могу помочь?',
+          time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        },
+      ];
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem('alarmer_chat_history', JSON.stringify(chatMessages));
+  }, [chatMessages]);
   // Dynamic AI-driven UI Configuration
   const [dynamicUi, setDynamicUi] = useState<DynamicUIConfig>(() => {
     try {
@@ -224,6 +251,8 @@ export const App: React.FC = () => {
               onSelectRoutine={setSelectedRoutine}
               onOpenAISettings={() => setActiveTab('settings')}
               timerMinutes={aiTimerMinutes}
+              activeSubModule={dashboardSubModule}
+              onSubModuleChange={setDashboardSubModule}
             />
           )}
           {activeTab === 'ai' && (
@@ -238,9 +267,16 @@ export const App: React.FC = () => {
               onApplyUI={(newUi) => setDynamicUi(newUi)}
               onSetTimerMinutes={(mins) => {
                 setAiTimerMinutes(mins);
+                setDashboardSubModule('timer');
                 setActiveTab('dashboard');
               }}
               onSwitchTab={(_tab) => setActiveTab('dashboard')}
+              messages={chatMessages}
+              onSendMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
+              onNavigateToModule={(mod) => {
+                setDashboardSubModule(mod);
+                setActiveTab('dashboard');
+              }}
             />
           )}
           {activeTab === 'settings' && (

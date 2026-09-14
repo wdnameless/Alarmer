@@ -18,6 +18,8 @@ interface DashboardViewProps {
   onSelectRoutine: (routine: WorkoutRoutine) => void;
   onOpenAISettings: () => void;
   timerMinutes?: number;
+  activeSubModule?: "timer" | "workout" | "stopwatch" | "alarms";
+  onSubModuleChange?: (sub: "timer" | "workout" | "stopwatch" | "alarms") => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -31,9 +33,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onSelectRoutine,
   onOpenAISettings,
   timerMinutes,
+  activeSubModule,
+  onSubModuleChange,
 }) => {
-  const [subModule, setSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
-
+  const [localSubModule, setLocalSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
+  const subModule = activeSubModule ?? localSubModule;
+  const setSubModule = (mod: "timer" | "workout" | "stopwatch" | "alarms") => {
+    setLocalSubModule(mod);
+    onSubModuleChange?.(mod);
+  };
   const t = I18nService.t();
 
   return (
