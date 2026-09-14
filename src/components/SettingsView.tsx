@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload } from 'lucide-react';
 import { ThemeColors, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '../types';
 import { CLOUD_VOICES, EdgeTtsService } from '../services/edgeTts';
 import { soundService } from '../services/sound';
@@ -405,6 +405,77 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <RotateCcw size={13} />
           <span>Сбросить кастомный UI к дефолту</span>
         </button>
+      </div>
+
+      {/* Data Management: Export / Import JSON */}
+      <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
+        <label className="text-xs font-bold uppercase tracking-wider opacity-60">
+          Управление данными (Резервная копия)
+        </label>
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            onClick={() => {
+              const data: Record<string, unknown> = {};
+              for (let i = 0; i < localStorage.length; i++) {
+                const key = localStorage.key(i);
+                if (key && key.startsWith('alarmer_')) {
+                  try {
+                    data[key] = JSON.parse(localStorage.getItem(key) || '""');
+                  } catch {
+                    data[key] = localStorage.getItem(key);
+                  }
+                }
+              }
+              const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+              const url = URL.createObjectURL(blob);
+              const a = document.createElement('a');
+              a.href = url;
+              a.download = `alarmer-backup-${new Date().toISOString().slice(0, 10)}.json`;
+              a.click();
+              URL.revokeObjectURL(url);
+            }}
+            className="py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center space-x-1.5 hover:bg-white/5 active:scale-98 transition-all"
+            style={{ borderColor: theme.border }}
+          >
+            <Download size={13} />
+            <span>Экспорт JSON</span>
+          </button>
+
+          <label
+            className="py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center space-x-1.5 hover:bg-white/5 active:scale-98 transition-all cursor-pointer"
+            style={{ borderColor: theme.border }}
+          >
+            <Upload size={13} />
+            <span>Импорт JSON</span>
+            <input
+              type="file"
+              accept=".json"
+              className="hidden"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                const reader = new FileReader();
+                reader.onload = (event) => {
+                  try {
+                    const parsed = JSON.parse(event.target?.result as string);
+                    Object.entries(parsed).forEach(([k, v]) => {
+                      if (typeof v === 'object') {
+                        localStorage.setItem(k, JSON.stringify(v));
+                      } else {
+                        localStorage.setItem(k, String(v));
+                      }
+                    });
+                    window.location.reload();
+                  } catch (err) {
+                    console.error('Import failed', err);
+                  }
+                };
+                reader.readAsText(file);
+              }}
+            />
+          </label>
+        </div>
       </div>
     </div>
   );

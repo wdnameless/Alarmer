@@ -177,8 +177,8 @@ export const RadialDial: React.FC<RadialDialProps> = ({
               x2={t.x2}
               y2={t.y2}
               stroke={t.isActive ? theme.accent : "#ffffff"}
-              strokeWidth={t.isMajor ? 2.4 : 1.2}
-              strokeOpacity={t.isActive ? 1 : 0.65}
+              strokeWidth={t.isMajor ? 2.0 : 0.9}
+              strokeOpacity={t.isActive ? 1.0 : t.isMajor ? 0.45 : 0.20}
               strokeLinecap="round"
             />
           ))}
@@ -199,15 +199,13 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           style={{ transition: dragProgress !== null ? 'none' : 'stroke-dasharray 0.8s ease' }}
         />
 
-        {/* Vintage Style: Roman Clock Hour Numerals / Chronograph ticks */}
-        {stylePreset === 'vintage' && (
-          <g opacity={0.65} fontSize={10} fontFamily="Georgia, serif" fill={theme.text} textAnchor="middle" dominantBaseline="middle">
-            <text x={radius} y={radius - dialRadius + 24}>XII</text>
-            <text x={radius + dialRadius - 24} y={radius}>III</text>
-            <text x={radius} y={radius + dialRadius - 24}>VI</text>
-            <text x={radius - dialRadius + 24} y={radius}>IX</text>
-          </g>
-        )}
+        {/* Dieter Rams Swiss Precision Numerals: 12, 3, 6, 9 */}
+        <g opacity={0.45} fontSize={11} fontWeight={600} fontFamily="Inter, -apple-system, sans-serif" fill="#ffffff" textAnchor="middle" dominantBaseline="middle">
+          <text x={radius} y={radius - dialRadius + 22}>12</text>
+          <text x={radius + dialRadius - 22} y={radius}>3</text>
+          <text x={radius} y={radius + dialRadius - 22}>6</text>
+          <text x={radius - dialRadius + 22} y={radius}>9</text>
+        </g>
 
         {/* Reference marker at 9 o'clock (square indicator) */}
         {stylePreset !== 'vintage' && (
