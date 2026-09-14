@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { ChatMessage } from './services/aiCompiler';
 import { HandClock, HandGear, HandSparkle } from './components/CustomIcons';
-import { AppMode, ThemeKey, AISettings, AlarmItem, WorkoutRoutine, ThemeColors } from './types';
+import { AppMode, ThemeKey, AISettings, AlarmItem, WorkoutRoutine, ThemeColors, DynamicUIConfig } from './types';
+import { AIChatDrawer } from './components/AIChatDrawer';
 import { THEMES } from './constants/themes';
 import {
   DEFAULT_AI_SETTINGS,
@@ -16,7 +17,7 @@ import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { I18nService } from './services/i18n';
-import { DynamicUIConfig, DEFAULT_DYNAMIC_UI } from './types';
+import { DEFAULT_DYNAMIC_UI } from './types';
 
 export const App: React.FC = () => {
   // App state
@@ -26,7 +27,8 @@ export const App: React.FC = () => {
   const [isPinned, setIsPinned] = useState(false);
   const [aiTimerMinutes] = useState<number | undefined>(undefined);
   const [dashboardSubModule, setDashboardSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
-  const [chatMessages] = useState<ChatMessage[]>(() => {
+  const [isAiWingOpen, setIsAiWingOpen] = useState<boolean>(false);
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     try {
       const saved = localStorage.getItem('alarmer_chat_history');
       return saved ? JSON.parse(saved) : [
@@ -131,8 +133,11 @@ export const App: React.FC = () => {
     setIsPinned(newPin);
     await windowService.setAlwaysOnTop(newPin);
   };
-  const openAiWindow = async () => {
-    await windowService.openAiCompanionWindow();
+  const toggleAiWing = async () => {
+    soundService.playUiClick();
+    const next = !isAiWingOpen;
+    setIsAiWingOpen(next);
+    await windowService.setCompanionWing(next);
   };
 
   const handleSelectTab = (tab: AppMode) => {
@@ -180,7 +185,10 @@ export const App: React.FC = () => {
       {/* Main Split Layout: Left Primary Surface + Right Side AI Sidebar */}
       <div className="flex-1 flex w-full h-full overflow-hidden relative">
         {/* Left Pane: Timer / Settings (Clean, Fixed 340px primary surface) */}
-        <div className="flex flex-col items-center justify-between p-3 overflow-y-auto w-full">
+        <div
+          className="flex flex-col items-center justify-between p-3 overflow-y-auto shrink-0 transition-all duration-300"
+          style={{ width: isAiWingOpen ? '340px' : '100%' }}
+        >
           <div
             className="flex items-center justify-between w-full max-w-[340px] p-1 mb-2 rounded-xl border transition-colors"
             style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
@@ -248,29 +256,57 @@ export const App: React.FC = () => {
           </div>
         </div>
 
-        {/* Sleek Upright Side Toggle Button on Right Edge to open Companion Window */}
-        <button
-          onClick={() => {
-            soundService.playUiClick();
-            openAiWindow();
-          }}
-          className="absolute right-0 top-1/2 -translate-y-1/2 z-40 flex items-center space-x-1.5 py-3 px-2 rounded-l-xl border border-r-0 shadow-2xl backdrop-blur-md transition-all active:scale-95 group hover:px-2.5"
-          style={{
-            backgroundColor: `${theme.cardBg}F2`,
-            borderColor: theme.border,
-          }}
-          title="Открыть отдельное окно AI Co-Pilot рядом"
-        >
-          <div className="flex flex-col items-center space-y-1.5">
-            <HandSparkle size={15} color={theme.accent} className="animate-pulse" />
-            <span
-              className="text-[10px] font-bold tracking-wider uppercase opacity-80 group-hover:opacity-100 transition-opacity"
-              style={{ color: theme.accent }}
-            >
-              AI
-            </span>
+        {/* Right Wing: Attached Companion AI Module */}
+        {isAiWingOpen && (
+          <div className="flex-1 h-full flex flex-row items-stretch border-l overflow-hidden" style={{ borderColor: `${theme.accent}30` }}>
+            <div className="w-[3px] bg-gradient-to-b from-transparent via-current to-transparent opacity-40" style={{ color: theme.accent }} />
+            <div className="flex-1 h-full flex flex-col overflow-hidden">
+              <AIChatDrawer
+                isOpen={true}
+                onClose={toggleAiWing}
+                theme={theme}
+                currentUi={dynamicUi}
+                aiSettings={aiSettings}
+                onApplyUI={(newUi: DynamicUIConfig) => setDynamicUi(newUi)}
+                onApplyAlarms={(newAlarms: AlarmItem[]) => setAlarms((prev) => [...prev, ...newAlarms])}
+                onApplyWorkout={(newWorkout: WorkoutRoutine) => handleSelectRoutine(newWorkout)}
+                onSetTimerMinutes={(_mins: number) => {
+                  setDashboardSubModule('timer');
+                  setActiveTab('dashboard');
+                }}
+                onNavigateToModule={(mod: 'timer' | 'workout' | 'stopwatch' | 'alarms') => {
+                  setDashboardSubModule(mod);
+                  setActiveTab('dashboard');
+                }}
+                messages={chatMessages}
+                onSendMessage={(msg: ChatMessage) => setChatMessages((prev) => [...prev, msg])}
+              />
+            </div>
           </div>
-        </button>
+        )}
+
+        {/* Sleek Upright Side Toggle Button on Right Edge */}
+        {!isAiWingOpen && (
+          <button
+            onClick={toggleAiWing}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-40 flex items-center space-x-1.5 py-3 px-2 rounded-l-xl border border-r-0 shadow-2xl backdrop-blur-md transition-all active:scale-95 group hover:px-2.5"
+            style={{
+              backgroundColor: `${theme.cardBg}F2`,
+              borderColor: theme.border,
+            }}
+            title="Раскрыть монолитный блок AI Co-Pilot"
+          >
+            <div className="flex flex-col items-center space-y-1.5">
+              <HandSparkle size={15} color={theme.accent} className="animate-pulse" />
+              <span
+                className="text-[10px] font-bold tracking-wider uppercase opacity-80 group-hover:opacity-100 transition-opacity"
+                style={{ color: theme.accent }}
+              >
+                AI
+              </span>
+            </div>
+          </button>
+        )}
       </div>
     </div>
   </div>

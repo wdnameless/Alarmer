@@ -1,5 +1,4 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
-import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
 import { invoke } from '@tauri-apps/api/core';
 
 export class WindowService {
@@ -69,23 +68,12 @@ export class WindowService {
     }
   }
 
-  static async openAiCompanionWindow(): Promise<void> {
+  static async setCompanionWing(open: boolean): Promise<void> {
     if (!this.isTauri()) return;
     try {
-      await invoke('toggle_ai_companion_window');
+      await invoke('set_companion_mode', { open });
     } catch (e) {
-      console.error('Failed to toggle AI companion window via Tauri command:', e);
-    }
-  }
-  static async closeAiCompanionWindow(): Promise<void> {
-    if (!this.isTauri()) return;
-    try {
-      const existing = await WebviewWindow.getByLabel('ai-copilot');
-      if (existing) {
-        await existing.close();
-      }
-    } catch (e) {
-      console.warn('Close companion window error:', e);
+      console.error('Failed to set companion wing mode:', e);
     }
   }
 

@@ -51,40 +51,11 @@ async fn synthesize_speech(text: String, voice_id: String) -> Result<String, Str
 }
 
 #[tauri::command]
-async fn toggle_ai_companion_window(app: tauri::AppHandle) -> Result<(), String> {
-    if let Some(existing) = app.get_webview_window("ai-copilot") {
-        if existing.is_visible().unwrap_or(false) {
-            let _ = existing.close();
-            return Ok(());
-        } else {
-            let _ = existing.show();
-            let _ = existing.set_focus();
-            return Ok(());
-        }
+async fn set_companion_mode(app: tauri::AppHandle, open: bool) -> Result<(), String> {
+    if let Some(win) = app.get_webview_window("main") {
+        let new_width = if open { 680.0 } else { 340.0 };
+        let _ = win.set_size(tauri::LogicalSize::new(new_width, 480.0));
     }
-
-    let (x, y) = if let Some(main_win) = app.get_webview_window("main") {
-        let pos = main_win.outer_position().unwrap_or_default();
-        let size = main_win.outer_size().unwrap_or_default();
-        (pos.x as f64 + size.width as f64 + 4.0, pos.y as f64)
-    } else {
-        (100.0, 100.0)
-    };
-
-    let builder = tauri::WebviewWindowBuilder::new(
-        &app,
-        "ai-copilot",
-        tauri::WebviewUrl::App("index.html?window=ai-copilot".into()),
-    )
-    .title("Alarmer — AI Co-Pilot")
-    .inner_size(340.0, 480.0)
-    .position(x, y)
-    .resizable(true)
-    .decorations(false)
-    .transparent(true)
-    .always_on_top(false);
-
-    builder.build().map_err(|e| format!("Failed to create window: {e}"))?;
     Ok(())
 }
 
@@ -93,7 +64,7 @@ pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![synthesize_speech, toggle_ai_companion_window])
+        .invoke_handler(tauri::generate_handler![synthesize_speech, set_companion_mode])
         .setup(|app| {
             // Build Tray Menu
             let show_i = MenuItem::with_id(app, "show", "Показать Alarmer", true, None::<&str>)?;
@@ -160,41 +131,9 @@ pub fn run() {
             Ok(())
         })
         .on_window_event(|window, event| {
-            match event {
-                tauri::WindowEvent::CloseRequested { api, .. } => {
-                    if window.label() == "main" {
-                        api.prevent_close();
-                        let _ = window.hide();
-                        if let Some(companion) = window.app_handle().get_webview_window("ai-copilot") {
-                            let _ = companion.hide();
-                        }
-                    } else if window.label() == "ai-copilot" {
-                        let _ = window.close();
-                    }
-                }
-                tauri::WindowEvent::Moved(new_pos) => {
-                    if window.label() == "main" {
-                        if let Some(companion) = window.app_handle().get_webview_window("ai-copilot") {
-                            if companion.is_visible().unwrap_or(false) {
-                                let main_size = window.outer_size().unwrap_or_default();
-                                let target_x = new_pos.x + main_size.width as i32 + 4;
-                                let target_y = new_pos.y;
-                                let _ = companion.set_position(tauri::PhysicalPosition::new(target_x, target_y));
-                            }
-                        }
-                    }
-                }
-                tauri::WindowEvent::Focused(focused) => {
-                    if *focused && window.label() == "main" {
-                        if let Some(companion) = window.app_handle().get_webview_window("ai-copilot") {
-                            if companion.is_visible().unwrap_or(false) {
-                                // Bring companion to top along with main
-                                let _ = companion.show();
-                            }
-                        }
-                    }
-                }
-                _ => {}
+            if let tauri::WindowEvent::CloseRequested { api, .. } = event {
+                api.prevent_close();
+                let _ = window.hide();
             }
         })
         .run(tauri::generate_context!())
