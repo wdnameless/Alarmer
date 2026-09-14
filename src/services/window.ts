@@ -1,5 +1,6 @@
 import { getCurrentWindow, LogicalSize } from '@tauri-apps/api/window';
 import { WebviewWindow } from '@tauri-apps/api/webviewWindow';
+import { invoke } from '@tauri-apps/api/core';
 
 export class WindowService {
   private static isTauri(): boolean {
@@ -71,47 +72,11 @@ export class WindowService {
   static async openAiCompanionWindow(): Promise<void> {
     if (!this.isTauri()) return;
     try {
-      // Check if existing companion window is already open
-      const existing = await WebviewWindow.getByLabel('ai-copilot');
-      if (existing) {
-        const isVis = await existing.isVisible();
-        if (isVis) {
-          await existing.setFocus();
-          return;
-        } else {
-          await existing.show();
-          await existing.setFocus();
-          return;
-        }
-      }
-
-      // Calculate position directly to the right of the main window
-      const mainWin = getCurrentWindow();
-      const mainPos = await mainWin.outerPosition();
-      const mainSize = await mainWin.outerSize();
-
-      // Open new dedicated native OS window docked next to main window
-      const companion = new WebviewWindow('ai-copilot', {
-        url: 'index.html?window=ai-copilot',
-        title: 'Alarmer — AI Co-Pilot',
-        width: 340,
-        height: 480,
-        x: mainPos.x + mainSize.width + 12,
-        y: mainPos.y,
-        resizable: true,
-        decorations: false,
-        transparent: true,
-        alwaysOnTop: false,
-      });
-
-      companion.once('tauri://error', (e) => {
-        console.error('Failed to create AI companion window:', e);
-      });
+      await invoke('toggle_ai_companion_window');
     } catch (e) {
-      console.error('Companion window error:', e);
+      console.error('Failed to toggle AI companion window via Tauri command:', e);
     }
   }
-
   static async closeAiCompanionWindow(): Promise<void> {
     if (!this.isTauri()) return;
     try {

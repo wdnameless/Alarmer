@@ -50,12 +50,50 @@ async fn synthesize_speech(text: String, voice_id: String) -> Result<String, Str
     .map_err(|e| format!("Task join error: {e}"))?
 }
 
+#[tauri::command]
+async fn toggle_ai_companion_window(app: tauri::AppHandle) -> Result<(), String> {
+    if let Some(existing) = app.get_webview_window("ai-copilot") {
+        if existing.is_visible().unwrap_or(false) {
+            let _ = existing.close();
+            return Ok(());
+        } else {
+            let _ = existing.show();
+            let _ = existing.set_focus();
+            return Ok(());
+        }
+    }
+
+    let (x, y) = if let Some(main_win) = app.get_webview_window("main") {
+        let pos = main_win.outer_position().unwrap_or_default();
+        let size = main_win.outer_size().unwrap_or_default();
+        (pos.x as f64 + size.width as f64 + 12.0, pos.y as f64)
+    } else {
+        (100.0, 100.0)
+    };
+
+    let builder = tauri::WebviewWindowBuilder::new(
+        &app,
+        "ai-copilot",
+        tauri::WebviewUrl::App("index.html?window=ai-copilot".into()),
+    )
+    .title("Alarmer — AI Co-Pilot")
+    .inner_size(340.0, 480.0)
+    .position(x, y)
+    .resizable(true)
+    .decorations(false)
+    .transparent(true)
+    .always_on_top(false);
+
+    builder.build().map_err(|e| format!("Failed to create window: {e}"))?;
+    Ok(())
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())
-        .invoke_handler(tauri::generate_handler![synthesize_speech])
+        .invoke_handler(tauri::generate_handler![synthesize_speech, toggle_ai_companion_window])
         .setup(|app| {
             // Build Tray Menu
             let show_i = MenuItem::with_id(app, "show", "Показать Alarmer", true, None::<&str>)?;
