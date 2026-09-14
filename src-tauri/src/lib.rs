@@ -69,8 +69,13 @@ pub fn run() {
             let mut builder = TrayIconBuilder::new()
                 .menu(&menu)
                 .tooltip("Alarmer — Умный будильник и таймер");
-
-            if let Some(icon) = default_icon {
+            let hourglass_bytes = include_bytes!("../icons/icon.ico");
+            if let Ok(icon) = tauri::image::Image::from_bytes(hourglass_bytes) {
+                builder = builder.icon(icon.clone());
+                if let Some(win) = app.get_webview_window("main") {
+                    let _ = win.set_icon(icon);
+                }
+            } else if let Some(icon) = default_icon {
                 builder = builder.icon(icon);
             }
 
