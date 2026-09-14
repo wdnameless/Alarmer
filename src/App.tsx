@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { Timer as TimerIcon, Settings as SettingsIcon, Sparkles } from 'lucide-react';
 import { TitleBar } from './components/TitleBar';
 import { ChatMessage } from './services/aiCompiler';
+import { HandClock, HandGear, HandSparkle } from './components/CustomIcons';
 import { AppMode, ThemeKey, AISettings, AlarmItem, WorkoutRoutine, ThemeColors } from './types';
 import { THEMES } from './constants/themes';
 import {
@@ -176,11 +176,13 @@ export const App: React.FC = () => {
         onTogglePin={togglePin}
       />
       {/* Main App Container */}
-      <div className="flex-1 flex flex-col items-center justify-between p-3 overflow-y-auto">
-        {/* Navigation Tabs (Hidden in ultra-compact view for floating pill look) */}
-        {true && (
+      {/* Main Split Layout: Left Primary Surface + Right Side AI Sidebar */}
+      <div className="flex-1 flex w-full h-full overflow-hidden relative">
+        {/* Left Pane: Timer / Settings */}
+        <div className="flex-1 flex flex-col items-center justify-between p-3 overflow-y-auto min-w-0 transition-all duration-300">
+          {/* Navigation Tabs */}
           <div
-            className="flex items-center justify-between w-full p-1 mb-2 rounded-xl border transition-colors"
+            className="flex items-center justify-between w-full max-w-[340px] p-1 mb-2 rounded-xl border transition-colors"
             style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
           >
             <div className="flex items-center space-x-1.5 flex-1">
@@ -195,8 +197,8 @@ export const App: React.FC = () => {
                 }}
                 title={t.dashboard}
               >
-                <TimerIcon size={15} />
-                <span className="text-xs hidden min-[280px]:inline truncate">{t.dashboard}</span>
+                <HandClock size={15} color={activeTab === 'dashboard' ? theme.accent : theme.text} />
+                <span className="text-xs truncate">{t.dashboard}</span>
               </button>
 
               <button
@@ -210,83 +212,94 @@ export const App: React.FC = () => {
                 }}
                 title={t.settings}
               >
-                <SettingsIcon size={15} />
-                <span className="text-xs hidden min-[280px]:inline truncate">{t.settings}</span>
+                <HandGear size={15} color={activeTab === 'settings' ? theme.accent : theme.text} />
+                <span className="text-xs truncate">{t.settings}</span>
               </button>
             </div>
           </div>
-        )}
-        {/* Content Area Rendering by active Tab */}
-        <div className="w-full flex-1 flex flex-col items-center justify-center">
-          {activeTab === 'dashboard' && (
-            <DashboardView
+
+          {/* Content Area Rendering */}
+          <div className="w-full flex-1 flex flex-col items-center justify-center">
+            {activeTab === 'dashboard' && (
+              <DashboardView
+                theme={theme}
+                dynamicUi={dynamicUi}
+                alarms={alarms}
+                routines={routines}
+                selectedRoutine={selectedRoutine}
+                aiSettings={aiSettings}
+                onUpdateAlarms={setAlarms}
+                onSelectRoutine={handleSelectRoutine}
+                onOpenAISettings={() => setActiveTab('settings')}
+                timerMinutes={aiTimerMinutes}
+                activeSubModule={dashboardSubModule}
+                onSubModuleChange={setDashboardSubModule}
+              />
+            )}
+            {activeTab === 'settings' && (
+              <SettingsView
+                theme={theme}
+                aiSettings={aiSettings}
+                currentUi={dynamicUi}
+                onUpdateAISettings={setAISettings}
+                onUpdateUI={setDynamicUi}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Right Pane: Split Sidebar for AI Chat */}
+        {isAiChatOpen && (
+          <div className="w-[320px] max-w-[85vw] h-full border-l flex flex-col z-30 transition-all duration-300" style={{ borderColor: theme.border }}>
+            <AIChatDrawer
+              isOpen={isAiChatOpen}
+              onClose={() => setIsAiChatOpen(false)}
               theme={theme}
-              dynamicUi={dynamicUi}
-              alarms={alarms}
-              routines={routines}
-              selectedRoutine={selectedRoutine}
-              aiSettings={aiSettings}
-              onUpdateAlarms={setAlarms}
-              onSelectRoutine={setSelectedRoutine}
-              onOpenAISettings={() => setActiveTab('settings')}
-              timerMinutes={aiTimerMinutes}
-              activeSubModule={dashboardSubModule}
-              onSubModuleChange={setDashboardSubModule}
-            />
-          )}
-          {activeTab === 'settings' && (
-            <SettingsView
-              theme={theme}
-              aiSettings={aiSettings}
               currentUi={dynamicUi}
-              onUpdateAISettings={setAISettings}
-              onUpdateUI={setDynamicUi}
+              aiSettings={aiSettings}
+              onApplyUI={(newUi) => setDynamicUi(newUi)}
+              onApplyAlarms={(newAlarms) => setAlarms((prev) => [...prev, ...newAlarms])}
+              onApplyWorkout={(newWorkout) => handleSelectRoutine(newWorkout)}
+              onSetTimerMinutes={(mins) => {
+                setAiTimerMinutes(mins);
+                setDashboardSubModule('timer');
+                setActiveTab('dashboard');
+              }}
+              onNavigateToModule={(mod) => {
+                setDashboardSubModule(mod);
+                setActiveTab('dashboard');
+              }}
+              messages={chatMessages}
+              onSendMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
             />
-          )}
+          </div>
+        )}
 
-
-          {/* Universal AI Co-Pilot & UI Compiler Drawer */}
-          <AIChatDrawer
-            isOpen={isAiChatOpen}
-            onClose={() => setIsAiChatOpen(false)}
-            theme={theme}
-            currentUi={dynamicUi}
-            aiSettings={aiSettings}
-            onApplyUI={(newUi) => setDynamicUi(newUi)}
-            onApplyAlarms={(newAlarms) => setAlarms((prev) => [...prev, ...newAlarms])}
-            onApplyWorkout={(newWorkout) => handleSelectRoutine(newWorkout)}
-            onSetTimerMinutes={(mins) => {
-              setAiTimerMinutes(mins);
-              setDashboardSubModule('timer');
-              setActiveTab('dashboard');
-            }}
-            onNavigateToModule={(mod) => {
-              setDashboardSubModule(mod);
-              setActiveTab('dashboard');
-            }}
-            messages={chatMessages}
-            onSendMessage={(msg) => setChatMessages((prev) => [...prev, msg])}
-          />
-          {/* Sleek Side Floating AI Drawer Button */}
+        {/* Sleek Upright Side Toggle Button on Right Edge */}
+        {!isAiChatOpen && (
           <button
             onClick={() => {
               soundService.playUiClick();
-              setIsAiChatOpen((prev) => !prev);
+              setIsAiChatOpen(true);
             }}
-            className={`fixed right-0 top-1/2 -translate-y-1/2 z-40 flex items-center py-2 px-1.5 rounded-l-xl border border-r-0 shadow-lg backdrop-blur-md transition-all group ${
-              isAiChatOpen ? 'bg-white/20' : 'bg-black/60 hover:bg-black/80'
-            }`}
-            style={{ borderColor: theme.border }}
+            className="absolute right-0 top-1/2 -translate-y-1/2 z-40 flex items-center space-x-1.5 py-3 px-2 rounded-l-xl border border-r-0 shadow-2xl backdrop-blur-md transition-all active:scale-95 group hover:px-2.5"
+            style={{
+              backgroundColor: `${theme.cardBg}F2`,
+              borderColor: theme.border,
+            }}
             title="Открыть AI Co-Pilot"
           >
-            <div className="flex flex-col items-center space-y-1">
-              <Sparkles size={14} style={{ color: theme.accent }} className="animate-pulse" />
-              <span className="text-[9px] font-mono tracking-widest uppercase writing-mode-vertical rotate-180 opacity-70 group-hover:opacity-100" style={{ color: theme.text }}>
+            <div className="flex flex-col items-center space-y-1.5">
+              <HandSparkle size={15} color={theme.accent} className="animate-pulse" />
+              <span
+                className="text-[10px] font-bold tracking-wider uppercase opacity-80 group-hover:opacity-100 transition-opacity"
+                style={{ color: theme.accent }}
+              >
                 AI
               </span>
             </div>
           </button>
-        </div>
+        )}
       </div>
     </div>
   </div>

@@ -1,9 +1,9 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { Send, Bot, Sparkles, X, Check, Loader2, ArrowRight } from 'lucide-react';
-import { ThemeColors, DynamicUIConfig, AISettings, AlarmItem, WorkoutRoutine } from '../types';
-import { AICompilerService, ChatMessage } from '../services/aiCompiler';
+import { HandClose, HandSend, HandSparkle, HandCheck } from './CustomIcons';
+import { Loader2, ArrowRight } from 'lucide-react';
 import { soundService } from '../services/sound';
-
+import { ThemeColors, DynamicUIConfig, AISettings, AlarmItem, WorkoutRoutine } from '../types';
+import { ChatMessage, AICompilerService } from '../services/aiCompiler';
 interface AIChatDrawerProps {
   isOpen: boolean;
   onClose: () => void;
@@ -124,9 +124,10 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
   return (
     <div
-      className="absolute inset-0 z-50 flex flex-col backdrop-blur-xl transition-all duration-300 select-none animate-in fade-in"
+      className="w-80 h-full border-l flex flex-col backdrop-blur-xl transition-all duration-300 select-none z-30 flex-shrink-0"
       style={{
-        backgroundColor: `${theme.bg}FA`,
+        backgroundColor: `${theme.cardBg}F0`,
+        borderColor: theme.border,
         color: theme.text,
       }}
     >
@@ -137,25 +138,24 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       >
         <div className="flex items-center space-x-2">
           <div
-            className="w-7 h-7 rounded-lg flex items-center justify-center shadow-lg"
+            className="w-6 h-6 rounded-lg flex items-center justify-center shadow-lg"
             style={{ backgroundColor: `${theme.accent}20`, color: theme.accent }}
           >
-            <Bot size={16} />
+            <HandSparkle size={14} color={theme.accent} />
           </div>
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
-              AI Co-Pilot & UI Compiler
-              <Sparkles size={12} style={{ color: theme.accent }} />
+              AI Co-Pilot
             </h3>
-            <span className="text-[10px] opacity-60">Диктуйте стиль, таймеры и сценарии</span>
+            <span className="text-[10px] opacity-60">Ассистент таймера</span>
           </div>
         </div>
 
         <button
           onClick={onClose}
-          className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white/70 hover:text-white"
+          className="w-6 h-6 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white/70 hover:text-white"
         >
-          <X size={15} />
+          <HandClose size={13} />
         </button>
       </div>
 
@@ -183,12 +183,12 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap gap-1">
                   {m.mutation.ui && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 flex items-center gap-1">
-                      <Check size={10} style={{ color: theme.accent }} /> UI трансформирован
+                      <HandCheck size={10} color={theme.accent} /> UI трансформирован
                     </span>
                   )}
                   {m.mutation.alarms && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 flex items-center gap-1">
-                      <Check size={10} style={{ color: theme.accent }} /> Будильники добавлены
+                      <HandCheck size={10} color={theme.accent} /> Будильники добавлены
                     </span>
                   )}
                 </div>
@@ -247,7 +247,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
               color: '#000000',
             }}
           >
-            <Send size={14} />
+            <HandSend size={14} color="#000000" />
           </button>
         </form>
       </div>
