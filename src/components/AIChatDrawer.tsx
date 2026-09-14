@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { HandClose, HandSend, HandSparkle, HandCheck } from './CustomIcons';
-import { Loader2, ArrowRight } from 'lucide-react';
+import { Loader2, ArrowRight, Plus, Copy, Check } from 'lucide-react';
 import { soundService } from '../services/sound';
 import { ThemeColors, DynamicUIConfig, AISettings, AlarmItem, WorkoutRoutine } from '../types';
 import { ChatMessage, AICompilerService } from '../services/aiCompiler';
@@ -18,6 +18,7 @@ interface AIChatDrawerProps {
   onNavigateToModule?: (module: 'timer' | 'workout' | 'stopwatch' | 'alarms') => void;
   messages: ChatMessage[];
   onSendMessage: (msg: ChatMessage) => void;
+  onResetChat?: () => void;
 }
 
 export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
@@ -34,7 +35,9 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   onNavigateToModule,
   messages,
   onSendMessage,
+  onResetChat,
 }) => {
+  const [copiedId, setCopiedId] = useState<string | null>(null);
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement | null>(null);
@@ -153,12 +156,25 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
           </div>
         </div>
 
-        <button
-          onClick={onClose}
-          className="w-6 h-6 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white/70 hover:text-white"
-        >
-          <HandClose size={13} />
-        </button>
+        <div className="flex items-center space-x-1.5">
+          <button
+            onClick={() => {
+              soundService.playUiClick();
+              onResetChat?.();
+            }}
+            className="flex items-center space-x-1 py-1 px-2 rounded-lg bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white/70 hover:text-white border border-white/5 text-[10px] font-medium"
+            title="Создать новый чистый чат"
+          >
+            <Plus size={11} />
+            <span>Новый чат</span>
+          </button>
+          <button
+            onClick={onClose}
+            className="w-6 h-6 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 active:scale-95 transition-all text-white/70 hover:text-white"
+          >
+            <HandClose size={13} />
+          </button>
+        </div>
       </div>
       )}
       {/* Messages Feed */}
@@ -169,17 +185,32 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             className={`flex flex-col ${m.sender === 'user' ? 'items-end' : 'items-start'}`}
           >
             <div
-              className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed shadow-md ${
+              className={`max-w-[85%] rounded-2xl px-3 py-2 text-xs leading-relaxed shadow-md select-text cursor-text relative group ${
                 m.sender === 'user'
                   ? 'text-black font-medium'
-                  : 'bg-white/5 border border-white/10'
+                  : 'bg-white/5 border border-white/10 text-white/90'
               }`}
               style={{
                 backgroundColor: m.sender === 'user' ? theme.accent : undefined,
                 color: m.sender === 'user' ? '#000000' : theme.text,
               }}
             >
-              {m.text}
+              <div className="select-text whitespace-pre-wrap">{m.text}</div>
+              {m.sender === 'assistant' && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    navigator.clipboard.writeText(m.text);
+                    setCopiedId(m.id);
+                    setTimeout(() => setCopiedId(null), 2000);
+                  }}
+                  className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 p-1 rounded-md bg-neutral-800 hover:bg-neutral-700 text-white/70 hover:text-white border border-white/10 shadow transition-all select-none"
+                  title="Копировать текст"
+                >
+                  {copiedId === m.id ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                </button>
+              )}
 
               {m.mutation && (
                 <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap gap-1">

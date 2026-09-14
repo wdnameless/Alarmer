@@ -333,6 +333,18 @@ export const App: React.FC = () => {
                 }}
                 messages={chatMessages}
                 onSendMessage={(msg: ChatMessage) => setChatMessages((prev) => [...prev, msg])}
+                onResetChat={() => {
+                  const cleanChat: ChatMessage[] = [
+                    {
+                      id: Date.now().toString(),
+                      sender: 'assistant',
+                      text: 'Новый чат начат! Чем могу помочь? (Расписание тренировок, будильники, таймеры или настройка интерфейса)',
+                      timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+                    },
+                  ];
+                  setChatMessages(cleanChat);
+                  localStorage.setItem('alarmer_chat_history', JSON.stringify(cleanChat));
+                }}
               />
             </div>
           </div>
