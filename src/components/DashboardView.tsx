@@ -1,10 +1,8 @@
 import React, { useState } from "react";
 import { ThemeColors, DynamicUIConfig, AlarmItem, WorkoutRoutine, AISettings } from "../types";
 import { Timer } from "./Timer";
-import { Stopwatch } from "./Stopwatch";
-import { WorkoutPlayer } from "./WorkoutPlayer";
 import { Alarms } from "./Alarms";
-import { Timer as TimerIcon, Watch, Flame, Bell } from "lucide-react";
+import { Timer as TimerIcon, Bell } from "lucide-react";
 import { I18nService } from "../services/i18n";
 
 interface DashboardViewProps {
@@ -26,11 +24,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   theme,
   dynamicUi,
   alarms,
-  routines,
-  selectedRoutine,
+  routines: _routines,
+  selectedRoutine: _selectedRoutine,
   aiSettings,
   onUpdateAlarms,
-  onSelectRoutine,
+  onSelectRoutine: _onSelectRoutine,
   onOpenAISettings,
   timerMinutes,
   activeSubModule,
@@ -69,34 +67,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
         </button>
 
         <button
-          onClick={() => setSubModule("workout")}
-          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
-          style={{
-            backgroundColor: subModule === "workout" ? theme.accent : "transparent",
-            color: subModule === "workout" ? "#000" : theme.text,
-            fontWeight: subModule === "workout" ? 700 : 500,
-          }}
-          title="Тренировка"
-        >
-          <Flame size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">{t.fitness}</span>
-        </button>
-
-        <button
-          onClick={() => setSubModule("stopwatch")}
-          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
-          style={{
-            backgroundColor: subModule === "stopwatch" ? theme.accent : "transparent",
-            color: subModule === "stopwatch" ? "#000" : theme.text,
-            fontWeight: subModule === "stopwatch" ? 700 : 500,
-          }}
-          title="Секундомер"
-        >
-          <Watch size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">{t.laps}</span>
-        </button>
-
-        <button
           onClick={() => setSubModule("alarms")}
           className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
           style={{
@@ -114,28 +84,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
       {/* Main Module Content */}
       <div className="w-full flex-1 flex flex-col items-center justify-center">
         {subModule === "timer" && <Timer theme={theme} dynamicUi={dynamicUi} initialMinutes={timerMinutes} />}
-        {subModule === "workout" && (
-          <div className="flex flex-col w-full space-y-3">
-            <div className="flex items-center space-x-2 overflow-x-auto pb-1 max-w-full">
-              {routines.map((r) => (
-                <button
-                  key={r.id}
-                  onClick={() => onSelectRoutine(r)}
-                  className="px-2.5 py-1 rounded-lg text-xs font-semibold whitespace-nowrap border"
-                  style={{
-                    backgroundColor: selectedRoutine.id === r.id ? theme.accent : theme.cardBg,
-                    color: selectedRoutine.id === r.id ? "#000" : theme.text,
-                    borderColor: theme.border,
-                  }}
-                >
-                  {r.name}
-                </button>
-              ))}
-            </div>
-            <WorkoutPlayer theme={theme} routine={selectedRoutine} />
-          </div>
-        )}
-        {subModule === "stopwatch" && <Stopwatch theme={theme} />}
         {subModule === "alarms" && (
           <Alarms
             theme={theme}
