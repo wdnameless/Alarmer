@@ -50,6 +50,31 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
     onUpdateSchedules(schedules.filter((s) => s.id !== id));
   };
 
+  /** Applies a change to one schedule, leaving the rest untouched. */
+  const patchSchedule = (id: string, patch: Partial<Schedule>) => {
+    onUpdateSchedules(schedules.map((s) => (s.id === id ? { ...s, ...patch } : s)));
+  };
+
+  /** Changes a step's time, keeping the schedule sorted by time. */
+  const editStepTime = (schedule: Schedule, stepId: string, time: string) => {
+    if (!/^\d{1,2}:\d{2}$/.test(time)) return;
+    const normalized = time.padStart(5, '0');
+    const steps = schedule.steps
+      .map((st) => (st.id === stepId ? { ...st, time: normalized } : st))
+      .sort((a, b) => a.time.localeCompare(b.time));
+    patchSchedule(schedule.id, { steps });
+  };
+
+  const deleteStep = (schedule: Schedule, stepId: string) => {
+    const steps = schedule.steps.filter((st) => st.id !== stepId);
+    // A schedule with no steps would silently stop working; drop it instead.
+    if (steps.length === 0) {
+      onUpdateSchedules(schedules.filter((s) => s.id !== schedule.id));
+      return;
+    }
+    patchSchedule(schedule.id, { steps });
+  };
+
   if (schedules.length === 0) {
     return (
       <div
@@ -96,12 +121,23 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
                 title="Показать шаги"
               >
                 <div className="flex items-center gap-1.5">
-                  <span
-                    className="text-xs font-semibold truncate"
-                    style={{ color: theme.text }}
-                  >
-                    {schedule.name}
-                  </span>
+                  {isExpanded ? (
+                    <input
+                      value={schedule.name}
+                      onChange={(e) => patchSchedule(schedule.id, { name: e.target.value })}
+                      onClick={(e) => e.stopPropagation()}
+                      className="min-w-0 flex-1 bg-transparent text-xs font-semibold outline-none border-b"
+                      style={{ color: theme.text, borderColor: 'rgba(255,255,255,0.16)' }}
+                      aria-label="Название программы"
+                    />
+                  ) : (
+                    <span
+                      className="text-xs font-semibold truncate"
+                      style={{ color: theme.text }}
+                    >
+                      {schedule.name}
+                    </span>
+                  )}
                   {isExpanded ? (
                     <ChevronUp size={12} style={{ color: theme.subtext }} />
                   ) : (
@@ -140,18 +176,29 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
                 {schedule.steps.map((step) => (
                   <div key={step.id} className="flex items-center gap-2 text-[11px]">
                     <Clock size={11} style={{ color: theme.subtext }} />
-                    <span
-                      className="font-mono tabular-nums shrink-0"
-                      style={{ color: theme.text }}
-                    >
-                      {step.time}
-                    </span>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      defaultValue={step.time}
+                      onBlur={(e) => editStepTime(schedule, step.id, e.target.value)}
+                      className="bg-transparent font-mono tabular-nums shrink-0 outline-none border-b w-[46px]"
+                      style={{ color: theme.text, borderColor: 'rgba(255,255,255,0.12)' }}
+                      aria-label={`Время шага ${step.label}`}
+                      title="Время в формате 24 часа, например 22:30"
+                    />
                     <span className="truncate" style={{ color: theme.text }}>
                       {step.label}
                     </span>
                     <span className="ml-auto shrink-0" style={{ color: theme.subtext }}>
                       {describeStep(step)}
                     </span>
+                    <button
+                      onClick={() => deleteStep(schedule, step.id)}
+                      title="Удалить шаг"
+                      className="p-1 rounded transition-colors hover:bg-red-500/20 text-red-400 opacity-50 hover:opacity-100 shrink-0"
+                    >
+                      <Trash2 size={11} />
+                    </button>
                   </div>
                 ))}
               </div>
