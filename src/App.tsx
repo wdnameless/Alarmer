@@ -11,7 +11,7 @@ import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { I18nService } from './services/i18n';
-import { AppMode, ThemeKey, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig, TaskItem, SessionRecord } from './types';
+import { AppMode, ThemeId, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig, TaskItem, SessionRecord } from './types';
 import { StoreService } from './services/store';
 import { buildFirings } from './services/scheduleEngine';
 import { AlarmCenter } from './components/AlarmCenter';
@@ -33,7 +33,9 @@ function welcomeMessage(): ChatMessage {
 export const App: React.FC = () => {
   // App state
   const [activeTab, setActiveTab] = useState<AppMode>('dashboard');
-  const [themeKey] = useState<ThemeKey>('winter');
+  const [themeKey, setThemeKey] = useState<ThemeId>(() =>
+    StoreService.getPreference('alarmer_theme', 'winter' as ThemeId),
+  );
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
   const [aiTimerMinutes] = useState<number | undefined>(undefined);
@@ -43,6 +45,13 @@ export const App: React.FC = () => {
     StoreService.getPreference('alarmer_left_pane_width', 340),
   );
   const [isResizingSplit, setIsResizingSplit] = useState<boolean>(false);
+  /** Alarm volume and mute, held as state so the backend ringer follows changes. */
+  const [alarmVolume, setAlarmVolume] = useState<number>(() =>
+    StoreService.getPreference('alarmer_alarm_volume', 0.8),
+  );
+  const [alarmEnabled, setAlarmEnabled] = useState<boolean>(() =>
+    StoreService.getPreference('alarmer_alarm_enabled', true),
+  );
   /** Gates writing until the stored file has been read, to avoid clobbering it. */
   const [hydrated, setHydrated] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
@@ -209,8 +218,8 @@ export const App: React.FC = () => {
       theme={theme}
       firings={firings}
       schedules={schedules}
-      alarmVolume={StoreService.getPreference('alarmer_alarm_volume', 0.8)}
-      alarmEnabled={StoreService.getPreference('alarmer_alarm_enabled', true)}
+      alarmVolume={alarmVolume}
+      alarmEnabled={alarmEnabled}
       onDisableAlarm={handleAlarmConsumed}
       onSession={recordSession}
     >
@@ -304,6 +313,19 @@ export const App: React.FC = () => {
               <ErrorBoundary theme={theme} fallbackTitle="Модуль настроек">
               <SettingsView
                 theme={theme}
+                themeKey={themeKey}
+                onSelectTheme={(next) => {
+                  setThemeKey(next);
+                  StoreService.setPreference('alarmer_theme', next);
+                }}
+                alarmVolume={alarmVolume}
+                alarmEnabled={alarmEnabled}
+                onAlarmAudioChange={(volume, enabled) => {
+                  setAlarmVolume(volume);
+                  setAlarmEnabled(enabled);
+                  StoreService.setPreference('alarmer_alarm_volume', volume);
+                  StoreService.setPreference('alarmer_alarm_enabled', enabled);
+                }}
                 aiSettings={aiSettings}
                 onUpdateAISettings={setAISettings}
                 onUpdateUI={setDynamicUi}

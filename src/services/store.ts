@@ -52,6 +52,9 @@ export const PREFERENCE_KEYS = [
   'alarmer_custom_alarm_sound',
   'alarmer_custom_alarm_filename',
   'alarmer_lang',
+  'alarmer_theme',
+  'alarmer_alarm_enabled',
+  'alarmer_timer_mode',
 ] as const;
 
 let storePromise: Promise<LazyStore> | null = null;
@@ -119,7 +122,6 @@ function sanitizeDynamicUi(raw: unknown): DynamicUIConfig {
   const layout = isRecord(raw.layout) ? raw.layout : {};
 
   return {
-    themeName: asString(raw.themeName, base.themeName),
     colors: {
       bg: asString(colors.bg, base.colors.bg),
       surface: asString(colors.surface, base.colors.surface),
@@ -160,13 +162,11 @@ function sanitizeDynamicUi(raw: unknown): DynamicUIConfig {
         ['rounded', 'square', 'pill'] as const,
         base.layout.buttonStyle,
       ),
-      glassmorphism: asBoolean(layout.glassmorphism, base.layout.glassmorphism),
       contentAlignment: oneOf(
         layout.contentAlignment,
         ['center', 'top', 'compact'] as const,
         base.layout.contentAlignment,
       ),
-      widgetsOrder: asArray(layout.widgetsOrder, base.layout.widgetsOrder),
       showSleepButton: asBoolean(layout.showSleepButton, true),
       showAiScheduleButton: asBoolean(layout.showAiScheduleButton, true),
       showCurrentTimeBadge: asBoolean(layout.showCurrentTimeBadge, true),

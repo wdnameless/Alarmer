@@ -4,6 +4,7 @@ import { ThemeColors, DynamicUIConfig } from '../types';
 import { RadialDial } from './RadialDial';
 import { soundService } from '../services/sound';
 import { TimerService, type TimerSnapshot, MAX_MINUTES, MIN_MINUTES } from '../services/timer';
+import { StoreService } from '../services/store';
 import confetti from 'canvas-confetti';
 import { listen } from '@tauri-apps/api/event';
 import { isTauri } from '../services/platform';
@@ -35,6 +36,14 @@ export const Timer: React.FC<TimerProps> = ({
   // Adopt the backend state on mount, then follow its broadcast.
   useEffect(() => {
     let active = true;
+
+    // Restore the arming mode, which is a user preference rather than a
+    // property of any one countdown.
+    const savedMode = StoreService.getPreference<string>('alarmer_timer_mode', 'countdown');
+    if (savedMode === 'flow' || savedMode === 'countdown') {
+      void TimerService.setMode(savedMode);
+    }
+
     void TimerService.getState().then((initial) => {
       if (active) setState(initial);
     });
@@ -98,6 +107,7 @@ export const Timer: React.FC<TimerProps> = ({
   const toggleMode = () => {
     soundService.playCountdownTick();
     const next = mode === 'flow' ? 'countdown' : 'flow';
+    StoreService.setPreference('alarmer_timer_mode', next);
     void TimerService.setMode(next).then(() => TimerService.getState().then(setState));
   };
 
@@ -180,6 +190,7 @@ export const Timer: React.FC<TimerProps> = ({
         timeScale={dynamicUi?.typography?.timeScale ?? 1.0}
         size={dynamicUi?.dial?.size ?? 180}
         stylePreset={dynamicUi?.dial?.stylePreset ?? 'minimal'}
+        glowIntensity={dynamicUi?.dial?.glowIntensity ?? 'none'}
       />
 
       <div className={`grid ${dynamicUi?.layout?.showPresetButtons === false ? 'grid-cols-2 max-w-[150px]' : 'grid-cols-2 max-w-[210px]'} gap-3 mt-4 w-full`}>

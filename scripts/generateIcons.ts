@@ -1,3 +1,11 @@
+/**
+ * One-off generator for the app icons, which are committed under `src-tauri/icons`.
+ *
+ * Not part of the build. Its `canvas` dependency pulls a native toolchain, so it
+ * is not installed by default — add it ad hoc only when regenerating:
+ *
+ *   bun add -d canvas && bun run scripts/generateIcons.ts
+ */
 import { createCanvas } from 'canvas';
 import fs from 'node:fs';
 import path from 'node:path';

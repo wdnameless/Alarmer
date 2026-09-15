@@ -15,6 +15,8 @@ interface RadialDialProps {
   fontFamily?: string;
   timeScale?: number;
   stylePreset?: 'neon' | 'vintage' | 'chronograph' | 'minimal';
+  /** Halo strength around the progress arc; 'none' keeps it flat. */
+  glowIntensity?: 'none' | 'subtle' | 'high';
 }
 
 export const RadialDial: React.FC<RadialDialProps> = ({
@@ -31,6 +33,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   fontFamily = 'system-ui',
   timeScale = 1.0,
   stylePreset = 'neon',
+  glowIntensity = 'none',
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [dragProgress, setDragProgress] = useState<number | null>(null);
@@ -141,6 +144,20 @@ export const RadialDial: React.FC<RadialDialProps> = ({
         onPointerUp={handlePointerUp}
       >
         <defs>
+          {/* A real blur filter rather than a CSS shadow, so the halo follows
+              the arc's own geometry at any dial size. */}
+          {glowIntensity !== 'none' && (
+            <filter id="alarmer-dial-glow" x="-50%" y="-50%" width="200%" height="200%">
+              <feGaussianBlur
+                stdDeviation={glowIntensity === 'high' ? 4 : 2}
+                result="blur"
+              />
+              <feMerge>
+                <feMergeNode in="blur" />
+                <feMergeNode in="SourceGraphic" />
+              </feMerge>
+            </filter>
+          )}
         </defs>
 
         {/* Outer Background Track */}
@@ -181,6 +198,7 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           strokeLinecap="round"
           fill="none"
           transform={`rotate(-90 ${radius} ${radius})`}
+          filter={glowIntensity !== 'none' ? 'url(#alarmer-dial-glow)' : undefined}
           style={{ transition: dragProgress !== null ? 'none' : 'stroke-dasharray 0.8s ease' }}
         />
 

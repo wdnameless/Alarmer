@@ -1,26 +1,17 @@
-import { AppSettings, Schedule } from '../types';
+import { Schedule } from '../types';
 
-export const DEFAULT_SETTINGS: AppSettings = {
-  theme: 'dark-neon',
-  ai: {
-    apiKey: '',
-    baseUrl: 'https://api.openai.com/v1',
-    model: 'gpt-4o-mini',
-    systemPrompt: 'Ты элитный фитнес-тренер и ментор по тайм-менеджменту. Давай краткие, зажигательные инструкции, рекомендации по подходам и отдыху.',
-  },
-  sound: {
-    uiClicksEnabled: true,
-    countdownTickEnabled: true,
-    profile: 'neon',
-    volume: 0.8,
-  },
-  soundEnabled: true,
-  ttsEnabled: true,
-  volume: 0.8,
-  keepOnTop: true,
-  compactMode: false,
+/**
+ * Sample content for a new install, so the product's core flow is visible on
+ * first launch rather than an empty screen.
+ */
+
+/** Defaults for the BYOK model connection. */
+export const DEFAULT_AI_SETTINGS = {
+  apiKey: '',
+  baseUrl: 'https://api.openai.com/v1',
+  model: 'gpt-4o-mini',
+  systemPrompt: 'Ты элитный фитнес-тренер и ментор по тайм-менеджменту. Давай краткие, зажигательные инструкции, рекомендации по подходам и отдыху.',
 };
-export const DEFAULT_AI_SETTINGS = DEFAULT_SETTINGS.ai;
 
 /**
  * A sample schedule so a new install demonstrates the flow immediately:

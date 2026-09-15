@@ -382,7 +382,7 @@ mod tests {
             let current = (total / 60) as i64;
             let next = (current + delta).clamp(MIN_MINUTES, MAX_MINUTES);
             total = next as u64 * 60;
-            assert!(total >= 60 && total <= 180 * 60, "clamped, got {total}");
+            assert!((60..=180 * 60).contains(&total), "clamped, got {total}");
         }
     }
 }

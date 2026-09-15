@@ -1,5 +1,4 @@
 export interface DynamicUIConfig {
-  themeName: string;
   colors: {
     bg: string;
     surface: string;
@@ -28,9 +27,7 @@ export interface DynamicUIConfig {
     showPresetButtons: boolean;
     showSubtimer: boolean;
     buttonStyle: 'rounded' | 'square' | 'pill';
-    glassmorphism: boolean;
     contentAlignment: 'center' | 'top' | 'compact';
-    widgetsOrder: Array<'dial' | 'subtimer' | 'presets' | 'controls' | 'alarmsPreview'>;
     showSleepButton?: boolean;
     showAiScheduleButton?: boolean;
     showCurrentTimeBadge?: boolean;
@@ -38,7 +35,6 @@ export interface DynamicUIConfig {
 }
 
 export const DEFAULT_DYNAMIC_UI: DynamicUIConfig = {
-  themeName: 'Winter',
   colors: {
     bg: '#050505',
     surface: '#0a0a0a',
@@ -67,8 +63,6 @@ export const DEFAULT_DYNAMIC_UI: DynamicUIConfig = {
     showPresetButtons: true,
     showSubtimer: true,
     buttonStyle: 'rounded',
-    glassmorphism: true,
     contentAlignment: 'center',
-    widgetsOrder: ['dial', 'subtimer', 'presets', 'controls'],
   },
 };

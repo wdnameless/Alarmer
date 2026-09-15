@@ -1,7 +1,6 @@
 export type AppMode = 'dashboard' | 'ai' | 'settings';
 
 export type ThemeId = 'winter' | 'dark-neon' | 'cyberpunk' | 'amoled' | 'nordic' | 'sunset';
-export type ThemeKey = ThemeId;
 export * from './dynamicUi';
 
 export interface ThemeColors {
@@ -155,21 +154,3 @@ export interface AISettings {
 }
 
 export type SoundProfileId = 'mechanical' | 'soft' | 'neon' | 'arcade';
-
-export interface SoundSettings {
-  uiClicksEnabled: boolean;
-  countdownTickEnabled: boolean;
-  profile: SoundProfileId;
-  volume: number; // 0..1
-}
-
-export interface AppSettings {
-  theme: ThemeId;
-  ai: AISettings;
-  sound: SoundSettings;
-  soundEnabled: boolean;
-  ttsEnabled: boolean;
-  volume: number; // 0..1
-  keepOnTop: boolean;
-  compactMode: boolean;
-}

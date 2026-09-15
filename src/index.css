@@ -34,6 +34,27 @@
     font-variant-numeric: tabular-nums;
     font-feature-settings: 'tnum' 1;
   }
+
+  /* Keyboard users need to see where they are. Most controls in this app are
+     styled with inline colours, so the ring is drawn rather than inherited. */
+  :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+    border-radius: 6px;
+  }
+
+  /* The app is full of hover/focus transitions and a pulsing alarm. Anyone who
+     has asked the OS to reduce motion gets the end state instead. */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
+  }
 }
 
 /* Custom scrollbars */

@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
 import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload } from 'lucide-react';
-import { ThemeColors, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '../types';
+import { ThemeColors, ThemeId, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '../types';
+import { THEMES } from '../constants/themes';
 import { CLOUD_VOICES, EdgeTtsService } from '../services/edgeTts';
 import { soundService } from '../services/sound';
 import { I18nService, Language } from '../services/i18n';
@@ -10,6 +11,13 @@ import { StoreService } from '../services/store';
 
 interface SettingsViewProps {
   theme: ThemeColors;
+  /** Currently applied base theme. */
+  themeKey: ThemeId;
+  onSelectTheme: (theme: ThemeId) => void;
+  /** Alarm volume 0..1, and whether alarms sound at all. */
+  alarmVolume: number;
+  alarmEnabled: boolean;
+  onAlarmAudioChange: (volume: number, enabled: boolean) => void;
   aiSettings: AISettings;
   onUpdateAISettings: (settings: AISettings) => void;
   onUpdateUI: (ui: DynamicUIConfig) => void;
@@ -17,6 +25,11 @@ interface SettingsViewProps {
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
   theme,
+  themeKey,
+  onSelectTheme,
+  alarmVolume,
+  alarmEnabled,
+  onAlarmAudioChange,
   aiSettings,
   onUpdateAISettings,
   onUpdateUI,
@@ -48,9 +61,6 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   });
   const [clickVolume, setClickVolume] = useState<number>(() => {
     return StoreService.getPreference('alarmer_click_volume', 0.5);
-  });
-  const [alarmVolume, setAlarmVolume] = useState<number>(() => {
-    return StoreService.getPreference('alarmer_alarm_volume', 0.8);
   });
   const [voiceVolume, setVoiceVolume] = useState<number>(() => {
     return StoreService.getPreference('alarmer_voice_volume', 0.8);
@@ -372,9 +382,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
 
             <div className="flex flex-col space-y-1">
-              <div className="flex justify-between text-[11px]">
-                <span className="opacity-80">Громкость будильников и сигналов:</span>
-                <span className="font-mono font-bold tabular-nums" style={{ color: theme.text }}>{Math.round(alarmVolume * 100)}%</span>
+              <div className="flex justify-between items-center text-[11px]">
+                <button
+                  type="button"
+                  onClick={() => {
+                    soundService.playUiClick();
+                    onAlarmAudioChange(alarmVolume, !alarmEnabled);
+                  }}
+                  className="flex items-center gap-1.5 rounded-lg px-1.5 py-0.5 -ml-1.5 transition-colors hover:bg-white/5"
+                  title={alarmEnabled ? 'Выключить звук будильников' : 'Включить звук будильников'}
+                >
+                  {alarmEnabled ? <Volume2 size={11} /> : <VolumeX size={11} />}
+                  <span className="opacity-80">
+                    Громкость будильников и сигналов
+                  </span>
+                  {!alarmEnabled && <span className="font-bold">— без звука</span>}
+                </button>
+                <span className="font-mono font-bold tabular-nums" style={{ color: theme.text }}>
+                  {alarmEnabled ? `${Math.round(alarmVolume * 100)}%` : 'ВЫКЛ'}
+                </span>
               </div>
               <input
                 type="range"
@@ -382,14 +408,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 max="1"
                 step="0.05"
                 value={alarmVolume}
+                disabled={!alarmEnabled}
                 onChange={(e) => {
                   const val = parseFloat(e.target.value);
-                  setAlarmVolume(val);
-                  StoreService.setPreference('alarmer_alarm_volume', val);
+                  // Moving the slider off zero is an intent to hear alarms.
+                  onAlarmAudioChange(val, val > 0);
                 }}
-                className="w-full accent-current h-1 rounded-lg cursor-pointer opacity-80"
+                className="w-full accent-current h-1 rounded-lg cursor-pointer opacity-80 disabled:opacity-30"
                 style={{ accentColor: '#fafafa' }}
+                aria-label="Громкость будильников"
               />
+              <span className="text-[10px] opacity-60 leading-relaxed">
+                Действует и когда окно скрыто: сигнал играет backend, поэтому
+                будильник слышен и в трее.
+              </span>
             </div>
           </div>
           <div className="flex flex-col space-y-1.5 pt-1">
@@ -479,6 +511,44 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       {activeTab === 'data' && (
         <div className="flex flex-col space-y-6">
         {/* UI Reset */}
+        <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
+            Тема оформления
+          </label>
+          <div className="grid grid-cols-2 gap-2">
+            {(Object.values(THEMES)).map((candidate) => (
+              <button
+                key={candidate.id}
+                type="button"
+                onClick={() => {
+                  soundService.playUiClick();
+                  onSelectTheme(candidate.id);
+                }}
+                className="p-2 rounded-xl border flex items-center gap-2 text-left transition-all"
+                style={{
+                  borderColor: themeKey === candidate.id ? 'rgba(255,255,255,0.38)' : theme.border,
+                  backgroundColor: themeKey === candidate.id ? 'rgba(255,255,255,0.06)' : 'transparent',
+                }}
+                title={candidate.name}
+              >
+                {/* A swatch of the theme's own bg/accent is more honest than a name. */}
+                <span
+                  className="w-6 h-6 rounded-lg shrink-0 border"
+                  style={{ backgroundColor: candidate.bg, borderColor: candidate.border }}
+                >
+                  <span
+                    className="block w-2.5 h-2.5 rounded-full m-1.5"
+                    style={{ backgroundColor: candidate.accent }}
+                  />
+                </span>
+                <span className="text-[10px] leading-tight min-w-0" style={{ color: theme.text }}>
+                  {candidate.name}
+                </span>
+              </button>
+            ))}
+          </div>
+        </div>
+
         <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
           <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
             Сброс внешнего вида

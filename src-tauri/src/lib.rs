@@ -99,7 +99,7 @@ async fn synthesize_speech(text: String, voice_id: String) -> Result<String, Str
             .iter()
             .find(|v| {
                 v.name.contains(&voice_id)
-                    || v.short_name.as_deref().map_or(false, |s| s.contains(&voice_id))
+                    || v.short_name.as_deref().is_some_and(|s| s.contains(&voice_id))
             })
             .or_else(|| {
                 if voice_id.contains("Jenny") {
@@ -282,6 +282,17 @@ async fn missed_alarms_today() -> Result<Vec<scheduler::MissedAlarm>, String> {
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Both `aws-lc-rs` and `ring` are compiled into the dependency graph (the
+    // TTS client and reqwest each pull one), so rustls cannot pick a provider
+    // on its own and panics on the first HTTPS request — which would break every
+    // AI call at runtime while all tests still passed. Name one explicitly.
+    if rustls::crypto::ring::default_provider()
+        .install_default()
+        .is_err()
+    {
+        // Already installed by another initialiser; nothing to do.
+    }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_notification::init())

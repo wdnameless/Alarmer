@@ -1,7 +1,8 @@
 {
-  "name": "tauri-app",
+  "name": "alarmer",
   "private": true,
   "version": "0.1.0",
+  "description": "Alarmer — offline-first time management: schedules, interval blocks, alarms and focus statistics.",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -43,7 +44,6 @@
     "@typescript-eslint/parser": "^8.70.0",
     "@vitejs/plugin-react": "^6.0.2",
     "@vitest/coverage-v8": "^5.0.1",
-    "canvas": "^3.2.3",
     "eslint": "^10.10.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "jsdom": "^30.0.1",

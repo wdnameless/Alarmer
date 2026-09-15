@@ -116,9 +116,7 @@ export class AICompilerService {
       "showPresetButtons": true,
       "showSubtimer": true,
       "buttonStyle": "rounded" | "square" | "pill",
-      "glassmorphism": true,
-      "contentAlignment": "center" | "top" | "compact",
-      "widgetsOrder": ["dial", "subtimer", "presets", "controls"]
+      "contentAlignment": "center" | "top" | "compact"
     }
   },
   "alarms": [
@@ -234,7 +232,6 @@ export class AICompilerService {
     const changes: string[] = [];
     // Colors & Palettes
     if (lower.includes('киберпанк') || lower.includes('cyberpunk') || lower.includes('розов')) {
-      cloned.themeName = 'Cyberpunk AI';
       cloned.colors.bg = '#0d0d17';
       cloned.colors.surface = '#181a27';
       cloned.colors.accent = '#ff007f';
@@ -244,7 +241,6 @@ export class AICompilerService {
       cloned.dial.glowIntensity = 'high';
       changes.push('тема Cyberpunk (неоновый розовый/желтый)');
     } else if (lower.includes('амолед') || lower.includes('amoled') || lower.includes('черн')) {
-      cloned.themeName = 'AMOLED Pure';
       cloned.colors.bg = '#000000';
       cloned.colors.surface = '#0a0a0a';
       cloned.colors.cardBg = '#0a0a0a';
@@ -254,7 +250,6 @@ export class AICompilerService {
       cloned.dial.glowIntensity = 'subtle';
       changes.push('глубокий AMOLED черный');
     } else if (lower.includes('золот') || lower.includes('amber') || lower.includes('янтарь') || lower.includes('оранж')) {
-      cloned.themeName = 'Amber Terminal';
       cloned.colors.bg = '#140f07';
       cloned.colors.surface = '#22190c';
       cloned.colors.accent = '#ffb300';
