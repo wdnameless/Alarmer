@@ -2,8 +2,24 @@ import React, { useState, useRef, useEffect } from 'react';
 import { HandClose, HandSend, HandSparkle, HandCheck } from './CustomIcons';
 import { Loader2, ArrowRight, Plus, Copy, Check } from 'lucide-react';
 import { soundService } from '../services/sound';
-import { ThemeColors, DynamicUIConfig, AISettings, AlarmItem } from '../types';
-import { ChatMessage, AICompilerService } from '../services/aiCompiler';
+import { ThemeColors, DynamicUIConfig, AISettings, AlarmItem, Schedule } from '../types';
+import { ScheduleParserService, ParsedSchedule } from '../services/scheduleParser';
+import { describeDays } from '../services/scheduleEngine';
+
+/** Builds the message payload for a parsed schedule awaiting confirmation. */
+function toDraft(parsed: ParsedSchedule, sourceText: string): ScheduleDraft {
+  return {
+    id: `draft_${Date.now()}`,
+    name: parsed.name,
+    days: parsed.days,
+    enabled: true,
+    steps: parsed.steps,
+    createdAt: new Date().toISOString(),
+    sourceText,
+    note: parsed.note,
+  };
+}
+import { ChatMessage, AICompilerService, ScheduleDraft } from '../services/aiCompiler';
 
 /** Message ids and timestamps are created outside render so components stay pure. */
 let messageSeq = 0;
@@ -30,6 +46,8 @@ interface AIChatDrawerProps {
   messages: ChatMessage[];
   onSendMessage: (msg: ChatMessage) => void;
   onResetChat?: () => void;
+  /** Saves a confirmed schedule draft as a working program. */
+  onSaveSchedule?: (schedule: Schedule) => void;
 }
 
 export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
@@ -46,6 +64,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   messages,
   onSendMessage,
   onResetChat,
+  onSaveSchedule,
 }) => {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [input, setInput] = useState('');
@@ -75,6 +94,21 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
     setLoading(true);
 
     try {
+      // A pasted plan becomes a saveable schedule — the product's main flow.
+      if (ScheduleParserService.looksLikeSchedule(textToSend)) {
+        const draft = await ScheduleParserService.parse(textToSend, aiSettings);
+        const draftMsg: ChatMessage = {
+          id: createMessageId('draft'),
+          sender: 'assistant',
+          text: draft.note,
+          timestamp: nowLabel(),
+          scheduleDraft: toDraft(draft, textToSend),
+        };
+        onSendMessage(draftMsg);
+        soundService.speak(draft.note);
+        return;
+      }
+
       const mutation = await AICompilerService.compileUserIntent(textToSend, currentUi, aiSettings);
 
       if (mutation.ui) {
@@ -215,6 +249,58 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 >
                   {copiedId === m.id ? <Check size={10} color={theme.text} /> : <Copy size={10} />}
                 </button>
+              )}
+
+              {m.scheduleDraft && (
+                <div
+                  className="mt-2.5 pt-2.5 border-t flex flex-col space-y-2"
+                  style={{ borderColor: theme.border }}
+                >
+                  <span className="text-[11px] font-semibold" style={{ color: theme.text }}>
+                    {m.scheduleDraft.name}
+                  </span>
+                  <span className="text-[10px]" style={{ color: theme.subtext }}>
+                    {describeDays(m.scheduleDraft.days)} · {m.scheduleDraft.steps.length} шаг(ов)
+                  </span>
+                  <div className="flex flex-col space-y-1">
+                    {m.scheduleDraft.steps.slice(0, 6).map((step) => (
+                      <div key={step.id} className="flex items-center gap-2 text-[10px]">
+                        <span className="font-mono tabular-nums" style={{ color: theme.text }}>
+                          {step.time}
+                        </span>
+                        <span className="truncate" style={{ color: theme.subtext }}>
+                          {step.label}
+                        </span>
+                        {step.kind === 'block' && (
+                          <span className="ml-auto shrink-0 opacity-70" style={{ color: theme.subtext }}>
+                            {step.exercises.length} упражн.
+                          </span>
+                        )}
+                      </div>
+                    ))}
+                    {m.scheduleDraft.steps.length > 6 && (
+                      <span className="text-[10px] opacity-60" style={{ color: theme.subtext }}>
+                        и ещё {m.scheduleDraft.steps.length - 6}…
+                      </span>
+                    )}
+                  </div>
+                  <button
+                    onClick={() => {
+                      onSaveSchedule?.(m.scheduleDraft as Schedule);
+                      onSendMessage({
+                        id: createMessageId('saved'),
+                        sender: 'assistant',
+                        text: `Программа «${m.scheduleDraft?.name}» сохранена и включена. Откройте «Алармы», чтобы увидеть её шаги.`,
+                        timestamp: nowLabel(),
+                      });
+                      onNavigateToModule?.('alarms');
+                    }}
+                    className="w-full py-2 rounded-lg text-[11px] font-semibold active:scale-[0.98] transition-transform"
+                    style={{ backgroundColor: '#fafafa', color: '#0a0a0a' }}
+                  >
+                    Сохранить программу
+                  </button>
+                </div>
               )}
 
               {m.mutation && (

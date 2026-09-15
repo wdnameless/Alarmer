@@ -302,6 +302,12 @@ export const App: React.FC = () => {
                 }}
                 messages={chatMessages}
                 onSendMessage={(msg: ChatMessage) => setChatMessages((prev) => [...prev, msg])}
+                onSaveSchedule={(schedule: Schedule) => {
+                  setSchedules((prev) => {
+                    const withoutSameName = prev.filter((x) => x.name !== schedule.name);
+                    return [...withoutSameName, schedule];
+                  });
+                }}
                 onResetChat={() => {
                   const cleanChat: ChatMessage[] = [
                     {
