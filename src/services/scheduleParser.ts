@@ -124,6 +124,40 @@ function sanitizeStep(raw: unknown, index: number): ScheduleStep | null {
 }
 
 /**
+ * Splits pasted text into one segment per scheduled item.
+ *
+ * People paste plans on separate lines, but just as often as a single run-on
+ * sentence ("в 06:45 подъём, в 07:00 зарядка 20 минут, ..."). Splitting on
+ * newlines alone collapses such a plan into one step, so commas and semicolons
+ * are also treated as separators whenever the following fragment carries a time.
+ */
+function splitIntoSegments(text: string): string[] {
+  const rough = text
+    .split(/[\n;•·]+/)
+    .map((l) => l.trim())
+    .filter(Boolean);
+
+  const timeRe = /\d{1,2}[:.]\d{2}/;
+  const segments: string[] = [];
+
+  for (const line of rough) {
+    if (!timeRe.test(line)) {
+      segments.push(line);
+      continue;
+    }
+    // Keep the leading day phrase with the first item so the day detection and
+    // the step itself stay connected.
+    const parts = line
+      .split(/[,;]+/)
+      .map((p) => p.trim())
+      .filter(Boolean);
+    segments.push(...parts);
+  }
+
+  return segments;
+}
+
+/**
  * Heuristic parser used when no API key is configured.
  *
  * It reads time-stamped lines ("07:00 Подъём", "в 7:15 разминка 15 мин") and
@@ -131,10 +165,7 @@ function sanitizeStep(raw: unknown, index: number): ScheduleStep | null {
  */
 export function parseScheduleHeuristically(text: string): ParsedSchedule {
   const days = parseDaysFromText(text);
-  const lines = text
-    .split(/[\n;•·]+/)
-    .map((l) => l.trim())
-    .filter(Boolean);
+  const lines = splitIntoSegments(text);
 
   const steps: ScheduleStep[] = [];
   const timeRe = /(\d{1,2})[:.](\d{2})/;

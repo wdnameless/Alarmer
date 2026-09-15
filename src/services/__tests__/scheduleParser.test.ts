@@ -101,3 +101,26 @@ describe('parsing service', () => {
     expect(ScheduleParserService.toSchedule(draft, 'x').enabled).toBe(true);
   });
 });
+
+describe('run-on sentences', () => {
+  it('splits a single-line plan joined by commas into separate steps', () => {
+    const plan =
+      'Ср, Пт: в 06:45 подъём и душ, в 07:00 зарядка 20 минут, в 19:30 силовая тренировка 45 минут, в 23:00 отход ко сну';
+    const result = parseScheduleHeuristically(plan);
+
+    expect(result.steps.map((s) => s.time)).toEqual(['06:45', '07:00', '19:30', '23:00']);
+    expect(result.days).toEqual([3, 5]);
+  });
+
+  it('still splits line-separated plans correctly', () => {
+    const result = parseScheduleHeuristically('07:00 Подъём\n19:00 Тренировка');
+    expect(result.steps).toHaveLength(2);
+  });
+
+  it('turns a timed training inside a run-on sentence into a block', () => {
+    const result = parseScheduleHeuristically('в 07:00 зарядка 20 минут, в 23:00 сон');
+    const training = result.steps.find((s) => s.time === '07:00');
+
+    expect(training?.kind).toBe('block');
+  });
+});

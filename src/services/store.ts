@@ -1,5 +1,5 @@
 import { LazyStore } from '@tauri-apps/plugin-store';
-import { DEFAULT_AI_SETTINGS, DEFAULT_ALARMS, DEFAULT_SCHEDULES } from '../constants/defaults';
+import { DEFAULT_AI_SETTINGS, DEFAULT_SCHEDULES } from '../constants/defaults';
 import { DEFAULT_DYNAMIC_UI, DynamicUIConfig } from '../types/dynamicUi';
 import { AISettings, AlarmItem, Schedule, ScheduleStep, ExerciseStep } from '../types';
 import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../types/guards';
@@ -264,7 +264,7 @@ export function migrate(raw: unknown): PersistedState {
 
   return {
     schemaVersion: SCHEMA_VERSION,
-    alarms: asArray<unknown>(record.alarms, version < 2 ? DEFAULT_ALARMS : [])
+    alarms: asArray<unknown>(record.alarms, [])
       .map(sanitizeAlarm)
       .filter((a): a is AlarmItem => a !== null),
     schedules: withSchedules,
