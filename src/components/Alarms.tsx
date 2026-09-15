@@ -281,7 +281,7 @@ export const Alarms: React.FC<AlarmsProps> = ({
                 soundService.playUiClick();
                 soundService.speak('Будильник ко сну установлен на 23:00');
               }}
-              className="px-2 py-0.5 text-[10px] font-semibold rounded-lg bg-indigo-500/20 text-indigo-300 border border-indigo-500/30 hover:bg-indigo-500/30 transition-all shrink-0"
+              className="px-2 py-0.5 text-[10px] font-semibold rounded-lg border transition-colors shrink-0" style={{ borderColor: theme.border, color: theme.subtext }}
               title="Reverse Alarm: Будильник ко сну"
             >
               🌙 Ко сну

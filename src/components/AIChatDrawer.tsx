@@ -213,7 +213,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                   className="absolute -right-2 -top-2 opacity-0 group-hover:opacity-100 p-1 rounded-md bg-neutral-800 hover:bg-neutral-700 text-white/70 hover:text-white border border-white/10 shadow transition-all select-none"
                   title="Копировать текст"
                 >
-                  {copiedId === m.id ? <Check size={10} className="text-emerald-400" /> : <Copy size={10} />}
+                  {copiedId === m.id ? <Check size={10} color={theme.text} /> : <Copy size={10} />}
                 </button>
               )}
 

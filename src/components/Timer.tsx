@@ -280,7 +280,7 @@ export const Timer: React.FC<TimerProps> = ({
                 const next = presets[(idx + 1) % presets.length];
                 setPresetMinutes(next);
               }}
-              className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 font-mono font-extrabold text-2xl shadow-md hover:border-emerald-400/50`}
+              className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 font-mono font-extrabold text-2xl shadow-md`}
               style={{
                 backgroundColor: theme.cardBg,
                 border: `1.5px solid ${theme.border}`,
