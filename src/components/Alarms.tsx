@@ -323,10 +323,11 @@ export const Alarms: React.FC<AlarmsProps> = ({
       {/* AI Orchestration Modal Banner */}
       {showAiModal && (
         <div
-          className="p-3 rounded-xl border flex flex-col space-y-2 animate-in fade-in zoom-in-95 duration-150"
+          className="p-4 rounded-2xl border backdrop-blur-2xl flex flex-col space-y-2 animate-in fade-in zoom-in-95 duration-150"
           style={{
-            backgroundColor: `${theme.surface}f0`,
-            borderColor: theme.border,
+            backgroundColor: 'rgba(255,255,255,0.05)',
+            borderColor: 'rgba(255,255,255,0.10)',
+            boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
           }}
         >
           <div className="flex items-center justify-between">
@@ -389,7 +390,8 @@ export const Alarms: React.FC<AlarmsProps> = ({
       {/* Responsive Quick Add Form */}
       <form
         onSubmit={addAlarm}
-        className="flex items-center gap-1.5 p-1.5 rounded-xl bg-black/20 border border-white/5 w-full"
+        className="flex items-center gap-1.5 p-2 rounded-2xl border w-full"
+        style={{ backgroundColor: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.07)' }}
       >
         <input
           type="time"
@@ -425,11 +427,15 @@ export const Alarms: React.FC<AlarmsProps> = ({
           alarms.map((alarm) => (
             <div
               key={alarm.id}
-              className={`flex items-center justify-between p-2.5 rounded-xl border transition-all ${
-                alarm.enabled ? 'bg-black/30' : 'bg-black/10 opacity-50'
-              }`}
+              className="flex items-center justify-between p-3 rounded-2xl border backdrop-blur-xl transition-all"
               style={{
-                borderColor: alarm.enabled ? "rgba(255,255,255,0.36)" : "rgba(255,255,255,0.06)",
+                backgroundColor: alarm.enabled
+                  ? 'rgba(255,255,255,0.045)'
+                  : 'rgba(255,255,255,0.015)',
+                // Interactive rows keep a boundary that clears the 3.0 UI floor.
+                borderColor: alarm.enabled ? 'rgba(255,255,255,0.36)' : 'rgba(255,255,255,0.06)',
+                boxShadow: alarm.enabled ? '0 8px 24px rgba(0,0,0,0.32)' : 'none',
+                opacity: alarm.enabled ? 1 : 0.55,
               }}
             >
               <div className="flex items-center space-x-3">

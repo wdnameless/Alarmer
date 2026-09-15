@@ -53,8 +53,11 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
   if (schedules.length === 0) {
     return (
       <div
-        className="w-full rounded-xl border p-4 text-center"
-        style={{ borderColor: theme.border }}
+        className="w-full rounded-2xl border p-5 text-center"
+        style={{
+          backgroundColor: 'rgba(255,255,255,0.03)',
+          borderColor: 'rgba(255,255,255,0.07)',
+        }}
       >
         <CalendarDays size={20} className="mx-auto mb-2 opacity-40" style={{ color: theme.subtext }} />
         <p className="text-xs leading-relaxed" style={{ color: theme.subtext }}>
@@ -73,10 +76,17 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
         return (
           <div
             key={schedule.id}
-            className="rounded-xl border transition-opacity"
+            className="rounded-2xl border backdrop-blur-xl transition-opacity"
             style={{
-              borderColor: schedule.enabled ? 'rgba(255,255,255,0.22)' : theme.border,
-              opacity: schedule.enabled ? 1 : 0.55,
+              // Soft layer: translucent surface plus a soft shadow instead of a
+              // hard border. An enabled program reads as raised, a disabled one
+              // recedes.
+              backgroundColor: schedule.enabled
+                ? 'rgba(255,255,255,0.05)'
+                : 'rgba(255,255,255,0.02)',
+              borderColor: schedule.enabled ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)',
+              boxShadow: schedule.enabled ? '0 10px 30px rgba(0,0,0,0.38)' : 'none',
+              opacity: schedule.enabled ? 1 : 0.6,
             }}
           >
             <div className="flex items-start justify-between gap-2 p-3">
