@@ -42,7 +42,7 @@ interface AIChatDrawerProps {
   onApplyUI: (newUi: DynamicUIConfig) => void;
   onApplyAlarms?: (alarms: AlarmItem[]) => void;
   onSetTimerMinutes?: (minutes: number) => void;
-  onNavigateToModule?: (module: 'timer' | 'workout' | 'stopwatch' | 'alarms') => void;
+  onNavigateToModule?: (module: 'today' | 'timer' | 'alarms') => void;
   messages: ChatMessage[];
   onSendMessage: (msg: ChatMessage) => void;
   onResetChat?: () => void;

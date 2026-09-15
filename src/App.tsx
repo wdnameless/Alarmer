@@ -34,12 +34,14 @@ export const App: React.FC = () => {
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
   const [aiTimerMinutes] = useState<number | undefined>(undefined);
-  const [dashboardSubModule, setDashboardSubModule] = useState<"timer" | "workout" | "stopwatch" | "alarms">("timer");
+  const [dashboardSubModule, setDashboardSubModule] = useState<"today" | "timer" | "alarms">("today");
   const [isAiWingOpen, setIsAiWingOpen] = useState<boolean>(false);
   const [leftPaneWidth, setLeftPaneWidth] = useState<number>(() =>
     StoreService.getPreference('alarmer_left_pane_width', 340),
   );
   const [isResizingSplit, setIsResizingSplit] = useState<boolean>(false);
+  /** Gates writing until the stored file has been read, to avoid clobbering it. */
+  const [hydrated, setHydrated] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
     const stored = StoreService.snapshot().chatMessages;
     if (stored.length > 0) return stored as unknown as ChatMessage[];
@@ -63,9 +65,18 @@ export const App: React.FC = () => {
   const firings = useMemo(() => buildFirings(schedules, alarms), [schedules, alarms]);
 
   // Single persistence funnel: structured state goes to the native store file.
+  // Guarded until hydration completes, otherwise the initial defaults would be
+  // written over the file before it has been read.
   useEffect(() => {
-    void StoreService.persist({ aiSettings, alarms, dynamicUi, chatMessages: chatMessages as never });
-  }, [aiSettings, alarms, dynamicUi, chatMessages]);
+    if (!hydrated) return;
+    void StoreService.persist({
+      aiSettings,
+      alarms,
+      schedules,
+      dynamicUi,
+      chatMessages: chatMessages as never,
+    });
+  }, [hydrated, aiSettings, alarms, schedules, dynamicUi, chatMessages]);
 
   // Adopt the persisted store file on first mount (native file, not localStorage).
   useEffect(() => {
@@ -78,8 +89,12 @@ export const App: React.FC = () => {
         if (state.chatMessages.length > 0) {
           setChatMessages(state.chatMessages as unknown as ChatMessage[]);
         }
+        setHydrated(true);
       })
-      .catch((e) => console.warn('Failed to hydrate store:', e));
+      .catch((e) => {
+        console.warn('Failed to hydrate store:', e);
+        setHydrated(true);
+      });
   }, []);
 
   // Initialize notification permissions on mount
@@ -296,7 +311,7 @@ export const App: React.FC = () => {
                   setDashboardSubModule('timer');
                   setActiveTab('dashboard');
                 }}
-                onNavigateToModule={(mod: 'timer' | 'workout' | 'stopwatch' | 'alarms') => {
+                onNavigateToModule={(mod: 'today' | 'timer' | 'alarms') => {
                   setDashboardSubModule(mod);
                   setActiveTab('dashboard');
                 }}
