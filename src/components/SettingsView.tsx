@@ -5,6 +5,7 @@ import { ThemeColors, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '..
 import { CLOUD_VOICES, EdgeTtsService } from '../services/edgeTts';
 import { soundService } from '../services/sound';
 import { I18nService, Language } from '../services/i18n';
+import { AIGateway } from '../services/aiGateway';
 import { StoreService } from '../services/store';
 
 interface SettingsViewProps {
@@ -25,6 +26,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   });
 
   const [apiKey, setApiKey] = useState(aiSettings.apiKey);
+  const [keyStored, setKeyStored] = useState(false);
   const [baseUrl, setBaseUrl] = useState(aiSettings.baseUrl);
   const [model, setModel] = useState(aiSettings.model);
   const [savedSuccess, setSavedSuccess] = useState(false);
@@ -105,15 +107,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     }
   };
 
-  const handleSaveAI = (e: React.FormEvent) => {
+  const handleSaveAI = async (e: React.FormEvent) => {
     e.preventDefault();
+    // The key goes to the OS credential store, not into the exported backup
+    // file alongside alarms and settings.
+    try {
+      await AIGateway.setKey(apiKey);
+    } catch (err) {
+      setImportError(err instanceof Error ? err.message : 'Не удалось сохранить ключ');
+      return;
+    }
     onUpdateAISettings({
       ...aiSettings,
-      apiKey,
+      // Left out of persisted state on purpose: `hasKey` reports the real thing.
+      apiKey: '',
       baseUrl: baseUrl || 'https://api.openai.com/v1',
       model: model || 'gpt-4o-mini',
-      enabled: Boolean(apiKey.trim()),
+      enabled: Boolean(apiKey.trim()) || keyStored,
     });
+    setKeyStored(Boolean(apiKey.trim()));
     setSavedSuccess(true);
     soundService.playCountdownTick();
     setTimeout(() => setSavedSuccess(false), 1500);
@@ -123,6 +135,11 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     onUpdateUI(DEFAULT_DYNAMIC_UI);
     soundService.playCountdownTick();
   };
+
+  // Reflect a previously stored key without ever reading it back into the UI.
+  useEffect(() => {
+    void AIGateway.hasKey().then(setKeyStored);
+  }, []);
 
   // Reflect the real OS-level autostart state rather than a cached flag.
   useEffect(() => {
@@ -413,10 +430,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               type="password"
               value={apiKey}
               onChange={(e) => setApiKey(e.target.value)}
-              placeholder="sk-..."
+              placeholder={keyStored ? '•••••••• (ключ сохранён)' : 'sk-...'}
               className="w-full px-3 py-2 rounded-xl text-xs border outline-none bg-black/30"
               style={{ borderColor: theme.border, color: theme.text }}
             />
+            <span className="text-[10px] opacity-60 leading-relaxed">
+              {keyStored
+                ? 'Ключ хранится в системном хранилище учётных данных и не попадает в резервную копию. Введите новый, чтобы заменить, или оставьте пустым и сохраните, чтобы удалить.'
+                : 'Ключ будет сохранён в системном хранилище учётных данных (Windows Credential Manager / Keychain), а не в файле данных.'}
+            </span>
           </div>
 
           <div className="flex flex-col space-y-1">

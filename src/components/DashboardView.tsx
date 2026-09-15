@@ -1,10 +1,15 @@
 import React, { useState } from "react";
-import { ThemeColors, DynamicUIConfig, AlarmItem, Schedule, AISettings } from "../types";
+import { ThemeColors, DynamicUIConfig, AlarmItem, Schedule, AISettings, TaskItem, SessionRecord } from "../types";
 import { Timer } from "./Timer";
 import { Alarms } from "./Alarms";
 import { TodayView } from "./TodayView";
-import { Timer as TimerIcon, Bell, CalendarDays } from "lucide-react";
+import { TasksView } from "./TasksView";
+import { StatsView } from "./StatsView";
+import { Timer as TimerIcon, Bell, CalendarDays, ListTodo, TrendingUp } from "lucide-react";
 import { I18nService } from "../services/i18n";
+
+/** Modules reachable from the dashboard. */
+export type SubModule = 'today' | 'timer' | 'tasks' | 'alarms' | 'stats';
 
 interface DashboardViewProps {
   theme: ThemeColors;
@@ -15,9 +20,13 @@ interface DashboardViewProps {
   aiSettings: AISettings;
   onUpdateAlarms: (alarms: AlarmItem[]) => void;
   onOpenAISettings: () => void;
+  tasks: TaskItem[];
+  onUpdateTasks: (tasks: TaskItem[]) => void;
+  sessions: SessionRecord[];
+  onSession: (session: SessionRecord) => void;
   timerMinutes?: number;
-  activeSubModule?: "today" | "timer" | "alarms";
-  onSubModuleChange?: (sub: "today" | "timer" | "alarms") => void;
+  activeSubModule?: SubModule;
+  onSubModuleChange?: (sub: SubModule) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -29,17 +38,29 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   aiSettings,
   onUpdateAlarms,
   onOpenAISettings,
+  tasks,
+  onUpdateTasks,
+  sessions,
+  onSession,
   timerMinutes,
   activeSubModule,
   onSubModuleChange,
 }) => {
-  const [localSubModule, setLocalSubModule] = useState<"today" | "timer" | "alarms">("today");
+  const [localSubModule, setLocalSubModule] = useState<SubModule>("today");
   const subModule = activeSubModule ?? localSubModule;
-  const setSubModule = (mod: "today" | "timer" | "alarms") => {
+  const setSubModule = (mod: SubModule) => {
     setLocalSubModule(mod);
     onSubModuleChange?.(mod);
   };
   const t = I18nService.t();
+
+  const tabs: Array<{ id: SubModule; label: string; title: string; icon: React.ReactNode }> = [
+    { id: 'today', label: 'Сегодня', title: 'Что сейчас и что дальше', icon: <CalendarDays size={13} /> },
+    { id: 'timer', label: t.timer, title: 'Таймер', icon: <TimerIcon size={13} /> },
+    { id: 'tasks', label: 'Задачи', title: 'Что нужно сделать', icon: <ListTodo size={13} /> },
+    { id: 'alarms', label: t.alarms, title: 'Будильники', icon: <Bell size={13} /> },
+    { id: 'stats', label: 'Итоги', title: 'Сколько сделано', icon: <TrendingUp size={13} /> },
+  ];
 
   return (
     <div className="flex flex-col items-center w-full h-full space-y-4">
@@ -51,54 +72,41 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           borderColor: theme.border,
         }}
       >
-        <button
-          onClick={() => setSubModule("today")}
-          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
-          style={{
-            backgroundColor: subModule === "today" ? "rgba(255,255,255,0.07)" : "transparent",
-            color: subModule === "today" ? theme.text : theme.subtext,
-            fontWeight: subModule === "today" ? 600 : 400,
-          }}
-          title="Что сейчас и что дальше"
-        >
-          <CalendarDays size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">Сегодня</span>
-        </button>
-
-        <button
-          onClick={() => setSubModule("timer")}
-          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
-          style={{
-            backgroundColor: subModule === "timer" ? "rgba(255,255,255,0.07)" : "transparent",
-            color: subModule === "timer" ? theme.text : theme.subtext,
-            fontWeight: subModule === "timer" ? 600 : 400,
-          }}
-          title="Таймер"
-        >
-          <TimerIcon size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">{t.timer}</span>
-        </button>
-
-        <button
-          onClick={() => setSubModule("alarms")}
-          className="flex-1 flex items-center justify-center space-x-1 py-1 px-1 rounded-lg transition-all"
-          style={{
-            backgroundColor: subModule === "alarms" ? "rgba(255,255,255,0.07)" : "transparent",
-            color: subModule === "alarms" ? theme.text : theme.subtext,
-            fontWeight: subModule === "alarms" ? 600 : 400,
-          }}
-          title="Будильники"
-        >
-          <Bell size={13} />
-          <span className="hidden min-[290px]:inline text-[11px]">{t.alarms}</span>
-        </button>
+        {tabs.map((tab) => (
+          <button
+            key={tab.id}
+            onClick={() => setSubModule(tab.id)}
+            className="flex-1 flex items-center justify-center space-x-1 py-1 px-0.5 rounded-lg transition-all"
+            style={{
+              backgroundColor: subModule === tab.id ? "rgba(255,255,255,0.07)" : "transparent",
+              color: subModule === tab.id ? theme.text : theme.subtext,
+              fontWeight: subModule === tab.id ? 600 : 400,
+            }}
+            title={tab.title}
+          >
+            {tab.icon}
+            {/* The labels only fit once the pane is wide enough; below that the
+                icons carry the meaning. */}
+            <span className="hidden min-[330px]:inline text-[10px] truncate">{tab.label}</span>
+          </button>
+        ))}
       </div>
 
-      {/* Main Module Content */}
+      {/* Main Module Content.
+          Every module stays mounted and inactive ones are hidden: unmounting
+          used to destroy component-owned state, so leaving the Timer tab reset
+          the countdown. */}
       <div className="w-full flex-1 flex flex-col items-center justify-center">
-        {subModule === "today" && <TodayView theme={theme} schedules={schedules} />}
-        {subModule === "timer" && <Timer theme={theme} dynamicUi={dynamicUi} initialMinutes={timerMinutes} />}
-        {subModule === "alarms" && (
+        <div className={`w-full flex-1 flex flex-col items-center justify-center ${subModule === 'today' ? '' : 'hidden'}`}>
+          <TodayView theme={theme} schedules={schedules} onSession={onSession} />
+        </div>
+        <div className={`w-full flex-1 flex flex-col items-center justify-center ${subModule === 'timer' ? '' : 'hidden'}`}>
+          <Timer theme={theme} dynamicUi={dynamicUi} initialMinutes={timerMinutes} />
+        </div>
+        <div className={`w-full flex-1 flex flex-col items-center justify-start overflow-y-auto ${subModule === 'tasks' ? '' : 'hidden'}`}>
+          <TasksView theme={theme} tasks={tasks} onUpdateTasks={onUpdateTasks} />
+        </div>
+        <div className={`w-full flex-1 flex flex-col items-center justify-center ${subModule === 'alarms' ? '' : 'hidden'}`}>
           <Alarms
             theme={theme}
             alarms={alarms}
@@ -109,7 +117,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onOpenAISettings={onOpenAISettings}
             dynamicUi={dynamicUi}
           />
-        )}
+        </div>
+        <div className={`w-full flex-1 flex flex-col items-center justify-start overflow-y-auto ${subModule === 'stats' ? '' : 'hidden'}`}>
+          <StatsView theme={theme} sessions={sessions} tasks={tasks} />
+        </div>
       </div>
     </div>
   );

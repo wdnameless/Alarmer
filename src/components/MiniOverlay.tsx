@@ -1,44 +1,42 @@
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
-import { listen } from '@tauri-apps/api/event';
 import { THEMES } from '../constants/themes';
+import { TimerService, type TimerSnapshot } from '../services/timer';
 
 /**
  * Compact always-on-top overlay showing the remaining timer time.
  *
  * Rendered in its own transparent, frameless window (`?window=mini-overlay`).
- * The timer state is mirrored here through the `timer://tick` event so the
- * overlay never owns the clock itself.
+ * It reads the backend timer, the same source the main window renders, so it
+ * shows the real countdown even when the main window has never opened the Timer
+ * sub-tab — and it stays correct when the main window is hidden.
  */
 export function MiniOverlay() {
-  const [remaining, setRemaining] = useState(0);
-  const [total, setTotal] = useState(1);
-  const [running, setRunning] = useState(false);
+  const [state, setState] = useState<TimerSnapshot | null>(null);
 
-  const theme = THEMES['dark-neon'];
-  const progress = total > 0 ? Math.max(0, Math.min(1, remaining / total)) : 0;
+  const theme = THEMES['winter'];
 
   useEffect(() => {
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-
-    void listen<{ remaining: number; total: number; running: boolean }>('timer://tick', (event) => {
-      setRemaining(event.payload.remaining);
-      setTotal(event.payload.total);
-      setRunning(event.payload.running);
-    }).then((fn) => {
-      if (cancelled) fn();
-      else unlisten = fn;
+    let active = true;
+    void TimerService.getState().then((initial) => {
+      if (active) setState(initial);
     });
-
+    const unsubscribe = TimerService.subscribe((next) => setState(next));
     return () => {
-      cancelled = true;
-      unlisten?.();
+      active = false;
+      unsubscribe();
     };
   }, []);
 
-  const mm = Math.floor(remaining / 60).toString().padStart(2, '0');
-  const ss = Math.floor(remaining % 60).toString().padStart(2, '0');
+  if (!state) return null;
+
+  const remaining = state.overtime ? state.overtime_secs : state.remaining_secs;
+  const progress = state.total_secs > 0
+    ? Math.max(0, Math.min(1, remaining / state.total_secs))
+    : 0;
+
+  const mm = Math.floor(state.remaining_secs / 60).toString().padStart(2, '0');
+  const ss = Math.floor(state.remaining_secs % 60).toString().padStart(2, '0');
 
   return (
     <div
@@ -69,11 +67,11 @@ export function MiniOverlay() {
           className="text-2xl font-mono font-bold tabular-nums leading-none"
           style={{ color: theme.text }}
         >
-          {mm}:{ss}
+          {state.overtime ? `+${mm}:${ss}` : `${mm}:${ss}`}
         </span>
 
         <span className="text-[9px] uppercase tracking-widest mt-1" style={{ color: theme.subtext }}>
-          {running ? 'идёт' : 'пауза'}
+          {state.overtime ? 'поток' : state.running ? 'идёт' : 'пауза'}
         </span>
       </div>
     </div>

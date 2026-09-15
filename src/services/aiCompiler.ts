@@ -1,4 +1,57 @@
 import { AISettings, DynamicUIConfig, AlarmItem, Schedule } from '../types';
+import { asArray, asBoolean, asString, isRecord, oneOf } from '../types/guards';
+import { AIGateway } from './aiGateway';
+
+/**
+ * Commands the local keyword map handles better than a model.
+ *
+ * Each entry is a *pair*: an action word and a thing it acts on. Matching on the
+ * bare verb ("покажи") swallowed unrelated requests, and matching on the bare
+ * noun ("тему") did the same. Both halves must be present.
+ */
+const UI_ACTION_WORDS = [
+  'убери',
+  'убрать',
+  'скрой',
+  'спрячь',
+  'верни',
+  'включи',
+  'выключи',
+  'добавь',
+  'отключи',
+];
+const UI_TARGET_WORDS = [
+  'засечк',
+  'пресет',
+  'кнопк',
+  'ко сну',
+  'панель',
+  'плашк',
+  'бейдж',
+  'подтаймер',
+  'циферблат',
+  'амолед',
+  'amoled',
+  'киберпанк',
+  'cyberpunk',
+  'минимал',
+  'круглые',
+  'квадратн',
+  'моноширинн',
+];
+
+/**
+ * True only for unambiguous local UI toggles.
+ *
+ * Deliberately narrow. A request that merely mentions a UI noun, or only shares
+ * a verb with these, must reach the model — that was the whole defect this
+ * replaces.
+ */
+function isLocalUiCommand(lowerPrompt: string): boolean {
+  const hasAction = UI_ACTION_WORDS.some((w) => lowerPrompt.includes(w));
+  const hasTarget = UI_TARGET_WORDS.some((w) => lowerPrompt.includes(w));
+  return hasAction && hasTarget;
+}
 
 /** A parsed draft carries the pasted text and the assistant note for the card. */
 export type ScheduleDraft = Schedule & { sourceText: string; note: string };
@@ -98,57 +151,66 @@ export class AICompilerService {
     settings: AISettings
   ): Promise<AIPlatformMutation> {
     const lowerPrompt = prompt.toLowerCase();
-    const isDirectUiCommand = lowerPrompt.includes('убери') || lowerPrompt.includes('скрой')
-      || lowerPrompt.includes('верни') || lowerPrompt.includes('покажи')
-      || lowerPrompt.includes('ко сну') || lowerPrompt.includes('засечк')
-      || lowerPrompt.includes('тему') || lowerPrompt.includes('киберпанк')
-      || lowerPrompt.includes('амолед') || lowerPrompt.includes('пресет');
 
-    if (isDirectUiCommand || !settings.apiKey || settings.apiKey.trim() === '') {
+    // The offline compiler is a keyword map, not a model. It used to take over
+    // on any prompt containing "покажи", "верни" or "тему" — so "покажи
+    // расписание на завтра" never reached the model at all. It now handles only
+    // the two things it is genuinely better at: instant local UI toggles, and
+    // the no-key case.
+    const isDirectUiCommand = isLocalUiCommand(lowerPrompt);
+    const haveKey = Boolean(settings.apiKey?.trim()) || (await AIGateway.hasKey());
+
+    if (isDirectUiCommand || !haveKey) {
       return this.offlineFallbackCompiler(prompt, currentUi);
     }
-    try {
-      const url = `${settings.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${settings.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: settings.model || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: this.SYSTEM_PROMPT },
-            {
-              role: 'user',
-              content: `Текущий конфиг UI:\n${JSON.stringify(currentUi, null, 2)}\n\nЗапрос пользователя:\n"${prompt}"`,
-            },
-          ],
-          temperature: 0.7,
-          response_format: { type: 'json_object' },
-        }),
-      });
 
-      if (!response.ok) {
-        throw new Error(`AI Gateway error: ${response.status} ${response.statusText}`);
-      }
+    const { value, error } = await AIGateway.requestJson({
+      system: this.SYSTEM_PROMPT,
+      user: `Текущий конфиг UI:\n${JSON.stringify(currentUi, null, 2)}\n\nЗапрос пользователя:\n"${prompt}"`,
+      baseUrl: settings.baseUrl,
+      model: settings.model || 'gpt-4o-mini',
+    });
 
-      const data = await response.json();
-      const content = data.choices?.[0]?.message?.content || '{}';
-      const clean = content.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsed = JSON.parse(clean);
+    if (error) {
+      // Say so. Reporting a canned local edit as the model's work is how the
+      // CSP-blocked endpoint went unnoticed.
+      const fallback = this.offlineFallbackCompiler(prompt, currentUi);
+      return { ...fallback, explanation: `${fallback.explanation} (модель недоступна: ${error})` };
+    }
 
+    return {
+      type: value.type === 'hybrid' || value.type === 'alarm_schedule' ? 'hybrid' : 'ui_change',
+      explanation: asString(value.explanation, 'Интерфейс обновлён'),
+      ui: isRecord(value.ui) ? (value.ui as Partial<DynamicUIConfig>) : undefined,
+      alarms: asArray<unknown>(value.alarms, []).length > 0
+        ? this.toAlarms(value.alarms)
+        : undefined,
+      autoApply: asBoolean(value.autoApply, true),
+    };
+  }
+
+  /** Validates alarms the model produced into real `AlarmItem`s. */
+  private static toAlarms(raw: unknown): AlarmItem[] {
+    return asArray<unknown>(raw, []).map((item, idx) => {
+      const a = isRecord(item) ? item : {};
+      const title = asString(a.title, asString(a.label, 'Будильник'));
+      const days = asArray<unknown>(a.days, [1, 2, 3, 4, 5]).filter(
+        (d): d is number => typeof d === 'number' && d >= 0 && d <= 6,
+      );
+      const voicePrompt = asString(a.voicePrompt, title);
       return {
-        type: parsed.type || 'hybrid',
-        explanation: parsed.explanation || 'Интерфейс и расписание обновлены ИИ',
-        ui: parsed.ui,
-        alarms: parsed.alarms,
-        autoApply: parsed.autoApply ?? true,
+        id: `ai_alarm_${Date.now()}_${idx}`,
+        title,
+        label: title,
+        time: asString(a.time, '08:00'),
+        days,
+        repeat: oneOf(a.repeat, ['once', 'daily', 'days'] as const, 'days' as const),
+        enabled: asBoolean(a.enabled, true),
+        sound: asString(a.sound, 'gentle'),
+        voicePrompt,
+        voiceAnnouncement: voicePrompt,
       };
-    } catch (e) {
-      console.warn('Online AI failed, using intelligent offline compiler:', e);
-      return this.offlineFallbackCompiler(prompt, currentUi);
-    }
+    });
   }
 
   private static offlineFallbackCompiler(
@@ -270,6 +332,7 @@ export class AICompilerService {
         title: `Напоминание ${t}`,
         label: `Напоминание ${t}`,
         time: t.padStart(5, '0'),
+        repeat: 'days' as const,
         days: [1, 2, 3, 4, 5],
         enabled: true,
         sound: 'gentle',

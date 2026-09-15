@@ -4,18 +4,21 @@ import { ChatMessage } from './services/aiCompiler';
 import { HandClock, HandGear, HandSparkle } from './components/CustomIcons';
 import { AIChatDrawer } from './components/AIChatDrawer';
 import { THEMES } from './constants/themes';
-import { DashboardView } from './components/DashboardView';
+import { DashboardView, type SubModule } from './components/DashboardView';
 import { SettingsView } from './components/SettingsView';
 import { windowService } from './services/window';
 import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { I18nService } from './services/i18n';
-import { AppMode, ThemeKey, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig } from './types';
+import { AppMode, ThemeKey, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig, TaskItem, SessionRecord } from './types';
 import { StoreService } from './services/store';
 import { buildFirings } from './services/scheduleEngine';
+import { AlarmCenter } from './components/AlarmCenter';
+import { trimSessions } from './services/session';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { invoke } from '@tauri-apps/api/core';
+import { isTauri } from './services/platform';
 
 /** First message shown in a brand-new conversation. */
 function welcomeMessage(): ChatMessage {
@@ -34,7 +37,7 @@ export const App: React.FC = () => {
   const [isCompact, setIsCompact] = useState(true);
   const [isPinned, setIsPinned] = useState(false);
   const [aiTimerMinutes] = useState<number | undefined>(undefined);
-  const [dashboardSubModule, setDashboardSubModule] = useState<"today" | "timer" | "alarms">("today");
+  const [dashboardSubModule, setDashboardSubModule] = useState<SubModule>('today');
   const [isAiWingOpen, setIsAiWingOpen] = useState<boolean>(false);
   const [leftPaneWidth, setLeftPaneWidth] = useState<number>(() =>
     StoreService.getPreference('alarmer_left_pane_width', 340),
@@ -57,6 +60,10 @@ export const App: React.FC = () => {
   const [alarms, setAlarms] = useState<AlarmItem[]>(() => StoreService.snapshot().alarms);
   /** Saved schedules — the primary object of the product. */
   const [schedules, setSchedules] = useState<Schedule[]>(() => StoreService.snapshot().schedules);
+  /** Work the user intends to do, linked to schedule steps where applicable. */
+  const [tasks, setTasks] = useState<TaskItem[]>(() => StoreService.snapshot().tasks);
+  /** Log of completed focus sessions, the source of every statistic. */
+  const [sessions, setSessions] = useState<SessionRecord[]>(() => StoreService.snapshot().sessions);
 
   /**
    * What the scheduler actually receives: schedule steps expanded into firings,
@@ -73,10 +80,12 @@ export const App: React.FC = () => {
       aiSettings,
       alarms,
       schedules,
+      tasks,
+      sessions,
       dynamicUi,
       chatMessages: chatMessages as never,
     });
-  }, [hydrated, aiSettings, alarms, schedules, dynamicUi, chatMessages]);
+  }, [hydrated, aiSettings, alarms, schedules, tasks, sessions, dynamicUi, chatMessages]);
 
   // Adopt the persisted store file on first mount (native file, not localStorage).
   useEffect(() => {
@@ -84,6 +93,8 @@ export const App: React.FC = () => {
       .then((state) => {
         setAlarms(state.alarms);
         setSchedules(state.schedules);
+        setTasks(state.tasks);
+        setSessions(state.sessions);
         setAISettings(state.aiSettings);
         setDynamicUi(state.dynamicUi);
         if (state.chatMessages.length > 0) {
@@ -123,16 +134,35 @@ export const App: React.FC = () => {
   /** Opens the compact always-on-top overlay window. */
   const toggleMiniOverlay = () => {
     soundService.playUiClick();
+    // The overlay is a second native window; a plain browser has no such thing.
+    if (!isTauri()) return;
     void invoke('toggle_mini_overlay', { open: true }).catch((e) =>
       console.warn('mini overlay unavailable:', e),
     );
   };
-
   const toggleAiWing = async () => {
     soundService.playUiClick();
     const next = !isAiWingOpen;
     setIsAiWingOpen(next);
     await windowService.setCompanionWing(next);
+  };
+
+  /**
+   * A one-shot alarm switches itself off in the backend the moment it rings, so
+   * the frontend mirrors that instead of leaving a lit toggle for a dead alarm.
+   */
+  const handleAlarmConsumed = (id: string) => {
+    setAlarms((prev) => prev.map((a) => (a.id === id ? { ...a, enabled: false } : a)));
+  };
+
+  /**
+   * Records a finished focus session.
+   *
+   * This is the only place the session log grows, so the trim that keeps the
+   * store file bounded lives here too rather than being forgotten at a call site.
+   */
+  const recordSession = (session: SessionRecord) => {
+    setSessions((prev) => trimSessions([...prev, session]));
   };
 
   // Mouse drag handlers for splitter between Dashboard and AI Wing
@@ -175,6 +205,15 @@ export const App: React.FC = () => {
   const t = I18nService.t();
 
   return (
+    <AlarmCenter
+      theme={theme}
+      firings={firings}
+      schedules={schedules}
+      alarmVolume={StoreService.getPreference('alarmer_alarm_volume', 0.8)}
+      alarmEnabled={StoreService.getPreference('alarmer_alarm_enabled', true)}
+      onDisableAlarm={handleAlarmConsumed}
+      onSession={recordSession}
+    >
     <div className="w-screen h-screen m-0 p-0 bg-transparent overflow-hidden select-none">
       <div
         className="relative w-full h-full flex flex-col rounded-2xl overflow-hidden shadow-2xl transition-colors duration-200"
@@ -252,6 +291,10 @@ export const App: React.FC = () => {
                 onUpdateAlarms={setAlarms}
                 onOpenAISettings={() => setActiveTab('settings')}
                 timerMinutes={aiTimerMinutes}
+                tasks={tasks}
+                onUpdateTasks={setTasks}
+                sessions={sessions}
+                onSession={recordSession}
                 activeSubModule={dashboardSubModule}
                 onSubModuleChange={setDashboardSubModule}
               />
@@ -368,8 +411,9 @@ export const App: React.FC = () => {
         )}
       </div>
     </div>
-  </div>
-);
+    </div>
+    </AlarmCenter>
+  );
 };
 
 export default App;

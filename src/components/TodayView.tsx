@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { CalendarDays, Play, Clock } from 'lucide-react';
-import type { Schedule, ScheduleStep, ThemeColors } from '../types';
+import type { Schedule, ScheduleStep, SessionRecord, ThemeColors } from '../types';
 import { blockDurationSec, findNextUp, schedulesForToday } from '../services/scheduleEngine';
 import { BlockPlayer } from './BlockPlayer';
 import { soundService } from '../services/sound';
@@ -8,6 +8,8 @@ import { soundService } from '../services/sound';
 interface TodayViewProps {
   theme: ThemeColors;
   schedules: Schedule[];
+  /** A finished interval block, so its focus time can be recorded. */
+  onSession?: (session: SessionRecord) => void;
 }
 
 type BlockStep = Extract<ScheduleStep, { kind: 'block' }>;
@@ -36,9 +38,9 @@ function formatUntil(minutes: number): string {
  * A bare list of times cannot answer "what should I be doing right now", which
  * is the question this product exists to answer.
  */
-export const TodayView: React.FC<TodayViewProps> = ({ theme, schedules }) => {
+export const TodayView: React.FC<TodayViewProps> = ({ theme, schedules, onSession }) => {
   const [now, setNow] = useState(() => new Date());
-  const [runningBlock, setRunningBlock] = useState<BlockStep | null>(null);
+  const [runningBlock, setRunningBlock] = useState<{ step: BlockStep; scheduleId: string } | null>(null);
 
   // Keep "in 12 minutes" honest without a full re-render loop.
   useEffect(() => {
@@ -48,7 +50,13 @@ export const TodayView: React.FC<TodayViewProps> = ({ theme, schedules }) => {
 
   if (runningBlock) {
     return (
-      <BlockPlayer theme={theme} block={runningBlock} onClose={() => setRunningBlock(null)} />
+      <BlockPlayer
+        theme={theme}
+        block={runningBlock.step}
+        scheduleId={runningBlock.scheduleId}
+        onSession={onSession}
+        onClose={() => setRunningBlock(null)}
+      />
     );
   }
 
@@ -119,7 +127,10 @@ export const TodayView: React.FC<TodayViewProps> = ({ theme, schedules }) => {
             <button
               onClick={() => {
                 soundService.playUiClick();
-                setRunningBlock(next.step as BlockStep);
+                setRunningBlock({
+                  step: next.step as BlockStep,
+                  scheduleId: next.schedule.id,
+                });
               }}
               className="w-full py-2.5 rounded-xl text-[11px] font-semibold flex items-center justify-center gap-1.5 transition-transform active:scale-[0.98]"
               style={{ backgroundColor: '#fafafa', color: '#0a0a0a' }}

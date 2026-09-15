@@ -67,7 +67,10 @@ export type ScheduleStep =
 export interface Schedule {
   id: string;
   name: string;
-  /** Weekdays this schedule runs on; 0 = Sunday. Empty means every day. */
+  /**
+   * Weekdays this schedule runs on; 0 = Sunday. Empty means every day — a
+   * schedule is a routine, so "no days chosen" is "all of them".
+   */
   days: number[];
   enabled: boolean;
   steps: ScheduleStep[];
@@ -76,12 +79,64 @@ export interface Schedule {
   createdAt: string;
 }
 
+/**
+ * How often a standalone alarm rings.
+ *
+ * `days: []` used to mean "once" in the type, "one time" in the AI prompt and
+ * "every day" in the Rust scheduler, so an alarm created as a one-off rang
+ * forever. The intent is now explicit instead of inferred from an empty list.
+ */
+export type RepeatMode = 'once' | 'daily' | 'days';
+
+/**
+ * A piece of work the user intends to do.
+ *
+ * A schedule answers "when", which is not the same question as "what". Without
+ * a task, a 09:00 block can only say "Начать блок" — it cannot say what the
+ * block is for, and nothing survives the block to be counted afterwards.
+ */
+export interface TaskItem {
+  id: string;
+  title: string;
+  /** Optional longer note shown while the task is being worked on. */
+  note?: string;
+  done: boolean;
+  /** Schedule step this task belongs to, when it came from a program. */
+  stepId?: string;
+  scheduleId?: string;
+  /** ISO timestamps. */
+  createdAt: string;
+  completedAt?: string;
+}
+
+/**
+ * One completed interval block or finished countdown.
+ *
+ * Recorded so the app can answer "how much did I actually do" — the question
+ * that keeps a time-management tool installed past the first week.
+ */
+export interface SessionRecord {
+  id: string;
+  /** Schedule the block came from, when it came from one. */
+  scheduleId?: string;
+  stepId?: string;
+  label: string;
+  /** Focused seconds actually spent, excluding paused time. */
+  focusedSec: number;
+  startedAt: string;
+  endedAt: string;
+  /** True when the user ran it to completion rather than closing it early. */
+  completed: boolean;
+}
+
 export interface AlarmItem {
   id: string;
   title: string;
   label?: string;
   time: string; // "HH:MM" 24h
-  days: number[]; // 0=Sun, 1=Mon, ..., 6=Sat (empty means once)
+  /** Weekdays, 0 = Sunday. Only consulted when `repeat` is `'days'`. */
+  days: number[];
+  repeat: RepeatMode;
   enabled: boolean;
   sound: string;
   voicePrompt?: string;

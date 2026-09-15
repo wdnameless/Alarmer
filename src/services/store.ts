@@ -1,7 +1,7 @@
 import { LazyStore } from '@tauri-apps/plugin-store';
 import { DEFAULT_AI_SETTINGS, DEFAULT_SCHEDULES } from '../constants/defaults';
 import { DEFAULT_DYNAMIC_UI, DynamicUIConfig } from '../types/dynamicUi';
-import { AISettings, AlarmItem, Schedule, ScheduleStep, ExerciseStep } from '../types';
+import { AISettings, AlarmItem, Schedule, ScheduleStep, ExerciseStep, TaskItem, SessionRecord } from '../types';
 import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../types/guards';
 
 /**
@@ -16,7 +16,7 @@ import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../type
  * render tree.
  */
 
-export const SCHEMA_VERSION = 2;
+export const SCHEMA_VERSION = 3;
 
 const STORE_FILE = 'alarmer.json';
 
@@ -31,6 +31,8 @@ export interface PersistedState {
   schemaVersion: number;
   alarms: AlarmItem[];
   schedules: Schedule[];
+  tasks: TaskItem[];
+  sessions: SessionRecord[];
   aiSettings: AISettings;
   dynamicUi: DynamicUIConfig;
   chatMessages: StoredChatMessage[];
@@ -71,18 +73,28 @@ function sanitizeAlarm(raw: unknown, index: number): AlarmItem | null {
   const time = asString(raw.time, '');
   if (!/^\d{1,2}:\d{2}$/.test(time)) return null;
   const label = asString(raw.label, asString(raw.title, 'Будильник'));
+  const days = asArray<unknown>(raw.days, [1, 2, 3, 4, 5]).filter(
+    (d): d is number => typeof d === 'number' && d >= 0 && d <= 6,
+  );
   return {
     id: asString(raw.id, `alarm_${index}`),
     title: asString(raw.title, label),
     label,
     time: time.padStart(5, '0'),
-    days: asArray<unknown>(raw.days, [1, 2, 3, 4, 5]).filter(
-      (d): d is number => typeof d === 'number' && d >= 0 && d <= 6,
+    days,
+    // Files written before `repeat` existed used an empty day list for a
+    // one-off and a populated one for specific days. Reading them back that way
+    // keeps an existing one-off alarm a one-off instead of arming it daily.
+    repeat: oneOf(
+      raw.repeat,
+      ['once', 'daily', 'days'] as const,
+      days.length === 0 ? 'once' : 'days',
     ),
     enabled: asBoolean(raw.enabled, true),
     sound: asString(raw.sound, 'gentle'),
     voicePrompt: typeof raw.voicePrompt === 'string' ? raw.voicePrompt : undefined,
     voiceAnnouncement: typeof raw.voiceAnnouncement === 'string' ? raw.voiceAnnouncement : undefined,
+    scheduleId: typeof raw.scheduleId === 'string' ? raw.scheduleId : undefined,
   };
 }
 
@@ -243,12 +255,47 @@ function sanitizeMessages(raw: unknown): StoredChatMessage[] {
     .filter((m) => m.text.length > 0);
 }
 
+function sanitizeTask(raw: unknown, index: number): TaskItem | null {
+  if (!isRecord(raw)) return null;
+  const title = asString(raw.title, '').trim();
+  if (!title) return null;
+  return {
+    id: asString(raw.id, `task_${index}`),
+    title,
+    note: typeof raw.note === 'string' ? raw.note : undefined,
+    done: asBoolean(raw.done, false),
+    stepId: typeof raw.stepId === 'string' ? raw.stepId : undefined,
+    scheduleId: typeof raw.scheduleId === 'string' ? raw.scheduleId : undefined,
+    createdAt: asString(raw.createdAt, new Date().toISOString()),
+    completedAt: typeof raw.completedAt === 'string' ? raw.completedAt : undefined,
+  };
+}
+
+function sanitizeSession(raw: unknown, index: number): SessionRecord | null {
+  if (!isRecord(raw)) return null;
+  const focused = asNumber(raw.focusedSec, 0);
+  if (focused <= 0) return null;
+  return {
+    id: asString(raw.id, `session_${index}`),
+    scheduleId: typeof raw.scheduleId === 'string' ? raw.scheduleId : undefined,
+    stepId: typeof raw.stepId === 'string' ? raw.stepId : undefined,
+    label: asString(raw.label, 'Сессия'),
+    focusedSec: Math.round(focused),
+    startedAt: asString(raw.startedAt, new Date().toISOString()),
+    endedAt: asString(raw.endedAt, new Date().toISOString()),
+    completed: asBoolean(raw.completed, true),
+  };
+}
+
 /**
  * Brings any stored payload up to the current schema. Unknown or corrupt fields
  * are replaced with defaults rather than propagated.
  *
  * v1 -> v2: introduced `schedules` as the primary object. Existing standalone
  * alarms are preserved as-is so nobody loses the alarms they already rely on.
+ *
+ * v2 -> v3: added `tasks` and `sessions`. Both start empty: an existing user has
+ * no history to import, and inventing one would be a lie in the statistics.
  */
 export function migrate(raw: unknown): PersistedState {
   const record = isRecord(raw) ? raw : {};
@@ -268,6 +315,12 @@ export function migrate(raw: unknown): PersistedState {
       .map(sanitizeAlarm)
       .filter((a): a is AlarmItem => a !== null),
     schedules: withSchedules,
+    tasks: asArray<unknown>(record.tasks, [])
+      .map(sanitizeTask)
+      .filter((t): t is TaskItem => t !== null),
+    sessions: asArray<unknown>(record.sessions, [])
+      .map(sanitizeSession)
+      .filter((s): s is SessionRecord => s !== null),
     aiSettings: sanitizeAiSettings(record.aiSettings),
     dynamicUi: sanitizeDynamicUi(record.dynamicUi),
     chatMessages: sanitizeMessages(record.chatMessages),

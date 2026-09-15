@@ -1,7 +1,8 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Pause, Play, SkipForward, X } from 'lucide-react';
-import type { ScheduleStep, ThemeColors } from '../types';
+import type { ScheduleStep, SessionRecord, ThemeColors } from '../types';
 import { soundService } from '../services/sound';
+import { SessionBuilder } from '../services/session';
 
 type BlockStep = Extract<ScheduleStep, { kind: 'block' }>;
 
@@ -9,6 +10,10 @@ interface BlockPlayerProps {
   theme: ThemeColors;
   block: BlockStep;
   onClose: () => void;
+  /** Schedule the block came from, when it came from one. */
+  scheduleId?: string;
+  /** Called once with the finished session so it can be recorded. */
+  onSession?: (session: SessionRecord) => void;
 }
 
 /** "45" or "1:30" — compact clock for a single exercise. */
@@ -31,12 +36,47 @@ function voiceFor(exercise: { name: string; voicePrompt?: string }): string {
  * This is what makes a schedule answer "what do I do now" rather than just
  * "something is scheduled at 07:15".
  */
-export const BlockPlayer: React.FC<BlockPlayerProps> = ({ theme, block, onClose }) => {
+export const BlockPlayer: React.FC<BlockPlayerProps> = ({
+  theme,
+  block,
+  onClose,
+  scheduleId,
+  onSession,
+}) => {
   const exercises = block.exercises;
   const [index, setIndex] = useState(0);
   const [remaining, setRemaining] = useState(exercises[0]?.durationSec ?? 0);
   const [running, setRunning] = useState(true);
   const announcedRef = useRef<number>(-1);
+
+  // Focus is accumulated as exercises actually elapse, so paused time is
+  // excluded and a block left open overnight reports nothing extra.
+  const builderRef = useRef<SessionBuilder>(
+    new SessionBuilder({
+      label: block.label,
+      scheduleId,
+      stepId: block.id,
+      startedAt: new Date(),
+    }),
+  );
+  const reportedRef = useRef(false);
+
+  /** Hands the finished session to the caller exactly once. */
+  const reportSession = useCallback(
+    (completed: boolean) => {
+      if (reportedRef.current) return;
+      reportedRef.current = true;
+      const record = builderRef.current.finish(new Date(), completed);
+      if (record) onSession?.(record);
+    },
+    [onSession],
+  );
+
+  /** Closing early still counts the time that was genuinely spent. */
+  const close = () => {
+    reportSession(false);
+    onClose();
+  };
 
   const totalSeconds = useMemo(
     () => exercises.reduce((sum, e) => sum + e.durationSec, 0),
@@ -58,28 +98,47 @@ export const BlockPlayer: React.FC<BlockPlayerProps> = ({ theme, block, onClose 
   }, [index, current]);
 
   // Countdown. Ends the block when the last exercise finishes.
+  //
+  // The tick reads the current second and exercise from refs, and every side
+  // effect happens outside a state updater: React may invoke an updater more
+  // than once (StrictMode does), so counting focus time or ringing the finish
+  // chime from inside one would double-count and double-ring.
+  const remainingRef = useRef(remaining);
+  const indexRef = useRef(index);
+
+  useEffect(() => {
+    remainingRef.current = remaining;
+    indexRef.current = index;
+  }, [remaining, index]);
+
   useEffect(() => {
     if (!running) return;
     const timer = window.setInterval(() => {
-      setRemaining((prev) => {
-        if (prev > 1) {
-          if (prev <= 4) soundService.playCountdownTick();
-          return prev - 1;
-        }
-        // Move to the next exercise, or finish.
-        if (index < exercises.length - 1) {
-          const nextDuration = exercises[index + 1].durationSec;
-          setIndex(index + 1);
-          return nextDuration;
-        }
-        setRunning(false);
-        soundService.playFinishAlarm();
-        soundService.speak('Блок завершён. Отличная работа!');
-        return 0;
-      });
+      const prev = remainingRef.current;
+      const currentIndex = indexRef.current;
+
+      if (prev <= 4) soundService.playCountdownTick();
+      builderRef.current.addFocus(1);
+
+      if (prev > 1) {
+        setRemaining(prev - 1);
+        return;
+      }
+
+      if (currentIndex < exercises.length - 1) {
+        setIndex(currentIndex + 1);
+        setRemaining(exercises[currentIndex + 1].durationSec);
+        return;
+      }
+
+      setRunning(false);
+      setRemaining(0);
+      soundService.playFinishAlarm();
+      soundService.speak('Блок завершён. Отличная работа!');
+      reportSession(true);
     }, 1000);
     return () => window.clearInterval(timer);
-  }, [running, index, exercises]);
+  }, [running, exercises, reportSession]);
 
   const skip = () => {
     soundService.playUiClick();
@@ -115,7 +174,7 @@ export const BlockPlayer: React.FC<BlockPlayerProps> = ({ theme, block, onClose 
             {block.label}
           </span>
           <button
-            onClick={onClose}
+            onClick={close}
             className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
             style={{ color: theme.subtext }}
             title="Закрыть блок"

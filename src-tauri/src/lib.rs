@@ -5,11 +5,62 @@ use std::sync::{Mutex, OnceLock};
 use tauri::{
     menu::{Menu, MenuItem},
     tray::TrayIconBuilder,
-    Manager,
+    Emitter, Manager,
 };
 use scheduler::ScheduledAlarm;
 use base64::Engine;
+mod ai;
+mod alarm_sound;
+mod credentials;
 mod scheduler;
+mod timer;
+
+/// Asks the configured model for a completion.
+///
+/// Runs from the backend so any OpenAI-compatible endpoint works regardless of
+/// the webview's CSP, and returns the failure reason instead of a canned reply.
+#[tauri::command]
+async fn ai_complete(
+    base_url: String,
+    model: String,
+    messages: Vec<ai::ChatMessage>,
+) -> Result<ai::ChatOutcome, String> {
+    let key = credentials::get().unwrap_or_default();
+    Ok(ai::complete(&base_url, &key, &model, messages).await)
+}
+
+/// Saves the API key to the OS credential store; an empty key clears it.
+#[tauri::command]
+async fn set_api_key(key: String) -> Result<(), String> {
+    credentials::set(&key)
+}
+
+/// Whether a key is stored, without returning it to the webview.
+#[tauri::command]
+async fn has_api_key() -> Result<bool, String> {
+    Ok(credentials::has())
+}
+
+/// Silences a ring started by the backend (window hidden or in the tray).
+#[tauri::command]
+async fn stop_alarm_sound() -> Result<(), String> {
+    alarm_sound::stop();
+    Ok(())
+}
+
+/// Id of the alarm still ringing, so a window opened late still shows the
+/// takeover for an alarm that started while it was hidden.
+#[tauri::command]
+async fn ringing_alarm_id() -> Result<Option<String>, String> {
+    Ok(alarm_sound::ringing_id())
+}
+
+/// Pushes the user's alarm volume and mute state down to the backend.
+#[tauri::command]
+async fn set_alarm_audio_prefs(volume: f32, enabled: bool) -> Result<(), String> {
+    scheduler::set_audio_prefs(volume, enabled);
+    Ok(())
+}
 use msedge_tts::{tts::client::connect, tts::SpeechConfig, voice::{get_voices_list, Voice}};
 
 static AUDIO_CACHE: OnceLock<Mutex<HashMap<String, String>>> = OnceLock::new();
@@ -152,30 +203,43 @@ async fn toggle_mini_overlay(app: tauri::AppHandle, open: bool) -> Result<(), St
 }
 
 /// Registers process-wide shortcuts so the timer can be driven from any app.
+///
+/// These act on the backend timer directly. They used to emit events into the
+/// webview, which meant they did nothing at all unless the Timer sub-tab
+/// happened to be mounted.
 #[tauri::command]
 async fn register_shortcuts(app: tauri::AppHandle) -> Result<(), String> {
-    use tauri::Emitter;
     use tauri_plugin_global_shortcut::{Code, GlobalShortcutExt, Modifiers, Shortcut, ShortcutState};
 
-    let bindings: Vec<(&str, Shortcut)> = vec![
-        ("timer://toggle", Shortcut::new(Some(Modifiers::ALT), Code::KeyS)),
-        ("timer://reset", Shortcut::new(Some(Modifiers::ALT), Code::KeyR)),
-        ("timer://add-five", Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyU)),
-        ("timer://sub-five", Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyD)),
+    let bindings: Vec<(Shortcut, fn())> = vec![
+        (Shortcut::new(Some(Modifiers::ALT), Code::KeyS), || {
+            if timer::snapshot().running {
+                timer::pause();
+            } else {
+                timer::start();
+            }
+        }),
+        (Shortcut::new(Some(Modifiers::ALT), Code::KeyR), timer::reset),
+        (Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyU), || {
+            timer::shift_minutes(5)
+        }),
+        (Shortcut::new(Some(Modifiers::ALT | Modifiers::SHIFT), Code::KeyD), || {
+            timer::shift_minutes(-5)
+        }),
     ];
 
     let mut bound = 0usize;
-    for (event, shortcut) in bindings {
-        let emit_event = event.to_string();
-        let handle = app.clone();
+    for (shortcut, action) in bindings {
         // A combo already owned by another program must not disable the rest.
-        match app.global_shortcut().on_shortcut(shortcut, move |_app, _shortcut, press| {
+        match app.global_shortcut().on_shortcut(shortcut, move |app, _shortcut, press| {
             if press.state() == ShortcutState::Pressed {
-                let _ = handle.emit(&emit_event, ());
+                action();
+                // Nudge the UI to re-read the backend state it did not change.
+                let _ = app.emit("timer://changed", ());
             }
         }) {
             Ok(()) => bound += 1,
-            Err(e) => eprintln!("shortcut {event} unavailable: {e}"),
+            Err(e) => eprintln!("shortcut unavailable: {e}"),
         }
     }
     if bound == 0 {
@@ -191,9 +255,10 @@ async fn sync_alarms(alarms: Vec<ScheduledAlarm>) -> Result<(), String> {
     Ok(())
 }
 
-/// Defers an alarm by N minutes.
+/// Deletes an alarm's pending state and silences it.
 #[tauri::command]
 async fn snooze_alarm(id: String, minutes: u32) -> Result<(), String> {
+    alarm_sound::stop();
     scheduler::snooze(&id, minutes);
     Ok(())
 }
@@ -201,8 +266,18 @@ async fn snooze_alarm(id: String, minutes: u32) -> Result<(), String> {
 /// Marks an alarm as acknowledged.
 #[tauri::command]
 async fn dismiss_alarm(id: String) -> Result<(), String> {
+    // The backend may be the one ringing (window hidden); silencing it here is
+    // what makes Stop work when the webview never saw the alarm.
+    alarm_sound::stop();
     scheduler::dismiss(&id);
     Ok(())
+}
+
+/// Alarms whose moment passed without ringing today, so the UI can say so
+/// instead of silently dropping them.
+#[tauri::command]
+async fn missed_alarms_today() -> Result<Vec<scheduler::MissedAlarm>, String> {
+    Ok(scheduler::missed_today())
 }
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
@@ -222,6 +297,20 @@ pub fn run() {
             sync_alarms,
             snooze_alarm,
             dismiss_alarm,
+            missed_alarms_today,
+            stop_alarm_sound,
+            ringing_alarm_id,
+            set_alarm_audio_prefs,
+            ai_complete,
+            set_api_key,
+            has_api_key,
+            timer::timer_set_duration,
+            timer::timer_start,
+            timer::timer_pause,
+            timer::timer_reset,
+            timer::timer_shift_minutes,
+            timer::timer_set_mode,
+            timer::timer_get_state,
             register_shortcuts,
             toggle_mini_overlay,
         ])
@@ -290,6 +379,9 @@ pub fn run() {
 
             // Alarms must fire even with the window hidden or another tab open.
             scheduler::spawn(app.handle().clone());
+
+            // The countdown outlives any screen it is displayed on.
+            timer::spawn(app.handle().clone());
 
             // Timer control from any application, no window focus needed.
             let handle = app.handle().clone();

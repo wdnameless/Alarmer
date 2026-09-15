@@ -73,6 +73,7 @@ describe('building the firing list', () => {
     title: 'Разовый',
     time: '12:00',
     days: [],
+    repeat: 'once',
     enabled: true,
     sound: 'gentle',
   };

@@ -5,10 +5,35 @@
 //! open, or when WebView2 throttles a background page. So the frontend pushes
 //! the schedule down here and this loop decides when to ring.
 
+use chrono::{Datelike, Local, NaiveDate, NaiveDateTime, Timelike};
 use serde::{Deserialize, Serialize};
 use std::sync::Mutex;
-use std::time::{Duration, Instant};
+use std::time::{Duration, SystemTime};
 use tauri::{Emitter, Manager};
+
+/// How many minutes late an alarm may still ring.
+///
+/// Ticks can be delayed by a busy machine, a frozen process or a restart a
+/// moment after the alarm's time, and all of those should still ring. Anything
+/// later is reported as missed instead: a reminder that arrives hours late is
+/// worse than one that never claims to have fired on time.
+const CATCH_UP_MINUTES: i64 = 5;
+
+/// How often the loop wakes. Just under a second, so a minute is never skipped.
+const TICK_INTERVAL: Duration = Duration::from_millis(500);
+
+/// How often a given alarm is allowed to ring.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize, Default)]
+#[serde(rename_all = "snake_case")]
+pub enum Repeat {
+    /// Rings at its next matching moment, then switches itself off.
+    Once,
+    /// Rings every day. Weekdays are ignored.
+    #[default]
+    Daily,
+    /// Rings only on the weekdays in `days`.
+    Days,
+}
 
 /// One alarm as the scheduler sees it. Mirrors the frontend `AlarmItem`.
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -17,12 +42,22 @@ pub struct ScheduledAlarm {
     pub label: String,
     /// "HH:MM" in 24-hour local time.
     pub time: String,
-    /// Weekdays, 0 = Sunday. Empty means "every day".
+    /// Weekdays, 0 = Sunday. Only consulted when `repeat` is `Days`.
+    #[serde(default)]
     pub days: Vec<u32>,
+    #[serde(default)]
+    pub repeat: Repeat,
     pub enabled: bool,
+    /// Signal shape to play, matching the frontend alarm profiles.
+    #[serde(default = "default_sound")]
+    pub sound: String,
     /// Voice line spoken when the alarm rings.
     #[serde(default)]
     pub voice_prompt: Option<String>,
+}
+
+fn default_sound() -> String {
+    "gentle".to_string()
 }
 
 #[derive(Debug, Clone, Serialize)]
@@ -31,222 +66,311 @@ pub struct AlarmFiredEvent {
     pub label: String,
     pub time: String,
     pub voice_prompt: Option<String>,
-    /// Minutes the alarm was deferred by snooze, 0 for a normal fire.
+    /// Minutes the alarm was deferred by snooze, 0 for a scheduled ring.
     pub snoozed_for: u32,
+    /// Minutes past its own time when it eventually rang; 0 when on time.
+    pub late_by_minutes: u32,
+    /// Set when ringing this alarm switched it off for good.
+    pub consumed: bool,
+}
+
+/// An alarm whose moment passed while nothing was listening.
+#[derive(Debug, Clone, Serialize)]
+pub struct MissedAlarm {
+    pub id: String,
+    pub label: String,
+    pub time: String,
+    /// Minutes past its own time when it was noticed.
+    pub late_by_minutes: u32,
+}
+
+#[derive(Debug, Clone)]
+struct Snooze {
+    id: String,
+    due_at: SystemTime,
+    minutes: u32,
 }
 
 #[derive(Default, Debug)]
 struct SchedulerState {
     alarms: Vec<ScheduledAlarm>,
-    /// `alarm_id` -> instant at which a snoozed alarm should ring.
-    snoozed: Vec<(String, Instant)>,
-    /// `alarm_id` -> "HH:MM" already fired today, so we ring once per minute slot.
-    fired: Vec<(String, String)>,
+    snoozed: Vec<Snooze>,
+    /// `(alarm_id, local date)` already handled today, so nothing rings twice —
+    /// including after the user acknowledges it mid-minute.
+    handled: Vec<(String, NaiveDate)>,
+    /// Today's skipped alarms, for the "missed" surface.
+    missed: Vec<(NaiveDate, MissedAlarm)>,
+    /// False until the first sync, which carries restored state rather than a
+    /// newly created alarm and therefore keeps its catch-up chance.
+    synced_once: bool,
 }
 
 static STATE: Mutex<Option<SchedulerState>> = Mutex::new(None);
 
+/// Runs `f` against the scheduler state.
+///
+/// Poisoning is recovered rather than propagated: with `panic = "abort"` in the
+/// release profile, an abort here would take the whole process — and every
+/// pending alarm — down with it.
 fn with_state<T>(f: impl FnOnce(&mut SchedulerState) -> T) -> T {
-    let mut guard = STATE.lock().expect("scheduler state poisoned");
-    if guard.is_none() {
-        *guard = Some(SchedulerState::default());
+    let mut guard = STATE.lock().unwrap_or_else(|poisoned| poisoned.into_inner());
+    f(guard.get_or_insert_with(SchedulerState::default))
+}
+
+/// "HH:MM" to minutes since local midnight.
+fn parse_hhmm(value: &str) -> Option<i64> {
+    let (hours, minutes) = value.split_once(':')?;
+    let hours: i64 = hours.trim().parse().ok()?;
+    let minutes: i64 = minutes.trim().parse().ok()?;
+    (hours <= 23 && minutes <= 59).then_some(hours * 60 + minutes)
+}
+
+fn rings_on(alarm: &ScheduledAlarm, weekday: u32) -> bool {
+    match alarm.repeat {
+        // A one-shot rings at its next moment regardless of weekday: it turns
+        // itself off the instant it has rung, so it cannot repeat.
+        Repeat::Once | Repeat::Daily => true,
+        Repeat::Days => alarm.days.contains(&weekday),
     }
-    f(guard.as_mut().expect("state initialised above"))
 }
 
 /// Replaces the schedule the frontend wants enforced.
 pub fn sync(alarms: Vec<ScheduledAlarm>) {
     with_state(|state| {
-        state.alarms = alarms;
-        // Drop snoozes and fired markers for alarms that no longer exist.
         let known: Vec<String> = state.alarms.iter().map(|a| a.id.clone()).collect();
-        state.snoozed.retain(|(id, _)| known.contains(id));
-        state.fired.retain(|(id, _)| known.contains(id));
+
+        // An alarm created now for a time that has already gone today waits for
+        // its next occurrence instead of ringing — or being reported as missed —
+        // the moment it is created. The first sync after startup is different:
+        // that list is restored state, and its alarms keep their catch-up chance.
+        if state.synced_once {
+            let now = Local::now().naive_local();
+            let minute_of_day = now.hour() as i64 * 60 + now.minute() as i64;
+            for alarm in &alarms {
+                let already_known = known.contains(&alarm.id);
+                let passed_today = parse_hhmm(&alarm.time).is_some_and(|at| at < minute_of_day);
+                if !already_known && passed_today {
+                    state.handled.push((alarm.id.clone(), now.date()));
+                }
+            }
+        }
+        state.synced_once = true;
+
+        state.alarms = alarms;
+        let ids: Vec<String> = state.alarms.iter().map(|a| a.id.clone()).collect();
+        state.snoozed.retain(|s| ids.contains(&s.id));
+        state.handled.retain(|(id, _)| ids.contains(id));
+        state.missed.retain(|(_, m)| ids.contains(&m.id));
     });
 }
 
-/// Defers an alarm by `minutes`, overriding any pending snooze for it.
+/// Defers an alarm by `minutes`, replacing any pending snooze for it.
+///
+/// The "handled today" marker is left alone: the alarm already had its moment,
+/// and snoozing must not re-arm that slot as well as the deferred one.
 pub fn snooze(id: &str, minutes: u32) {
     with_state(|state| {
-        state.snoozed.retain(|(existing, _)| existing != id);
-        state
-            .snoozed
-            .push((id.to_string(), Instant::now() + Duration::from_secs(minutes as u64 * 60)));
-        // Allow the original slot to ring again later if it is still matching.
-        state.fired.retain(|(existing, _)| existing != id);
+        state.snoozed.retain(|s| s.id != id);
+        state.snoozed.push(Snooze {
+            id: id.to_string(),
+            due_at: SystemTime::now() + Duration::from_secs(minutes as u64 * 60),
+            minutes,
+        });
     });
 }
 
-/// Marks an alarm as acknowledged: clears its snooze and today's fired marker.
-pub fn dismiss(id: &str) {
-    with_state(|state| {
-        state.snoozed.retain(|(existing, _)| existing != id);
-        state.fired.retain(|(existing, _)| existing != id);
-    });
-}
-
-fn local_now() -> (u32, u32, String, u32) {
-    // Minimal local-time derivation without pulling a chrono dependency:
-    // Windows reports local time via SystemTime + the process timezone offset.
-    let now = std::time::SystemTime::now()
-        .duration_since(std::time::UNIX_EPOCH)
-        .unwrap_or_default();
-    let secs = now.as_secs();
-
-    // Local offset in seconds, resolved once per tick (cheap and always correct
-    // across DST changes).
-    let offset = local_utc_offset_seconds();
-    let local = (secs as i64 + offset).max(0) as u64;
-
-    let days_since_epoch = local / 86_400;
-    let seconds_today = local % 86_400;
-
-    let hour = (seconds_today / 3600) as u32;
-    let minute = ((seconds_today % 3600) / 60) as u32;
-
-    // 1970-01-01 was a Thursday (=4 with Sunday = 0).
-    let weekday = ((days_since_epoch + 4) % 7) as u32;
-
-    (hour, minute, format!("{hour:02}:{minute:02}"), weekday)
-}
-
-/// Reads the system UTC offset in seconds.
+/// Marks an alarm as acknowledged by clearing its pending snooze.
 ///
-/// On Windows this uses the current timezone information; elsewhere it falls
-/// back to zero, which only affects users outside UTC.
-#[cfg(windows)]
-fn local_utc_offset_seconds() -> i64 {
-    use std::mem::MaybeUninit;
-    #[repr(C)]
-    struct SystemTime {
-        year: u16,
-        month: u16,
-        day_of_week: u16,
-        day: u16,
-        hour: u16,
-        minute: u16,
-        second: u16,
-        milliseconds: u16,
-    }
-    #[link(name = "kernel32")]
-    extern "system" {
-        fn GetLocalTime(lp_system_time: *mut SystemTime);
-    }
-    // GetLocalTime gives no offset directly; compare against UTC via SystemTime.
-    let mut local = MaybeUninit::<SystemTime>::uninit();
-    unsafe {
-        GetLocalTime(local.as_mut_ptr());
-        let local = local.assume_init();
-        let local_secs = (local.hour as i64) * 3600 + (local.minute as i64) * 60 + local.second as i64;
+/// The "handled today" marker stays. Clearing it would let the next tick —
+/// half a second later, still inside the same minute — match the alarm again and
+/// ring it straight back at the person who just silenced it.
+pub fn dismiss(id: &str) {
+    with_state(|state| state.snoozed.retain(|s| s.id != id));
+}
 
-        let utc = std::time::SystemTime::now()
-            .duration_since(std::time::UNIX_EPOCH)
-            .unwrap_or_default();
-        let utc_secs = (utc.as_secs() % 86_400) as i64;
+/// Alarms skipped today, oldest first.
+pub fn missed_today() -> Vec<MissedAlarm> {
+    let today = Local::now().naive_local().date();
+    with_state(|state| {
+        state
+            .missed
+            .iter()
+            .filter(|(day, _)| *day == today)
+            .map(|(_, alarm)| alarm.clone())
+            .collect()
+    })
+}
 
-        let mut diff = local_secs - utc_secs;
-        if diff > 43_200 {
-            diff -= 86_400;
-        } else if diff < -43_200 {
-            diff += 86_400;
+/// Records a ring and returns the event to broadcast.
+///
+/// A one-shot alarm is switched off here rather than in the frontend, so it
+/// stays quiet even if the window never acknowledges the event.
+fn ring(
+    state: &mut SchedulerState,
+    alarm: &ScheduledAlarm,
+    snoozed_for: u32,
+    late_by_minutes: u32,
+) -> AlarmFiredEvent {
+    let consumed = alarm.repeat == Repeat::Once;
+    if consumed {
+        if let Some(slot) = state.alarms.iter_mut().find(|a| a.id == alarm.id) {
+            slot.enabled = false;
         }
-        diff
+    }
+
+    AlarmFiredEvent {
+        id: alarm.id.clone(),
+        label: alarm.label.clone(),
+        time: alarm.time.clone(),
+        voice_prompt: alarm.voice_prompt.clone(),
+        snoozed_for,
+        late_by_minutes,
+        consumed,
     }
 }
 
-#[cfg(not(windows))]
-fn local_utc_offset_seconds() -> i64 {
-    0
+fn find_alarm(state: &SchedulerState, id: &str) -> Option<ScheduledAlarm> {
+    state.alarms.iter().find(|a| a.id == id).cloned()
 }
 
+/// Pure decision step: given the state and the local clock, returns the alarms
+/// that must ring plus any that had to be marked as missed.
+///
+/// Extracted from the polling loop so both outcomes can be tested without a
+/// Tauri runtime.
+fn tick(state: &mut SchedulerState, now: NaiveDateTime) -> (Vec<AlarmFiredEvent>, Vec<MissedAlarm>) {
+    let today = now.date();
+    let weekday = now.weekday().num_days_from_sunday();
+    let minute_of_day = now.hour() as i64 * 60 + now.minute() as i64;
 
-/// Pure decision step: given the current state and clock, returns the alarms
-/// that must ring now. Extracted from the polling loop so it can be tested
-/// without a Tauri runtime.
-fn tick(state: &mut SchedulerState, hhmm: &str, weekday: u32, now: Instant) -> Vec<AlarmFiredEvent> {
-    let mut to_fire: Vec<AlarmFiredEvent> = Vec::new();
+    // Yesterday's bookkeeping says nothing about today.
+    state.handled.retain(|(_, day)| *day == today);
+    state.missed.retain(|(day, _)| *day == today);
 
-    // Snoozed alarms are due purely by elapsed time.
-    let due: Vec<String> = state
+    let mut fired = Vec::new();
+    let mut missed = Vec::new();
+
+    // Snoozed alarms are due purely by elapsed wall-clock time.
+    let due: Vec<Snooze> = state
         .snoozed
         .iter()
-        .filter(|(_, at)| *at <= now)
-        .map(|(id, _)| id.clone())
+        .filter(|s| s.due_at <= SystemTime::now())
+        .cloned()
         .collect();
 
-    for id in due {
-        state.snoozed.retain(|(existing, _)| existing != &id);
-        if let Some(alarm) = state.alarms.iter().find(|a| a.id == id) {
-            to_fire.push(AlarmFiredEvent {
+    for entry in due {
+        state.snoozed.retain(|s| s.id != entry.id);
+        if let Some(alarm) = find_alarm(state, &entry.id) {
+            if alarm.enabled {
+                fired.push(ring(state, &alarm, entry.minutes, 0));
+            }
+        }
+    }
+
+    // Scheduled matches: enabled, runs today, not snoozed, not already handled.
+    let pending: Vec<ScheduledAlarm> = state
+        .alarms
+        .iter()
+        .filter(|a| a.enabled && rings_on(a, weekday))
+        .filter(|a| !state.snoozed.iter().any(|s| s.id == a.id))
+        .filter(|a| !state.handled.iter().any(|(id, _)| id == &a.id))
+        .cloned()
+        .collect();
+
+    for alarm in pending {
+        let Some(at) = parse_hhmm(&alarm.time) else {
+            continue;
+        };
+        let late_by = minute_of_day - at;
+        if late_by < 0 {
+            continue; // still ahead of us today
+        }
+
+        state.handled.push((alarm.id.clone(), today));
+        if late_by <= CATCH_UP_MINUTES {
+            fired.push(ring(state, &alarm, 0, late_by as u32));
+        } else {
+            missed.push(MissedAlarm {
                 id: alarm.id.clone(),
                 label: alarm.label.clone(),
                 time: alarm.time.clone(),
-                voice_prompt: alarm.voice_prompt.clone(),
-                snoozed_for: 0,
+                late_by_minutes: late_by as u32,
             });
         }
     }
 
-    // Regular schedule matches: enabled, right minute, right weekday, not
-    // already fired this minute and not currently snoozed.
-    let matches: Vec<ScheduledAlarm> = state
-        .alarms
-        .iter()
-        .filter(|a| a.enabled && a.time == hhmm)
-        .filter(|a| a.days.is_empty() || a.days.contains(&weekday))
-        .filter(|a| {
-            let snoozed = state.snoozed.iter().any(|(id, _)| id == &a.id);
-            let fired = state.fired.iter().any(|(id, slot)| id == &a.id && slot == hhmm);
-            !snoozed && !fired
-        })
-        .cloned()
-        .collect();
-
-    for alarm in matches {
-        state.fired.push((alarm.id.clone(), hhmm.to_string()));
-        to_fire.push(AlarmFiredEvent {
-            id: alarm.id.clone(),
-            label: alarm.label.clone(),
-            time: alarm.time.clone(),
-            voice_prompt: alarm.voice_prompt.clone(),
-            snoozed_for: 0,
-        });
+    for alarm in &missed {
+        state.missed.push((today, alarm.clone()));
     }
 
-    // Forget yesterday's markers at midnight so slots can ring again tomorrow.
-    if hhmm == "00:00" {
-        state.fired.clear();
-    }
-
-    to_fire
+    (fired, missed)
 }
 
-/// Starts the 1-second polling loop. Runs for the lifetime of the process.
+/// Signal profile configured for `id`, falling back to a global default.
+fn find_sound(id: &str) -> String {
+    with_state(|state| {
+        state
+            .alarms
+            .iter()
+            .find(|a| a.id == id)
+            .map(|a| a.sound.clone())
+            .unwrap_or_else(default_sound)
+    })
+}
+
+/// Alarm volume (0..1) with a sensible default.
+pub fn audio_settings() -> (f32, bool) {
+    let guard = AUDIO_PREFS.lock().unwrap_or_else(|e| e.into_inner());
+    guard.unwrap_or((0.8, true))
+}
+
+/// Pushes the user's audio preferences down from the frontend.
+pub fn set_audio_prefs(volume: f32, enabled: bool) {
+    let mut guard = AUDIO_PREFS.lock().unwrap_or_else(|e| e.into_inner());
+    *guard = Some((volume.clamp(0.0, 1.0), enabled));
+}
+
+static AUDIO_PREFS: Mutex<Option<(f32, bool)>> = Mutex::new(None);
+
+/// Starts the polling loop. Runs for the lifetime of the process.
 pub fn spawn(app: tauri::AppHandle) {
     tauri::async_runtime::spawn(async move {
-        // Wake slightly more often than once per second so we never skip a minute.
-        let mut ticker = tokio::time::interval(Duration::from_millis(500));
+        let mut ticker = tokio::time::interval(TICK_INTERVAL);
         loop {
             ticker.tick().await;
 
-            let (_, _, hhmm, weekday) = local_now();
-            let to_fire = with_state(|state| tick(state, &hhmm, weekday, Instant::now()));
+            let now = Local::now().naive_local();
+            let (fired, missed) = with_state(|state| tick(state, now));
 
-            for event in to_fire {
+            for alarm in missed {
+                let _ = app.emit("alarm://missed", alarm);
+            }
+
+            for event in fired {
+                let id = event.id.clone();
                 let label = event.label.clone();
                 let prompt = event.voice_prompt.clone();
+                let sound = find_sound(&id);
 
-                // Ring in the webview when it is visible; otherwise use the OS.
+                let _ = app.emit("alarm://fired", event);
+
+                // The webview is ringing it out loud whenever it is alive; a
+                // hidden window has nothing to play from, so the OS takes over.
                 let visible = app
                     .get_webview_window("main")
                     .and_then(|w| w.is_visible().ok())
                     .unwrap_or(false);
 
-                let _ = app.emit("alarm://fired", event);
-
                 if !visible {
+                    // A hidden window cannot play anything, so the backend
+                    // raises the signal itself rather than letting the alarm
+                    // go off in silence.
+                    if let Err(e) = crate::alarm_sound::start(&id, &sound, audio_settings().0) {
+                        eprintln!("alarm audio unavailable: {e}");
+                    }
+
                     use tauri_plugin_notification::NotificationExt;
-                    let body = prompt.clone().unwrap_or_else(|| label.clone());
+                    let body = prompt.unwrap_or_else(|| label.clone());
                     let _ = app
                         .notification()
                         .builder()
@@ -273,86 +397,209 @@ mod tests {
             label: format!("Alarm {id}"),
             time: time.to_string(),
             days,
+            repeat: Repeat::Days,
             enabled: true,
+            sound: default_sound(),
             voice_prompt: None,
         }
+    }
+
+    fn one_shot(id: &str, time: &str) -> ScheduledAlarm {
+        ScheduledAlarm {
+            repeat: Repeat::Once,
+            days: Vec::new(),
+            ..alarm(id, time, Vec::new())
+        }
+    }
+
+    /// 2026-01-07 is a Wednesday (weekday index 3 with Sunday = 0).
+    fn wednesday(hour: u32, minute: u32) -> NaiveDateTime {
+        NaiveDate::from_ymd_opt(2026, 1, 7)
+            .unwrap()
+            .and_hms_opt(hour, minute, 0)
+            .unwrap()
     }
 
     fn state_with(alarms: Vec<ScheduledAlarm>) -> SchedulerState {
         SchedulerState {
             alarms,
-            snoozed: Vec::new(),
-            fired: Vec::new(),
+            ..SchedulerState::default()
         }
     }
 
     #[test]
     fn fires_when_time_and_weekday_match() {
-        let mut state = state_with(vec![alarm("a", "07:00", vec![1, 2, 3, 4, 5])]);
-        let fired = tick(&mut state, "07:00", 1, Instant::now());
+        let mut state = state_with(vec![alarm("a", "07:00", vec![3])]);
+        let (fired, missed) = tick(&mut state, wednesday(7, 0));
+
         assert_eq!(fired.len(), 1, "matching alarm must fire");
         assert_eq!(fired[0].id, "a");
+        assert!(missed.is_empty());
     }
 
     #[test]
-    fn does_not_fire_twice_in_the_same_minute() {
-        let mut state = state_with(vec![alarm("a", "07:00", vec![])]);
-        let now = Instant::now();
-        assert_eq!(tick(&mut state, "07:00", 1, now).len(), 1);
-        assert_eq!(tick(&mut state, "07:00", 1, now).len(), 0, "must ring once per minute");
-    }
-
-    #[test]
-    fn skips_wrong_weekday() {
+    fn skips_a_weekday_the_alarm_does_not_run_on() {
         let mut state = state_with(vec![alarm("a", "07:00", vec![6])]);
-        assert_eq!(tick(&mut state, "07:00", 1, Instant::now()).len(), 0);
+        assert!(tick(&mut state, wednesday(7, 0)).0.is_empty());
     }
 
     #[test]
-    fn empty_days_means_every_day() {
-        let mut state = state_with(vec![alarm("a", "09:30", vec![])]);
-        for weekday in 0..7 {
-            state.fired.clear();
-            assert_eq!(tick(&mut state, "09:30", weekday, Instant::now()).len(), 1);
+    fn daily_alarm_rings_every_day() {
+        let mut state = state_with(vec![ScheduledAlarm {
+            repeat: Repeat::Daily,
+            ..alarm("a", "09:30", Vec::new())
+        }]);
+
+        for day in 5..12 {
+            state.handled.clear();
+            let date = NaiveDate::from_ymd_opt(2026, 1, day).unwrap().and_hms_opt(9, 30, 0).unwrap();
+            assert_eq!(tick(&mut state, date).0.len(), 1, "daily alarm must ring on {date}");
         }
     }
 
     #[test]
     fn disabled_alarm_never_fires() {
-        let mut a = alarm("a", "07:00", vec![]);
-        a.enabled = false;
-        let mut state = state_with(vec![a]);
-        assert_eq!(tick(&mut state, "07:00", 1, Instant::now()).len(), 0);
+        let mut slot = alarm("a", "07:00", Vec::new());
+        slot.repeat = Repeat::Daily;
+        slot.enabled = false;
+        let mut state = state_with(vec![slot]);
+
+        assert!(tick(&mut state, wednesday(7, 0)).0.is_empty());
     }
 
     #[test]
-    fn snoozed_alarm_is_suppressed_then_fires_after_delay() {
-        let mut state = state_with(vec![alarm("a", "07:00", vec![])]);
-        let now = Instant::now();
-        state.snoozed.push(("a".into(), now + Duration::from_secs(60)));
+    fn rings_once_per_day_not_once_per_tick() {
+        let mut state = state_with(vec![alarm("a", "07:00", vec![3])]);
 
-        assert_eq!(tick(&mut state, "07:00", 1, now).len(), 0, "snoozed slot is skipped");
-
-        let later = state.snoozed[0].1 + Duration::from_secs(1);
-        let fired = tick(&mut state, "07:01", 1, later);
-        assert_eq!(fired.len(), 1, "snoozed alarm must ring once the delay elapses");
-        assert_eq!(fired[0].id, "a");
+        assert_eq!(tick(&mut state, wednesday(7, 0)).0.len(), 1);
+        // The loop wakes twice a minute; the same slot must not ring twice.
+        assert_eq!(tick(&mut state, wednesday(7, 0)).0.len(), 0, "must ring once per day");
     }
 
     #[test]
-    fn sync_drops_snooze_for_removed_alarm() {
-        let mut state = state_with(vec![alarm("a", "07:00", vec![])]);
-        state.snoozed.push(("gone".into(), Instant::now() + Duration::from_secs(60)));
-        // Mirror what sync() does when the frontend deletes an alarm.
-        let known = vec!["a".to_string()];
-        state.snoozed.retain(|(id, _)| known.contains(id));
-        assert!(state.snoozed.is_empty(), "orphaned snooze must be discarded");
+    fn dismissed_alarm_stays_silent_for_the_rest_of_the_minute() {
+        // Regression: dismiss() used to clear the "handled" marker, so the very
+        // next tick re-matched the same minute and rang straight back at whoever
+        // had just pressed Stop.
+        let mut state = state_with(vec![alarm("a", "07:00", vec![3])]);
+
+        assert_eq!(tick(&mut state, wednesday(7, 0)).0.len(), 1, "first ring");
+        dismiss("a");
+        assert!(
+            tick(&mut state, wednesday(7, 0)).0.is_empty(),
+            "an acknowledged alarm must not ring again in the same minute"
+        );
     }
 
     #[test]
-    fn midnight_clears_fired_markers() {
-        let mut state = state_with(vec![alarm("a", "00:00", vec![])]);
-        tick(&mut state, "00:00", 1, Instant::now());
-        assert!(state.fired.is_empty(), "markers reset at midnight for the next day");
+    fn snoozed_alarm_is_suppressed_then_rings_at_the_deferred_time() {
+        let mut state = state_with(vec![alarm("a", "07:00", vec![3])]);
+        state.handled.push(("a".into(), wednesday(7, 0).date()));
+        state.snoozed.push(Snooze {
+            id: "a".into(),
+            due_at: SystemTime::now() - Duration::from_secs(1),
+            minutes: 5,
+        });
+
+        let (fired, _) = tick(&mut state, wednesday(7, 5));
+        assert_eq!(fired.len(), 1, "a due snooze must ring");
+        assert_eq!(fired[0].snoozed_for, 5);
+    }
+
+    #[test]
+    fn a_pending_snooze_suppresses_the_scheduled_slot() {
+        let mut state = state_with(vec![alarm("a", "07:00", vec![3])]);
+        state.snoozed.push(Snooze {
+            id: "a".into(),
+            due_at: SystemTime::now() + Duration::from_secs(600),
+            minutes: 10,
+        });
+
+        assert!(tick(&mut state, wednesday(7, 0)).0.is_empty(), "snoozed slot must stay quiet");
+    }
+
+    #[test]
+    fn one_shot_alarm_switches_itself_off_after_ringing() {
+        let mut state = state_with(vec![one_shot("a", "07:00")]);
+
+        let (fired, _) = tick(&mut state, wednesday(7, 0));
+        assert_eq!(fired.len(), 1);
+        assert!(fired[0].consumed, "the ring must report that it consumed the alarm");
+        assert!(!state.alarms[0].enabled, "a one-shot must not stay armed");
+        assert!(tick(&mut state, wednesday(7, 0)).0.is_empty());
+    }
+
+    #[test]
+    fn re_arming_a_one_shot_lets_it_ring_again() {
+        let mut state = state_with(vec![one_shot("a", "07:00")]);
+        tick(&mut state, wednesday(7, 0));
+
+        // The user turns it back on; the next occurrence rings normally.
+        state.alarms[0].enabled = true;
+        state.handled.clear();
+
+        let (fired, _) = tick(&mut state, wednesday(7, 0));
+        assert_eq!(fired.len(), 1, "a re-armed one-shot must ring");
+    }
+
+    #[test]
+    fn an_alarm_a_minute_late_still_rings() {
+        let mut state = state_with(vec![alarm("a", "07:00", vec![3])]);
+
+        let (fired, missed) = tick(&mut state, wednesday(7, 2));
+
+        assert_eq!(fired.len(), 1, "a slightly delayed tick must still ring");
+        assert_eq!(fired[0].late_by_minutes, 2);
+        assert!(missed.is_empty());
+    }
+
+    #[test]
+    fn an_alarm_hours_late_is_reported_as_missed_not_rung() {
+        let mut state = state_with(vec![alarm("a", "07:00", vec![3])]);
+
+        let (fired, missed) = tick(&mut state, wednesday(11, 30));
+
+        assert!(fired.is_empty(), "a stale reminder must not ring hours later");
+        assert_eq!(missed.len(), 1);
+        assert_eq!(missed[0].time, "07:00");
+        assert_eq!(state.missed.len(), 1, "it stays visible for the rest of the day");
+        // And it is not re-reported on every following tick.
+        assert!(tick(&mut state, wednesday(11, 30)).1.is_empty());
+    }
+
+    #[test]
+    fn a_future_alarm_is_neither_rung_nor_missed() {
+        let mut state = state_with(vec![alarm("a", "22:00", vec![3])]);
+
+        let (fired, missed) = tick(&mut state, wednesday(7, 0));
+        assert!(fired.is_empty());
+        assert!(missed.is_empty());
+    }
+
+    #[test]
+    fn a_malformed_time_is_ignored_rather_than_crashing_the_loop() {
+        let mut state = state_with(vec![alarm("a", "скоро", vec![3])]);
+        assert!(tick(&mut state, wednesday(7, 0)).0.is_empty());
+    }
+
+    #[test]
+    fn markers_from_yesterday_do_not_suppress_today() {
+        let mut state = state_with(vec![alarm("a", "07:00", vec![3])]);
+        state.handled.push(("a".into(), NaiveDate::from_ymd_opt(2026, 1, 6).unwrap()));
+
+        assert_eq!(tick(&mut state, wednesday(7, 0)).0.len(), 1);
+    }
+
+    #[test]
+    fn yesterday_is_forgotten_so_an_alarm_can_ring_again() {
+        let mut state = state_with(vec![ScheduledAlarm {
+            repeat: Repeat::Daily,
+            ..alarm("a", "07:00", Vec::new())
+        }]);
+        tick(&mut state, wednesday(7, 0));
+
+        // Thursday, same alarm: yesterday's marker must not silence it.
+        let thursday = NaiveDate::from_ymd_opt(2026, 1, 8).unwrap().and_hms_opt(7, 0, 0).unwrap();
+        assert_eq!(tick(&mut state, thursday).0.len(), 1);
     }
 }

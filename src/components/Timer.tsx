@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
 import { ThemeColors, DynamicUIConfig } from '../types';
 import { RadialDial } from './RadialDial';
 import { soundService } from '../services/sound';
+import { TimerService, type TimerSnapshot, MAX_MINUTES, MIN_MINUTES } from '../services/timer';
 import confetti from 'canvas-confetti';
-import { listen, emit } from '@tauri-apps/api/event';
+import { listen } from '@tauri-apps/api/event';
+import { isTauri } from '../services/platform';
 
 interface TimerProps {
   theme: ThemeColors;
@@ -13,136 +15,95 @@ interface TimerProps {
   onFinish?: () => void;
 }
 
+/**
+ * Renders the backend countdown.
+ *
+ * The component holds no clock of its own: mount and unmount are now free of
+ * consequences, so switching sub-tabs — or hiding the window entirely — no
+ * longer resets the timer or freezes the overlay.
+ */
 export const Timer: React.FC<TimerProps> = ({
   theme,
   dynamicUi,
-  initialMinutes = 25,
+  initialMinutes,
   onFinish,
 }) => {
-  const [totalSeconds, setTotalSeconds] = useState(initialMinutes * 60);
-  const [remainingSeconds, setRemainingSeconds] = useState(initialMinutes * 60);
-  const [isRunning, setIsRunning] = useState(false);
-  const [isOvertime, setIsOvertime] = useState(false);
-  const [overtimeSec, setOvertimeSec] = useState(0);
-  const [flowMode] = useState(true);
+  const [state, setState] = useState<TimerSnapshot | null>(null);
+  /** Progress the user is dragging on the dial; null when not dragging. */
+  const [dragging, setDragging] = useState<number | null>(null);
 
-  // Re-arm the dial whenever the preset changes while the timer is idle.
-  // Derived during render instead of in an effect to avoid a cascading re-render.
-  const [armedMinutes, setArmedMinutes] = useState(initialMinutes);
-  if (!isRunning && armedMinutes !== initialMinutes) {
-    const seconds = initialMinutes * 60;
-    setArmedMinutes(initialMinutes);
-    setTotalSeconds(seconds);
-    setRemainingSeconds(seconds);
-  }
-
+  // Adopt the backend state on mount, then follow its broadcast.
   useEffect(() => {
-    let timer: number | undefined;
-    if (isRunning) {
-      timer = window.setInterval(() => {
-        setRemainingSeconds((prev) => {
-          if (prev > 1) {
-            if (prev <= 4) {
-              soundService.playCountdownTick();
-            } else {
-              soundService.playClockTick();
-            }
-            return prev - 1;
-          }
+    let active = true;
+    void TimerService.getState().then((initial) => {
+      if (active) setState(initial);
+    });
+    const unsubscribe = TimerService.subscribe((next) => setState(next));
+    return () => {
+      active = false;
+      unsubscribe();
+    };
+  }, []);
 
-          // Time reached 0
-          if (flowMode) {
-            // FLOW EXTENSION: soft chime, switch to overtime without jarring alert
-            soundService.playBeep(520, 0.25, 0.25);
-            setIsRunning(false);
-            setIsOvertime(true);
-            setOvertimeSec(1);
-            return 0;
-          }
+  // An initial duration handed in from outside (e.g. "timer for 10 minutes" in
+  // the chat) arms the backend and stops there.
+  useEffect(() => {
+    if (initialMinutes === undefined) return;
+    void TimerService.setDuration(initialMinutes).then(() => TimerService.getState().then(setState));
+  }, [initialMinutes]);
 
-          setIsRunning(false);
-          soundService.playFinishAlarm();
-          soundService.speak('Время вышло!');
-          confetti({ particleCount: 60, spread: 60 });
-          onFinish?.();
-          return 0;
-        });
-      }, 1000);
-    } else if (isOvertime) {
-      timer = window.setInterval(() => {
-        setOvertimeSec((prev) => {
-          soundService.playClockTick();
-          return prev + 1;
-        });
-      }, 1000);
-    }
-    return () => window.clearInterval(timer);
-  }, [isRunning, isOvertime, flowMode, onFinish]);
+  // Ring locally when the backend reports zero, plus confetti for a finished
+  // countdown. The backend raises the OS notification when the window is hidden.
+  useEffect(() => {
+    if (!isTauri()) return;
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    void listen<TimerSnapshot>('timer://finished', (event) => {
+      soundService.playFinishAlarm();
+      soundService.speak('Время вышло!');
+      confetti({ particleCount: 60, spread: 60 });
+      onFinish?.();
+      setState(event.payload);
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
+  }, [onFinish]);
+
+  if (!state) return null;
+
+  const { total_secs, remaining_secs, running, overtime, overtime_secs, mode } = state;
 
   const toggleRun = () => {
     soundService.playCountdownTick();
-    setIsRunning(!isRunning);
+    void TimerService.toggle().then(() => TimerService.getState().then(setState));
   };
 
   const reset = () => {
     soundService.playCountdownTick();
-    setIsRunning(false);
-    setRemainingSeconds(totalSeconds);
+    void TimerService.reset().then(() => TimerService.getState().then(setState));
   };
 
-  /** Nudges the armed duration by ±5 minutes while the timer is idle. */
-  const shiftMinutes = (delta: number) => {
-    if (isRunning) return;
-    const next = Math.max(1, Math.min(180, Math.round(totalSeconds / 60) + delta));
-    const seconds = next * 60;
-    setTotalSeconds(seconds);
-    setRemainingSeconds(seconds);
+  const armMinutes = (minutes: number) => {
     soundService.playCountdownTick();
+    void TimerService.setDuration(minutes).then(() => TimerService.getState().then(setState));
   };
 
-  // Mirror the clock to the mini overlay whenever it changes.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
-    void emit('timer://tick', { remaining: remainingSeconds, total: totalSeconds, running: isRunning });
-  }, [remainingSeconds, totalSeconds, isRunning]);
-
-  // Global shortcuts fire from any application; Rust forwards them as events.
-  useEffect(() => {
-    if (typeof window === 'undefined' || !('__TAURI_INTERNALS__' in window)) return;
-
-    const unlisteners: Array<() => void> = [];
-    let cancelled = false;
-
-    const bind = (event: string, handler: () => void) => {
-      void listen(event, handler).then((fn) => {
-        if (cancelled) fn();
-        else unlisteners.push(fn);
-      });
-    };
-
-    bind('timer://toggle', toggleRun);
-    bind('timer://reset', reset);
-    bind('timer://add-five', () => shiftMinutes(5));
-    bind('timer://sub-five', () => shiftMinutes(-5));
-
-    return () => {
-      cancelled = true;
-      unlisteners.forEach((fn) => fn());
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isRunning, totalSeconds]);
-
-  const setPresetMinutes = (min: number) => {
+  const toggleMode = () => {
     soundService.playCountdownTick();
-    setIsRunning(false);
-    setTotalSeconds(min * 60);
-    setRemainingSeconds(min * 60);
+    const next = mode === 'flow' ? 'countdown' : 'flow';
+    void TimerService.setMode(next).then(() => TimerService.getState().then(setState));
   };
 
-  // Dial progress 0..1 based on 60 minutes full circle!
-  // So 26m is exactly ~0.43 of circle, and shrinks towards 0!
-  const progress = Math.max(0, Math.min(1, remainingSeconds / 3600));
-  // Format digital stopwatch format matching reference: 00:00:00
+  // Dial progress 0..1 over one hour, so 25 minutes is a little under half.
+  const progress = Math.max(0, Math.min(1, remaining_secs / 3600));
+
   const formatSubDigital = (sec: number) => {
     const h = Math.floor(sec / 3600);
     const m = Math.floor((sec % 3600) / 60);
@@ -156,24 +117,19 @@ export const Timer: React.FC<TimerProps> = ({
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  // Interactive dial progress adjustment
-  // Interactive dial progress adjustment during dragging
+  /** Live preview while dragging; the backend is only told on release. */
   const handleProgressChange = (newProgress: number) => {
-    if (!isRunning) {
-      const mins = Math.max(1, Math.round(newProgress * 60));
-      setTotalSeconds(mins * 60);
-      setRemainingSeconds(mins * 60);
-    }
+    if (!running) setDragging(newProgress);
   };
 
-  // Auto-start on knob drag release
+  // Dial release arms the duration and starts it — the gesture is the intent.
   const handleProgressCommit = (finalProgress: number) => {
-    const mins = Math.max(1, Math.round(finalProgress * 60));
-    setTotalSeconds(mins * 60);
-    setRemainingSeconds(mins * 60);
-    setIsOvertime(false);
+    const mins = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, Math.round(finalProgress * 60)));
+    setDragging(null);
     soundService.playCountdownTick();
-    setIsRunning(true);
+    void TimerService.setDuration(mins)
+      .then(() => TimerService.start())
+      .then(() => TimerService.getState().then(setState));
   };
 
   const btnRounding =
@@ -183,35 +139,39 @@ export const Timer: React.FC<TimerProps> = ({
       ? 'rounded-md'
       : 'rounded-2xl';
 
+  const displayedRemaining = dragging !== null ? Math.round(dragging * 60) : remaining_secs;
+  const displayedProgress = dragging !== null ? dragging : progress;
+  const totalMinutes = Math.max(MIN_MINUTES, Math.round(total_secs / 60));
+
   return (
     <div className={`flex flex-col items-center w-full ${dynamicUi?.layout?.contentAlignment === 'compact' ? 'justify-center my-auto' : ''}`}>
-      {/* Flow Overtime Banner */}
-      {isOvertime && (
+      {/* Overtime banner: only reachable in flow mode, where the timer keeps
+          counting up instead of interrupting. */}
+      {overtime && (
         <div
           className="flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-mono mb-2 animate-pulse"
-          style={{ backgroundColor: "rgba(255,255,255,0.06)", color: theme.text, border: `1px solid ${theme.border}` }}
+          style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: theme.text, border: `1px solid ${theme.border}` }}
         >
-          <span>⚡ ПОТОК +{Math.floor(overtimeSec / 60)}:{(overtimeSec % 60).toString().padStart(2, '0')}</span>
+          <span>⚡ ПОТОК +{Math.floor(overtime_secs / 60)}:{(overtime_secs % 60).toString().padStart(2, '0')}</span>
           <button
             onClick={() => {
-              setIsOvertime(false);
-              setOvertimeSec(0);
-              setRemainingSeconds(totalSeconds);
+              void TimerService.pause().then(() => TimerService.getState().then(setState));
             }}
             className="underline text-[10px] ml-1"
           >
-            отдых
+            стоп
           </button>
         </div>
       )}
 
-
       <RadialDial
         theme={theme}
-        progress={isOvertime ? 1 : progress}
-        primaryText={isOvertime ? `+${Math.floor(overtimeSec / 60)}:${(overtimeSec % 60).toString().padStart(2, '0')}` : formatPrimaryTime(remainingSeconds)}
-        secondaryText={isOvertime ? 'OVERTIME' : dynamicUi?.layout?.showSubtimer !== false ? formatSubDigital(remainingSeconds) : undefined}
-        isInteractive={!isRunning && !isOvertime}
+        progress={overtime ? 1 : displayedProgress}
+        primaryText={overtime
+          ? `+${Math.floor(overtime_secs / 60)}:${(overtime_secs % 60).toString().padStart(2, '0')}`
+          : formatPrimaryTime(displayedRemaining)}
+        secondaryText={overtime ? 'OVERTIME' : dynamicUi?.layout?.showSubtimer !== false ? formatSubDigital(displayedRemaining) : undefined}
+        isInteractive={!running && !overtime}
         onProgressChange={handleProgressChange}
         onProgressCommit={handleProgressCommit}
         showTicks={dynamicUi?.dial?.showTicks ?? true}
@@ -221,23 +181,21 @@ export const Timer: React.FC<TimerProps> = ({
         size={dynamicUi?.dial?.size ?? 180}
         stylePreset={dynamicUi?.dial?.stylePreset ?? 'minimal'}
       />
-      {/* Control Buttons matching reference image */}
+
       <div className={`grid ${dynamicUi?.layout?.showPresetButtons === false ? 'grid-cols-2 max-w-[150px]' : 'grid-cols-2 max-w-[210px]'} gap-3 mt-4 w-full`}>
-        {/* Top-Left: Play / Pause */}
         <button
           onClick={toggleRun}
           className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 shadow-md`}
           style={{
             backgroundColor: theme.cardBg,
-            border: `1.5px solid ${isRunning ? "rgba(255,255,255,0.38)" : theme.border}`,
+            border: `1.5px solid ${running ? 'rgba(255,255,255,0.38)' : theme.border}`,
             color: theme.text,
           }}
-          title={isRunning ? 'Пауза' : 'Старт'}
+          title={running ? 'Пауза' : 'Старт'}
         >
-          {isRunning ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
+          {running ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
         </button>
 
-        {/* Top-Right: Stopwatch / Lap icon */}
         <button
           onClick={reset}
           className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 shadow-md`}
@@ -251,34 +209,31 @@ export const Timer: React.FC<TimerProps> = ({
           <RotateCcw size={22} />
         </button>
 
-        {/* Optional Preset Buttons */}
         {dynamicUi?.layout?.showPresetButtons !== false && (
           <>
-            {/* Bottom-Left: SET button */}
+            {/* Was labelled SET but cycled the armed minutes; it now says what
+                it does, and the neighbouring control is what it always looked
+                like: the current duration, tappable to change. */}
             <button
-              onClick={() => {
-                const nextMins = totalSeconds === 25 * 60 ? 15 : totalSeconds === 15 * 60 ? 5 : 25;
-                setPresetMinutes(nextMins);
-              }}
+              onClick={toggleMode}
               className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 font-black text-sm tracking-wider shadow-md`}
               style={{
                 backgroundColor: theme.cardBg,
                 border: `1.5px solid ${theme.border}`,
                 color: theme.text,
               }}
-              title="Сменить пресет времени"
+              title={mode === 'flow'
+                ? 'Режим потока: после нуля продолжает считать вверх'
+                : 'Режим отсчёта: останавливается на нуле и звонит'}
             >
-              SET
+              {mode === 'flow' ? 'ПОТОК' : 'ОТСЧЁТ'}
             </button>
 
-            {/* Bottom-Right: Preset Number display (e.g. 25) */}
             <button
               onClick={() => {
                 const presets = [5, 10, 15, 20, 25, 30, 45, 60];
-                const curMins = Math.round(totalSeconds / 60);
-                const idx = presets.indexOf(curMins);
-                const next = presets[(idx + 1) % presets.length];
-                setPresetMinutes(next);
+                const idx = presets.indexOf(totalMinutes);
+                armMinutes(presets[(idx + 1) % presets.length]);
               }}
               className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 font-mono font-extrabold text-2xl shadow-md`}
               style={{
@@ -288,7 +243,7 @@ export const Timer: React.FC<TimerProps> = ({
               }}
               title="Нажмите чтобы переключить минуты"
             >
-              {Math.round(totalSeconds / 60)}
+              {totalMinutes}
             </button>
           </>
         )}

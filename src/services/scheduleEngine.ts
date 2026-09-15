@@ -40,6 +40,9 @@ export function expandSchedule(schedule: Schedule): AlarmItem[] {
     label: step.label,
     time: step.time,
     days: schedule.days,
+    // A schedule is a recurring routine, so its firings are weekday-driven
+    // even when the day list is empty ("every day").
+    repeat: 'days' as const,
     enabled: true,
     sound: step.kind === 'moment' ? (step.sound ?? 'gentle') : 'gentle',
     voicePrompt: voiceForStep(step),
@@ -69,6 +72,32 @@ export interface NextUp {
   step: ScheduleStep;
   /** Minutes from now until the step starts; 0 when it is due now. */
   minutesUntil: number;
+}
+
+/**
+ * Finds the schedule step behind a scheduler firing id.
+ *
+ * The scheduler identifies firings by `sched:<schedule>:<step>`; the ringing UI
+ * needs the step itself, so that a block alarm can offer to start its player
+ * instead of leaving the user to go find it.
+ */
+export function findStepByFiringId(
+  schedules: Schedule[],
+  firingId: string,
+): { schedule: Schedule; step: ScheduleStep } | null {
+  const prefix = 'sched:';
+  if (!firingId.startsWith(prefix)) return null;
+
+  const rest = firingId.slice(prefix.length);
+  const separator = rest.lastIndexOf(':');
+  if (separator < 0) return null;
+
+  const scheduleId = rest.slice(0, separator);
+  const stepId = rest.slice(separator + 1);
+
+  const schedule = schedules.find((s) => s.id === scheduleId);
+  const step = schedule?.steps.find((s) => s.id === stepId);
+  return schedule && step ? { schedule, step } : null;
 }
 
 /**
@@ -119,4 +148,16 @@ export function describeDays(days: number[]): string {
   if (sorted.length === 5 && weekdays.every((d) => sorted.includes(d))) return 'По будням';
   if (sorted.length === 2 && sorted.includes(0) && sorted.includes(6)) return 'По выходным';
   return sorted.map((d) => names[d]).join(', ');
+}
+
+/** Human label for how often an alarm rings, covering every repeat mode. */
+export function describeRepeat(alarm: Pick<AlarmItem, 'repeat' | 'days'>): string {
+  switch (alarm.repeat) {
+    case 'once':
+      return 'Один раз';
+    case 'daily':
+      return 'Каждый день';
+    case 'days':
+      return describeDays(alarm.days);
+  }
 }

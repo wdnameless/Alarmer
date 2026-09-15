@@ -4,13 +4,7 @@ import { ThemeColors, AlarmItem, Schedule, AISettings, DynamicUIConfig } from '.
 import { SchedulesPanel } from './SchedulesPanel';
 import { soundService } from '../services/sound';
 import { AIService } from '../services/ai';
-import { invoke } from '@tauri-apps/api/core';
-import { listen } from '@tauri-apps/api/event';
-
-/** True when running inside the Tauri shell (the scheduler is only available there). */
-function isTauri(): boolean {
-  return typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window;
-}
+import { describeRepeat } from '../services/scheduleEngine';
 
 interface AlarmsProps {
   theme: ThemeColors;
@@ -23,6 +17,12 @@ interface AlarmsProps {
   dynamicUi?: DynamicUIConfig;
 }
 
+/**
+ * Standalone alarms and saved schedules.
+ *
+ * Ringing is not handled here: firing and the ringing takeover live in
+ * `AlarmCenter` above the tabs, so an alarm rings whatever screen is open.
+ */
 export const Alarms: React.FC<AlarmsProps> = ({
   theme,
   alarms,
@@ -35,14 +35,15 @@ export const Alarms: React.FC<AlarmsProps> = ({
 }) => {
   const [newTime, setNewTime] = useState('08:00');
   const [newLabel, setNewLabel] = useState('Утренняя разминка');
+  const [newRepeat, setNewRepeat] = useState<AlarmItem['repeat']>('days');
   const [currentTime, setCurrentTime] = useState('');
-  const [ringingAlarm, setRingingAlarm] = useState<AlarmItem | null>(null);
-  
+
   // AI Smart Setup state
   const [showAiModal, setShowAiModal] = useState(false);
   const [aiPrompt, setAiPrompt] = useState('Вот моя тренировка: в 7:00 подъем, в 7:15 силовая разминка, в 19:30 вечерняя растяжка');
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState<string | null>(null);
+
   // Display clock only. Firing is owned by the Rust scheduler so alarms ring
   // with this tab closed, the window hidden, or the app in the tray.
   useEffect(() => {
@@ -59,81 +60,6 @@ export const Alarms: React.FC<AlarmsProps> = ({
     const interval = window.setInterval(updateTime, 1000);
     return () => window.clearInterval(interval);
   }, []);
-
-  // Push the schedule down to the backend whenever it changes.
-  useEffect(() => {
-    if (!isTauri()) return;
-    void invoke('sync_alarms', {
-      alarms: alarms.map((a) => ({
-        id: a.id,
-        label: a.label || a.title,
-        time: a.time,
-        days: a.days ?? [],
-        enabled: a.enabled,
-        voice_prompt: a.voicePrompt ?? null,
-      })),
-    }).catch((e) => console.warn('Failed to sync alarms to scheduler:', e));
-  }, [alarms]);
-
-  // Ring when the backend says it is time.
-  useEffect(() => {
-    if (!isTauri()) return;
-
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-
-    listen<{ id: string; label: string; time: string; voice_prompt: string | null }>(
-      'alarm://fired',
-      (event) => {
-        const payload = event.payload;
-        const alarm = alarms.find((a) => a.id === payload.id) ?? {
-          id: payload.id,
-          title: payload.label,
-          label: payload.label,
-          time: payload.time,
-          days: [],
-          enabled: true,
-          sound: 'gentle',
-          voicePrompt: payload.voice_prompt ?? undefined,
-        };
-        setRingingAlarm(alarm);
-
-        // Escalating signal: quiet start that swells until acknowledged.
-        soundService.startAlarmRamp(alarm.sound, alarm.id);
-        const announcement = payload.voice_prompt || `Внимание! Будильник: ${payload.label}`;
-        soundService.speak(announcement);
-      },
-    ).then((fn) => {
-      if (cancelled) {
-        fn();
-      } else {
-        unlisten = fn;
-      }
-    });
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [alarms]);
-
-  const dismissRingingAlarm = () => {
-    soundService.playCountdownTick();
-    soundService.stopAlarmRamp();
-    if (isTauri() && ringingAlarm) {
-      void invoke('dismiss_alarm', { id: ringingAlarm.id }).catch(() => {});
-    }
-    setRingingAlarm(null);
-  };
-
-  const snoozeRingingAlarm = (minutes: number) => {
-    soundService.playCountdownTick();
-    soundService.stopAlarmRamp();
-    if (isTauri() && ringingAlarm) {
-      void invoke('snooze_alarm', { id: ringingAlarm.id, minutes }).catch(() => {});
-    }
-    setRingingAlarm(null);
-  };
 
   const toggleAlarm = (id: string) => {
     soundService.playCountdownTick();
@@ -157,7 +83,8 @@ export const Alarms: React.FC<AlarmsProps> = ({
       title: newLabel || 'Будильник',
       label: newLabel || 'Будильник',
       time: newTime,
-      days: [0, 1, 2, 3, 4, 5, 6],
+      repeat: newRepeat,
+      days: newRepeat === 'days' ? [1, 2, 3, 4, 5] : [],
       enabled: true,
       sound: 'gentle',
       voicePrompt: newLabel,
@@ -176,7 +103,7 @@ export const Alarms: React.FC<AlarmsProps> = ({
     setAiError(null);
     try {
       soundService.playCountdownTick();
-      const newAlarms = await AIService.generateAlarms(aiPrompt, aiSettings);
+      const { alarms: newAlarms, error } = await AIService.generateAlarms(aiPrompt, aiSettings);
       if (newAlarms.length > 0) {
         onUpdateAlarms([...alarms, ...newAlarms]);
         soundService.speak(`ИИ настроил ${newAlarms.length} будильников!`);
@@ -184,6 +111,9 @@ export const Alarms: React.FC<AlarmsProps> = ({
       } else {
         setAiError('Не удалось выделить будильники из запроса.');
       }
+      // The model being unreachable is worth saying out loud even when the
+      // offline parser managed to produce something.
+      if (error) setAiError(error);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Ошибка при обращении к ИИ';
       setAiError(msg);
@@ -195,72 +125,6 @@ export const Alarms: React.FC<AlarmsProps> = ({
 
   return (
     <div className="flex flex-col w-full max-w-[340px] px-1 py-1 space-y-2.5 overflow-hidden">
-      {/* Ringing state: the calm monochrome gives way to a full warm takeover.
-          Deliberately the opposite of the resting screen — a muted alarm that
-          blends in is a broken alarm. Dark-on-warm text because the measured
-          contrast is 7.59:1, whereas white on warm is only 2.61:1. */}
-      {ringingAlarm && (
-        <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-5"
-          style={{ backgroundColor: theme.accent }}
-        >
-          <style>{`
-            @keyframes alarmer-pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
-            @media (prefers-reduced-motion: reduce) {
-              .alarmer-pulse { animation: none !important; }
-            }
-            .alarmer-pulse { animation: alarmer-pulse 1.4s ease-in-out infinite; }
-          `}</style>
-
-          <Bell size={30} color="#0a0a0a" className="alarmer-pulse mb-5" />
-
-          <span
-            className="text-[52px] font-bold leading-none tabular-nums"
-            style={{ color: '#0a0a0a' }}
-          >
-            {ringingAlarm.time}
-          </span>
-
-          <span
-            className="mt-2 text-sm font-semibold text-center max-w-[280px]"
-            style={{ color: 'rgba(10,10,10,0.82)' }}
-          >
-            {ringingAlarm.label || ringingAlarm.title}
-          </span>
-
-          {ringingAlarm.voicePrompt && (
-            <span
-              className="mt-3 text-[11px] text-center max-w-[280px] leading-relaxed"
-              style={{ color: 'rgba(10,10,10,0.62)' }}
-            >
-              {ringingAlarm.voicePrompt}
-            </span>
-          )}
-
-          <div className="flex items-center space-x-2 mt-8">
-            {[5, 10, 15].map((mins) => (
-              <button
-                key={mins}
-                onClick={() => snoozeRingingAlarm(mins)}
-                className="px-4 py-2.5 rounded-lg text-xs font-semibold active:scale-95 transition-transform"
-                style={{ color: '#0a0a0a', border: '1px solid rgba(10,10,10,0.28)' }}
-                title={`Отложить на ${mins} минут`}
-              >
-                +{mins} мин
-              </button>
-            ))}
-          </div>
-
-          <button
-            onClick={dismissRingingAlarm}
-            className="mt-3 w-full max-w-[280px] py-3.5 rounded-lg text-xs font-bold uppercase tracking-widest active:scale-[0.97] transition-transform"
-            style={{ backgroundColor: '#0a0a0a', color: theme.accent }}
-          >
-            Остановить
-          </button>
-        </div>
-      )}
-
       {/* Responsive Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-1.5 w-full">
         <div className="flex items-center space-x-1.5 shrink-0">
@@ -277,7 +141,8 @@ export const Alarms: React.FC<AlarmsProps> = ({
                   id: 'sleep_' + Date.now(),
                   title: 'Отход ко сну (Wind-down)',
                   time: '23:00',
-                  days: [0, 1, 2, 3, 4, 5, 6],
+                  repeat: 'daily',
+                  days: [],
                   enabled: true,
                   sound: 'gentle',
                   voicePrompt: 'Пора готовиться ко сну. Закрой рабочие вкладки и отдохни.',
@@ -408,6 +273,17 @@ export const Alarms: React.FC<AlarmsProps> = ({
           className="min-w-0 flex-1 bg-black/40 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
           style={{ color: theme.text }}
         />
+        <select
+          value={newRepeat}
+          onChange={(e) => setNewRepeat(e.target.value as AlarmItem['repeat'])}
+          className="bg-black/40 text-[10px] px-1 py-1.5 rounded-lg border border-white/10 focus:outline-none shrink-0 cursor-pointer"
+          style={{ color: theme.text }}
+          title="Как часто звонить"
+        >
+          <option value="once" className="bg-neutral-900">Один раз</option>
+          <option value="daily" className="bg-neutral-900">Каждый день</option>
+          <option value="days" className="bg-neutral-900">Пн–Пт</option>
+        </select>
         <button
           type="submit"
           className="w-7 h-7 rounded-lg transition-transform active:scale-95 flex items-center justify-center shrink-0"
@@ -460,6 +336,9 @@ export const Alarms: React.FC<AlarmsProps> = ({
                       {alarm.label || alarm.title}
                     </span>
                   </div>
+                  <span className="text-[10px] opacity-60">
+                    {describeRepeat(alarm)}
+                  </span>
                   {alarm.voicePrompt && (
                     <span className="text-[10px] opacity-60 flex items-center space-x-1 truncate max-w-[180px]">
                       <Volume2 size={10} className="shrink-0" />

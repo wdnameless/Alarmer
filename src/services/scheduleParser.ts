@@ -1,5 +1,6 @@
 import type { AISettings, ExerciseStep, Schedule, ScheduleStep } from '../types';
 import { asArray, asNumber, asString, isRecord, oneOf } from '../types/guards';
+import { AIGateway } from './aiGateway';
 
 /**
  * Turns pasted, human-written schedule text into a structured schedule.
@@ -234,56 +235,39 @@ export class ScheduleParserService {
       return { name: 'Пустое расписание', days: [], steps: [], note: 'Текст пуст.' };
     }
 
-    if (!settings.apiKey || settings.apiKey.trim() === '') {
+    if (!settings.apiKey && !(await AIGateway.hasKey())) {
       return parseScheduleHeuristically(trimmed);
     }
 
-    try {
-      const url = `${settings.baseUrl.replace(/\/+$/, '')}/chat/completions`;
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${settings.apiKey}`,
-        },
-        body: JSON.stringify({
-          model: settings.model || 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: SYSTEM_PROMPT },
-            { role: 'user', content: trimmed },
-          ],
-          temperature: 0.3,
-          response_format: { type: 'json_object' },
-        }),
-      });
+    const { value, error } = await AIGateway.requestJson({
+      system: SYSTEM_PROMPT,
+      user: trimmed,
+      baseUrl: settings.baseUrl,
+      model: settings.model || 'gpt-4o-mini',
+    });
 
-      if (!response.ok) throw new Error(`AI error ${response.status}`);
-
-      const data = await response.json();
-      const content = asString(data?.choices?.[0]?.message?.content, '{}');
-      const clean = content.replace(/^```json\s*/i, '').replace(/\s*```$/i, '').trim();
-      const parsed: unknown = JSON.parse(clean);
-      if (!isRecord(parsed)) throw new Error('unexpected shape');
-
-      const steps = asArray<unknown>(parsed.steps, [])
-        .map(sanitizeStep)
-        .filter((s): s is ScheduleStep => s !== null);
-      steps.sort((a, b) => a.time.localeCompare(b.time));
-
-      // A model that returned nothing usable should not beat the offline parser.
-      if (steps.length === 0) return parseScheduleHeuristically(trimmed);
-
-      return {
-        name: asString(parsed.name, 'Моё расписание'),
-        days: asArray<unknown>(parsed.days, [])
-          .filter((d): d is number => typeof d === 'number' && d >= 0 && d <= 6),
-        steps,
-        note: asString(parsed.note, `Готово: ${steps.length} шаг(ов).`),
-      };
-    } catch (e) {
-      console.warn('Schedule parsing via model failed, using heuristics:', e);
-      return parseScheduleHeuristically(trimmed);
+    if (error) {
+      // Say which path produced the result. A heuristic parse is still useful,
+      // but silently passing it off as the model's work is not.
+      const heuristic = parseScheduleHeuristically(trimmed);
+      return { ...heuristic, note: `${heuristic.note} (модель недоступна: ${error})` };
     }
+
+    const steps = asArray<unknown>(value.steps, [])
+      .map(sanitizeStep)
+      .filter((s): s is ScheduleStep => s !== null);
+    steps.sort((a, b) => a.time.localeCompare(b.time));
+
+    // A model that returned nothing usable should not beat the offline parser.
+    if (steps.length === 0) return parseScheduleHeuristically(trimmed);
+
+    return {
+      name: asString(value.name, 'Моё расписание'),
+      days: asArray<unknown>(value.days, [])
+        .filter((d): d is number => typeof d === 'number' && d >= 0 && d <= 6),
+      steps,
+      note: asString(value.note, `Готово: ${steps.length} шаг(ов).`),
+    };
   }
 
   /** Promotes a parsed draft into a persisted schedule. */
