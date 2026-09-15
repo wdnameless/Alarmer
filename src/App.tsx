@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { ChatMessage } from './services/aiCompiler';
 import { HandClock, HandGear, HandSparkle } from './components/CustomIcons';
@@ -11,8 +11,9 @@ import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { I18nService } from './services/i18n';
-import { AppMode, ThemeKey, AISettings, AlarmItem, ThemeColors, DynamicUIConfig } from './types';
+import { AppMode, ThemeKey, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig } from './types';
 import { StoreService } from './services/store';
+import { buildFirings } from './services/scheduleEngine';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { invoke } from '@tauri-apps/api/core';
 
@@ -50,7 +51,16 @@ export const App: React.FC = () => {
 
   const [aiSettings, setAISettings] = useState<AISettings>(() => StoreService.snapshot().aiSettings);
 
+  /** Standalone alarms the user created directly. */
   const [alarms, setAlarms] = useState<AlarmItem[]>(() => StoreService.snapshot().alarms);
+  /** Saved schedules — the primary object of the product. */
+  const [schedules, setSchedules] = useState<Schedule[]>(() => StoreService.snapshot().schedules);
+
+  /**
+   * What the scheduler actually receives: schedule steps expanded into firings,
+   * plus the standalone alarms. Derived, never stored twice.
+   */
+  const firings = useMemo(() => buildFirings(schedules, alarms), [schedules, alarms]);
 
   // Single persistence funnel: structured state goes to the native store file.
   useEffect(() => {
@@ -62,6 +72,7 @@ export const App: React.FC = () => {
     StoreService.hydrate()
       .then((state) => {
         setAlarms(state.alarms);
+        setSchedules(state.schedules);
         setAISettings(state.aiSettings);
         setDynamicUi(state.dynamicUi);
         if (state.chatMessages.length > 0) {
@@ -219,7 +230,9 @@ export const App: React.FC = () => {
               <DashboardView
                 theme={theme}
                 dynamicUi={dynamicUi}
-                alarms={alarms}
+                alarms={firings}
+                schedules={schedules}
+                onUpdateSchedules={setSchedules}
                 aiSettings={aiSettings}
                 onUpdateAlarms={setAlarms}
                 onOpenAISettings={() => setActiveTab('settings')}

@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { ThemeColors, DynamicUIConfig, AlarmItem, AISettings } from "../types";
+import { ThemeColors, DynamicUIConfig, AlarmItem, Schedule, AISettings } from "../types";
 import { Timer } from "./Timer";
 import { Alarms } from "./Alarms";
 import { Timer as TimerIcon, Bell } from "lucide-react";
@@ -9,6 +9,8 @@ interface DashboardViewProps {
   theme: ThemeColors;
   dynamicUi: DynamicUIConfig;
   alarms: AlarmItem[];
+  schedules: Schedule[];
+  onUpdateSchedules: (schedules: Schedule[]) => void;
   aiSettings: AISettings;
   onUpdateAlarms: (alarms: AlarmItem[]) => void;
   onOpenAISettings: () => void;
@@ -21,6 +23,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   theme,
   dynamicUi,
   alarms,
+  schedules,
+  onUpdateSchedules,
   aiSettings,
   onUpdateAlarms,
   onOpenAISettings,
@@ -82,6 +86,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <Alarms
             theme={theme}
             alarms={alarms}
+            schedules={schedules}
+            onUpdateSchedules={onUpdateSchedules}
             aiSettings={aiSettings}
             onUpdateAlarms={onUpdateAlarms}
             onOpenAISettings={onOpenAISettings}

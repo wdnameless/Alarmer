@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Trash2, Bell, BellOff, Volume2, Sparkles, Loader2 } from 'lucide-react';
-import { ThemeColors, AlarmItem, AISettings, DynamicUIConfig } from '../types';
+import { ThemeColors, AlarmItem, Schedule, AISettings, DynamicUIConfig } from '../types';
+import { SchedulesPanel } from './SchedulesPanel';
 import { soundService } from '../services/sound';
 import { AIService } from '../services/ai';
 import { invoke } from '@tauri-apps/api/core';
@@ -14,6 +15,8 @@ function isTauri(): boolean {
 interface AlarmsProps {
   theme: ThemeColors;
   alarms: AlarmItem[];
+  schedules: Schedule[];
+  onUpdateSchedules: (schedules: Schedule[]) => void;
   aiSettings?: AISettings;
   onUpdateAlarms: (alarms: AlarmItem[]) => void;
   onOpenAISettings?: () => void;
@@ -23,6 +26,8 @@ interface AlarmsProps {
 export const Alarms: React.FC<AlarmsProps> = ({
   theme,
   alarms,
+  schedules,
+  onUpdateSchedules,
   aiSettings,
   onUpdateAlarms,
   onOpenAISettings,
@@ -308,6 +313,13 @@ export const Alarms: React.FC<AlarmsProps> = ({
           )}
         </div>
       </div>
+      {/* Saved schedules — the primary object of the product */}
+      <SchedulesPanel
+        theme={theme}
+        schedules={schedules}
+        onUpdateSchedules={onUpdateSchedules}
+      />
+
       {/* AI Orchestration Modal Banner */}
       {showAiModal && (
         <div

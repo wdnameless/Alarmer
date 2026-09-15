@@ -20,20 +20,60 @@ export interface ThemeColors {
   ticks: string;
 }
 
-export interface WorkoutStep {
+/**
+ * One exercise inside an interval block.
+ */
+export interface ExerciseStep {
   id: string;
   name: string;
-  durationSec: number; // in seconds
-  type: 'work' | 'rest' | 'prepare' | 'cooldown';
-  voicePrompt?: string; // What TTS should speak when starting
+  durationSec: number;
+  kind: 'work' | 'rest' | 'prepare' | 'cooldown';
+  /** Spoken when this exercise starts; falls back to `name`. */
+  voicePrompt?: string;
 }
 
-export interface WorkoutRoutine {
+/**
+ * A step of a schedule is either a moment in time that rings, or a block of
+ * timed exercises that runs as a sequence.
+ */
+export type ScheduleStep =
+  | {
+      id: string;
+      kind: 'moment';
+      /** "HH:MM" local time. */
+      time: string;
+      label: string;
+      /** Announced when the moment rings. */
+      voicePrompt?: string;
+      sound?: string;
+    }
+  | {
+      id: string;
+      kind: 'block';
+      /** "HH:MM" local time at which the block begins. */
+      time: string;
+      label: string;
+      exercises: ExerciseStep[];
+      /** Spoken once when the block starts. */
+      voicePrompt?: string;
+    };
+
+/**
+ * A saved, reusable schedule — the primary object of the product.
+ *
+ * Unlike a bare alarm, a schedule can be named, toggled as a whole, edited and
+ * reused every week. Its steps expand into firings for the scheduler.
+ */
+export interface Schedule {
   id: string;
   name: string;
-  description?: string;
-  steps: WorkoutStep[];
-  repeatCount: number;
+  /** Weekdays this schedule runs on; 0 = Sunday. Empty means every day. */
+  days: number[];
+  enabled: boolean;
+  steps: ScheduleStep[];
+  /** The pasted text this schedule was built from, kept verbatim. */
+  sourceText?: string;
+  createdAt: string;
 }
 
 export interface AlarmItem {
@@ -46,6 +86,8 @@ export interface AlarmItem {
   sound: string;
   voicePrompt?: string;
   voiceAnnouncement?: string;
+  /** Set when this alarm was expanded from a schedule step. */
+  scheduleId?: string;
 }
 
 export interface AISettings {

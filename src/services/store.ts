@@ -1,7 +1,7 @@
 import { LazyStore } from '@tauri-apps/plugin-store';
-import { DEFAULT_AI_SETTINGS, DEFAULT_ALARMS } from '../constants/defaults';
+import { DEFAULT_AI_SETTINGS, DEFAULT_ALARMS, DEFAULT_SCHEDULES } from '../constants/defaults';
 import { DEFAULT_DYNAMIC_UI, DynamicUIConfig } from '../types/dynamicUi';
-import { AISettings, AlarmItem } from '../types';
+import { AISettings, AlarmItem, Schedule, ScheduleStep, ExerciseStep } from '../types';
 import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../types/guards';
 
 /**
@@ -16,7 +16,7 @@ import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../type
  * render tree.
  */
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const STORE_FILE = 'alarmer.json';
 
@@ -30,6 +30,7 @@ export interface StoredChatMessage {
 export interface PersistedState {
   schemaVersion: number;
   alarms: AlarmItem[];
+  schedules: Schedule[];
   aiSettings: AISettings;
   dynamicUi: DynamicUIConfig;
   chatMessages: StoredChatMessage[];
@@ -161,6 +162,75 @@ function sanitizeDynamicUi(raw: unknown): DynamicUIConfig {
   };
 }
 
+function sanitizeExercise(raw: unknown, index: number): ExerciseStep | null {
+  if (!isRecord(raw)) return null;
+  const duration = asNumber(raw.durationSec, 0);
+  if (duration <= 0) return null;
+  const name = asString(raw.name, `Упражнение ${index + 1}`);
+  return {
+    id: asString(raw.id, `ex_${index}`),
+    name,
+    durationSec: Math.round(duration),
+    kind: oneOf(raw.kind, ['work', 'rest', 'prepare', 'cooldown'] as const, 'work'),
+    voicePrompt: typeof raw.voicePrompt === 'string' ? raw.voicePrompt : undefined,
+  };
+}
+
+function sanitizeStep(raw: unknown, index: number): ScheduleStep | null {
+  if (!isRecord(raw)) return null;
+  const time = asString(raw.time, '');
+  if (!/^\d{1,2}:\d{2}$/.test(time)) return null;
+  const normalizedTime = time.padStart(5, '0');
+  const label = asString(raw.label, `Шаг ${index + 1}`);
+  const voicePrompt = typeof raw.voicePrompt === 'string' ? raw.voicePrompt : undefined;
+
+  if (raw.kind === 'block') {
+    const exercises = asArray<unknown>(raw.exercises, [])
+      .map(sanitizeExercise)
+      .filter((e): e is ExerciseStep => e !== null);
+    // A block with no usable exercises is not a block.
+    if (exercises.length === 0) return null;
+    return {
+      id: asString(raw.id, `step_${index}`),
+      kind: 'block',
+      time: normalizedTime,
+      label,
+      exercises,
+      voicePrompt,
+    };
+  }
+
+  return {
+    id: asString(raw.id, `step_${index}`),
+    kind: 'moment',
+    time: normalizedTime,
+    label,
+    voicePrompt,
+    sound: typeof raw.sound === 'string' ? raw.sound : undefined,
+  };
+}
+
+function sanitizeSchedule(raw: unknown, index: number): Schedule | null {
+  if (!isRecord(raw)) return null;
+  const name = asString(raw.name, '');
+  if (!name) return null;
+  const steps = asArray<unknown>(raw.steps, [])
+    .map(sanitizeStep)
+    .filter((s): s is ScheduleStep => s !== null);
+  if (steps.length === 0) return null;
+
+  return {
+    id: asString(raw.id, `sched_${index}`),
+    name,
+    days: asArray<unknown>(raw.days, [])
+      .filter((d): d is number => typeof d === 'number' && d >= 0 && d <= 6),
+    enabled: asBoolean(raw.enabled, true),
+    steps,
+    sourceText: typeof raw.sourceText === 'string' ? raw.sourceText : undefined,
+    createdAt: asString(raw.createdAt, new Date().toISOString()),
+  };
+}
+
 function sanitizeMessages(raw: unknown): StoredChatMessage[] {
   return asArray<unknown>(raw, [])
     .filter(isRecord)
@@ -176,14 +246,28 @@ function sanitizeMessages(raw: unknown): StoredChatMessage[] {
 /**
  * Brings any stored payload up to the current schema. Unknown or corrupt fields
  * are replaced with defaults rather than propagated.
+ *
+ * v1 -> v2: introduced `schedules` as the primary object. Existing standalone
+ * alarms are preserved as-is so nobody loses the alarms they already rely on.
  */
 export function migrate(raw: unknown): PersistedState {
   const record = isRecord(raw) ? raw : {};
+  const version = asNumber(record.schemaVersion, 0);
+
+  const schedules = asArray<unknown>(record.schedules, [])
+    .map(sanitizeSchedule)
+    .filter((s): s is Schedule => s !== null);
+
+  // A fresh install (or a v1 file with no schedules yet) gets the sample
+  // schedule so the product's core flow is visible on first launch.
+  const withSchedules = schedules.length === 0 && version < 2 ? DEFAULT_SCHEDULES : schedules;
+
   return {
     schemaVersion: SCHEMA_VERSION,
-    alarms: asArray<unknown>(record.alarms, DEFAULT_ALARMS)
+    alarms: asArray<unknown>(record.alarms, version < 2 ? DEFAULT_ALARMS : [])
       .map(sanitizeAlarm)
       .filter((a): a is AlarmItem => a !== null),
+    schedules: withSchedules,
     aiSettings: sanitizeAiSettings(record.aiSettings),
     dynamicUi: sanitizeDynamicUi(record.dynamicUi),
     chatMessages: sanitizeMessages(record.chatMessages),
