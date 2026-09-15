@@ -190,52 +190,76 @@ export const Alarms: React.FC<AlarmsProps> = ({
 
   return (
     <div className="flex flex-col w-full max-w-[340px] px-1 py-1 space-y-2.5 overflow-hidden">
-      {/* Ringing Overlay */}
+      {/* Ringing state: the calm monochrome gives way to a full warm takeover.
+          Deliberately the opposite of the resting screen — a muted alarm that
+          blends in is a broken alarm. Dark-on-warm text because the measured
+          contrast is 7.59:1, whereas white on warm is only 2.61:1. */}
       {ringingAlarm && (
         <div
-          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-4 backdrop-blur-xl animate-pulse"
-          style={{ backgroundColor: `${theme.bg}F0` }}
+          className="fixed inset-0 z-50 flex flex-col items-center justify-center p-5"
+          style={{ backgroundColor: theme.accent }}
         >
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mb-4 bg-red-500/20 text-red-400 border border-red-500/40">
-            <Bell size={32} className="animate-bounce" />
-          </div>
-          <h2 className="text-2xl font-black mb-1 tracking-tight" style={{ color: theme.text }}>
+          <style>{`
+            @keyframes alarmer-pulse { 0%,100% { opacity: 1 } 50% { opacity: .55 } }
+            @media (prefers-reduced-motion: reduce) {
+              .alarmer-pulse { animation: none !important; }
+            }
+            .alarmer-pulse { animation: alarmer-pulse 1.4s ease-in-out infinite; }
+          `}</style>
+
+          <Bell size={30} color="#0a0a0a" className="alarmer-pulse mb-5" />
+
+          <span
+            className="text-[52px] font-bold leading-none tabular-nums"
+            style={{ color: '#0a0a0a' }}
+          >
             {ringingAlarm.time}
-          </h2>
-          <p className="text-base font-bold mb-3 text-center" style={{ color: theme.accent }}>
+          </span>
+
+          <span
+            className="mt-2 text-sm font-semibold text-center max-w-[280px]"
+            style={{ color: 'rgba(10,10,10,0.82)' }}
+          >
             {ringingAlarm.label || ringingAlarm.title}
-          </p>
+          </span>
+
           {ringingAlarm.voicePrompt && (
-            <p className="text-xs text-center opacity-80 mb-4 italic max-w-xs" style={{ color: theme.subtext }}>
-              "{ringingAlarm.voicePrompt}"
-            </p>
+            <span
+              className="mt-3 text-[11px] text-center max-w-[280px] leading-relaxed"
+              style={{ color: 'rgba(10,10,10,0.62)' }}
+            >
+              {ringingAlarm.voicePrompt}
+            </span>
           )}
-          {/* Snooze: defer by 5 / 10 / 15 minutes */}
-          <div className="flex items-center space-x-2 mb-3">
+
+          <div className="flex items-center space-x-2 mt-8">
             {[5, 10, 15].map((mins) => (
               <button
                 key={mins}
                 onClick={() => snoozeRingingAlarm(mins)}
-                className="px-3.5 py-2 rounded-xl border text-xs font-bold active:scale-95 transition-all"
-                style={{ borderColor: theme.border, color: theme.text }}
+                className="px-4 py-2.5 rounded-lg text-xs font-semibold active:scale-95 transition-transform"
+                style={{ color: '#0a0a0a', border: '1px solid rgba(10,10,10,0.28)' }}
                 title={`Отложить на ${mins} минут`}
               >
                 +{mins} мин
               </button>
             ))}
           </div>
+
           <button
             onClick={dismissRingingAlarm}
-            className="w-full max-w-xs py-3 rounded-xl font-black text-xs uppercase tracking-wider bg-red-500 hover:bg-red-600 text-white shadow-xl active:scale-95 transition-all"
+            className="mt-3 w-full max-w-[280px] py-3.5 rounded-lg text-xs font-bold uppercase tracking-widest active:scale-[0.97] transition-transform"
+            style={{ backgroundColor: '#0a0a0a', color: theme.accent }}
           >
-            Остановить будильник
+            Остановить
           </button>
         </div>
       )}
+
       {/* Responsive Header bar */}
       <div className="flex flex-wrap items-center justify-between gap-1.5 w-full">
         <div className="flex items-center space-x-1.5 shrink-0">
-          <Bell size={15} style={{ color: theme.accent }} />
+          <Bell size={15} style={{ color: theme.subtext }} />
           <span className="text-xs font-bold tracking-wider uppercase opacity-90 truncate">
             Будильники
           </span>
@@ -268,9 +292,9 @@ export const Alarms: React.FC<AlarmsProps> = ({
               onClick={() => setShowAiModal(true)}
               className="flex items-center space-x-1 px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all shadow-sm shrink-0"
               style={{
-                backgroundColor: `${theme.accent}20`,
-                color: theme.accent,
-                border: `1px solid ${theme.accent}40`,
+                backgroundColor: 'rgba(255,255,255,0.06)',
+                color: theme.text,
+                border: `1px solid ${theme.border}`,
               }}
             >
               <Sparkles size={11} className="animate-pulse" />
@@ -290,11 +314,11 @@ export const Alarms: React.FC<AlarmsProps> = ({
           className="p-3 rounded-xl border flex flex-col space-y-2 animate-in fade-in zoom-in-95 duration-150"
           style={{
             backgroundColor: `${theme.surface}f0`,
-            borderColor: `${theme.accent}60`,
+            borderColor: theme.border,
           }}
         >
           <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-1.5 text-xs font-bold" style={{ color: theme.accent }}>
+            <div className="flex items-center space-x-1.5 text-xs font-bold" style={{ color: theme.text }}>
               <Sparkles size={14} />
               <span>Умная расстановка будильников ИИ</span>
             </div>
@@ -329,8 +353,8 @@ export const Alarms: React.FC<AlarmsProps> = ({
               disabled={aiLoading}
               className="flex items-center space-x-1 px-3 py-1 text-xs font-bold rounded-lg shadow-sm"
               style={{
-                backgroundColor: theme.accent,
-                color: theme.bg,
+                backgroundColor: '#fafafa',
+                color: '#0a0a0a',
               }}
             >
               {aiLoading ? (
@@ -373,7 +397,7 @@ export const Alarms: React.FC<AlarmsProps> = ({
         <button
           type="submit"
           className="w-7 h-7 rounded-lg transition-transform active:scale-95 flex items-center justify-center shrink-0"
-          style={{ backgroundColor: theme.accent, color: theme.bg }}
+          style={{ backgroundColor: "#fafafa", color: "#0a0a0a" }}
           title="Добавить будильник"
         >
           <Plus size={15} />
@@ -393,14 +417,14 @@ export const Alarms: React.FC<AlarmsProps> = ({
                 alarm.enabled ? 'bg-black/30' : 'bg-black/10 opacity-50'
               }`}
               style={{
-                borderColor: alarm.enabled ? `${theme.accent}30` : 'rgba(255,255,255,0.05)',
+                borderColor: alarm.enabled ? "rgba(255,255,255,0.36)" : "rgba(255,255,255,0.06)",
               }}
             >
               <div className="flex items-center space-x-3">
                 <button
                   onClick={() => toggleAlarm(alarm.id)}
                   className="p-1.5 rounded-lg transition-colors hover:bg-white/10"
-                  style={{ color: alarm.enabled ? theme.accent : theme.subtext }}
+                  style={{ color: alarm.enabled ? theme.text : theme.subtext }}
                 >
                   {alarm.enabled ? <Bell size={16} /> : <BellOff size={16} />}
                 </button>

@@ -244,7 +244,7 @@ export const App: React.FC = () => {
 
         {/* Right Wing: Attached Companion AI Module */}
         {isAiWingOpen && (
-          <div className="flex-1 h-full flex flex-row items-stretch border-l overflow-hidden relative" style={{ borderColor: `${theme.accent}30` }}>
+          <div className="flex-1 h-full flex flex-row items-stretch border-l overflow-hidden relative" style={{ borderColor: theme.border }}>
             {/* Interactive Drag Handle to resize panels */}
             <div
               onMouseDown={(e) => {
@@ -256,7 +256,7 @@ export const App: React.FC = () => {
             >
               <div className="w-[2px] h-12 rounded-full bg-white/20 group-hover:bg-white/80 transition-colors" />
             </div>
-            <div className="w-[2px] bg-gradient-to-b from-transparent via-current to-transparent opacity-30" style={{ color: theme.accent }} />
+            <div className="w-px h-full" style={{ backgroundColor: theme.border }} />
             <div className="flex-1 h-full flex flex-col overflow-hidden">
               <ErrorBoundary theme={theme} fallbackTitle="AI Co-Pilot">
               <AIChatDrawer

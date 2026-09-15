@@ -80,7 +80,7 @@ export const TitleBar: React.FC<TitleBarProps> = ({
               onClick={onTogglePin}
               title={isPinned ? 'Открепить поверх всех окон' : 'Закрепить поверх всех окон'}
               className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 transition-colors"
-              style={{ color: isPinned ? theme.accent : theme.subtext }}
+              style={{ color: isPinned ? theme.text : theme.subtext }}
             >
               {isPinned ? <Pin size={13} /> : <PinOff size={13} />}
             </button>

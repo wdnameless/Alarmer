@@ -144,14 +144,14 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       {!hideHeader && (
       <div
         className="flex items-center justify-between px-4 py-3 border-b"
-        style={{ borderColor: `${theme.accent}30` }}
+        style={{ borderColor: theme.border }}
       >
         <div className="flex items-center space-x-2">
           <div
             className="w-6 h-6 rounded-lg flex items-center justify-center shadow-lg"
-            style={{ backgroundColor: `${theme.accent}20`, color: theme.accent }}
+            style={{ backgroundColor: "rgba(255,255,255,0.06)", color: theme.text }}
           >
-            <HandSparkle size={14} color={theme.accent} />
+            <HandSparkle size={14} color={theme.text} />
           </div>
           <div>
             <h3 className="text-xs font-bold uppercase tracking-wider flex items-center gap-1.5">
@@ -196,8 +196,8 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                   : 'bg-white/5 border border-white/10 text-white/90'
               }`}
               style={{
-                backgroundColor: m.sender === 'user' ? theme.accent : undefined,
-                color: m.sender === 'user' ? '#000000' : theme.text,
+                backgroundColor: m.sender === 'user' ? "rgba(255,255,255,0.10)" : undefined,
+                color: theme.text,
               }}
             >
               <div className="select-text whitespace-pre-wrap">{m.text}</div>
@@ -221,12 +221,12 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                 <div className="mt-2 pt-2 border-t border-white/10 flex flex-wrap gap-1">
                   {m.mutation.ui && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 flex items-center gap-1">
-                      <HandCheck size={10} color={theme.accent} /> UI трансформирован
+                      <HandCheck size={10} color={theme.subtext} /> UI трансформирован
                     </span>
                   )}
                   {m.mutation.alarms && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 flex items-center gap-1">
-                      <HandCheck size={10} color={theme.accent} /> Будильники добавлены
+                      <HandCheck size={10} color={theme.subtext} /> Будильники добавлены
                     </span>
                   )}
                 </div>
@@ -238,7 +238,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
 
         {loading && (
           <div className="flex items-center space-x-2 text-xs opacity-60 p-2">
-            <Loader2 size={13} className="animate-spin" style={{ color: theme.accent }} />
+            <Loader2 size={13} className="animate-spin" style={{ color: theme.subtext }} />
             <span>AI компилирует интерфейс и сценарии...</span>
           </div>
         )}
@@ -281,8 +281,8 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
             disabled={!input.trim() || loading}
             className="w-9 h-9 rounded-xl flex items-center justify-center shadow-lg transition-all active:scale-95 disabled:opacity-30"
             style={{
-              backgroundColor: theme.accent,
-              color: '#000000',
+              backgroundColor: '#fafafa',
+              color: '#0a0a0a',
             }}
           >
             <HandSend size={14} color="#000000" />

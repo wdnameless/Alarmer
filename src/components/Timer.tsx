@@ -189,7 +189,7 @@ export const Timer: React.FC<TimerProps> = ({
       {isOvertime && (
         <div
           className="flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-mono mb-2 animate-pulse"
-          style={{ backgroundColor: `${theme.accent}20`, color: theme.accent, border: `1px solid ${theme.accent}40` }}
+          style={{ backgroundColor: "rgba(255,255,255,0.06)", color: theme.text, border: `1px solid ${theme.border}` }}
         >
           <span>⚡ ПОТОК +{Math.floor(overtimeSec / 60)}:{(overtimeSec % 60).toString().padStart(2, '0')}</span>
           <button
@@ -229,8 +229,8 @@ export const Timer: React.FC<TimerProps> = ({
           className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 shadow-md`}
           style={{
             backgroundColor: theme.cardBg,
-            border: `1.5px solid ${isRunning ? theme.accent : theme.border}`,
-            color: isRunning ? theme.accent : theme.text,
+            border: `1.5px solid ${isRunning ? "rgba(255,255,255,0.38)" : theme.border}`,
+            color: theme.text,
           }}
           title={isRunning ? 'Пауза' : 'Старт'}
         >

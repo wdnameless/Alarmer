@@ -174,7 +174,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
             activeTab === 'sound' ? 'bg-white/20 font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
           }`}
-          style={{ color: activeTab === 'sound' ? theme.accent : undefined }}
+          style={{ color: activeTab === 'sound' ? theme.text : theme.subtext }}
         >
           <Volume2 size={13} />
           <span>Звук</span>
@@ -188,7 +188,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
             activeTab === 'ai' ? 'bg-white/20 font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
           }`}
-          style={{ color: activeTab === 'ai' ? theme.accent : undefined }}
+          style={{ color: activeTab === 'ai' ? theme.text : theme.subtext }}
         >
           <Key size={13} />
           <span>Нейросеть</span>
@@ -202,7 +202,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
             activeTab === 'data' ? 'bg-white/20 font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
           }`}
-          style={{ color: activeTab === 'data' ? theme.accent : undefined }}
+          style={{ color: activeTab === 'data' ? theme.text : theme.subtext }}
         >
           <RotateCcw size={13} />
           <span>Данные</span>
@@ -213,7 +213,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {/* Voice Selection */}
         <div className="flex flex-col space-y-3">
           <div className="flex items-center justify-between">
-            <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.accent }}>
+            <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.subtext }}>
               {selectedVoice === 'none' ? <VolumeX size={15} /> : <Volume2 size={15} />}
               <span>Голосовая озвучка (Cloud Neural TTS)</span>
             </label>
@@ -250,7 +250,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="flex flex-col space-y-1.5 pt-1">
             <div className="flex justify-between text-xs">
               <span style={{ color: theme.subtext }}>Громкость голоса озвучки:</span>
-              <span className="font-mono font-bold" style={{ color: theme.accent }}>
+              <span className="font-mono font-bold tabular-nums" style={{ color: theme.text }}>
                 {Math.round(voiceVolume * 100)}%
               </span>
             </div>
@@ -266,7 +266,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 StoreService.setPreference('alarmer_voice_volume', val);
               }}
               className="w-full accent-current h-1.5 rounded-lg cursor-pointer bg-white/10"
-              style={{ accentColor: theme.accent }}
+              style={{ accentColor: '#fafafa' }}
             />
           </div>
 
@@ -277,7 +277,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         {/* Sound Effects & Clicks Controls */}
         <div className="flex flex-col space-y-3 border-t pt-4" style={{ borderColor: theme.border }}>
-          <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.accent }}>
+          <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.subtext }}>
             <Volume2 size={15} />
             <span>Звуковые эффекты и клики интерфейса</span>
           </label>
@@ -288,8 +288,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onClick={() => handleToggleUiClicks()}
               className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all"
               style={{
-                borderColor: uiClicks ? theme.accent : theme.border,
-                backgroundColor: uiClicks ? `${theme.accent}15` : 'transparent',
+                borderColor: uiClicks ? 'rgba(255,255,255,0.38)' : theme.border,
+                backgroundColor: uiClicks ? 'rgba(255,255,255,0.06)' : 'transparent',
                 color: theme.text,
               }}
             >
@@ -302,8 +302,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               onClick={() => handleToggleCountdownTicks()}
               className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all"
               style={{
-                borderColor: countdownTicks ? theme.accent : theme.border,
-                backgroundColor: countdownTicks ? `${theme.accent}15` : 'transparent',
+                borderColor: countdownTicks ? 'rgba(255,255,255,0.38)' : theme.border,
+                backgroundColor: countdownTicks ? 'rgba(255,255,255,0.06)' : 'transparent',
                 color: theme.text,
               }}
             >
@@ -320,8 +320,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               }}
               className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all col-span-2"
               style={{
-                borderColor: clockTick ? theme.accent : theme.border,
-                backgroundColor: clockTick ? `${theme.accent}15` : 'transparent',
+                borderColor: clockTick ? 'rgba(255,255,255,0.38)' : theme.border,
+                backgroundColor: clockTick ? 'rgba(255,255,255,0.06)' : 'transparent',
                 color: theme.text,
               }}
             >
@@ -335,7 +335,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             <div className="flex flex-col space-y-1">
               <div className="flex justify-between text-[11px]">
                 <span className="opacity-80">Громкость кликов и тиков:</span>
-                <span className="font-mono font-bold" style={{ color: theme.accent }}>{Math.round(clickVolume * 100)}%</span>
+                <span className="font-mono font-bold tabular-nums" style={{ color: theme.text }}>{Math.round(clickVolume * 100)}%</span>
               </div>
               <input
                 type="range"
@@ -350,14 +350,14 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   soundService.playUiClick();
                 }}
                 className="w-full accent-current h-1 rounded-lg cursor-pointer opacity-80"
-                style={{ accentColor: theme.accent }}
+                style={{ accentColor: '#fafafa' }}
               />
             </div>
 
             <div className="flex flex-col space-y-1">
               <div className="flex justify-between text-[11px]">
                 <span className="opacity-80">Громкость будильников и сигналов:</span>
-                <span className="font-mono font-bold" style={{ color: theme.accent }}>{Math.round(alarmVolume * 100)}%</span>
+                <span className="font-mono font-bold tabular-nums" style={{ color: theme.text }}>{Math.round(alarmVolume * 100)}%</span>
               </div>
               <input
                 type="range"
@@ -371,7 +371,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   StoreService.setPreference('alarmer_alarm_volume', val);
                 }}
                 className="w-full accent-current h-1 rounded-lg cursor-pointer opacity-80"
-                style={{ accentColor: theme.accent }}
+                style={{ accentColor: '#fafafa' }}
               />
             </div>
           </div>
@@ -385,8 +385,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   onClick={() => handleSelectProfile(prof)}
                   className="py-1.5 px-2 rounded-lg border text-[11px] font-medium capitalize transition-all"
                   style={{
-                    borderColor: soundProfile === prof ? theme.accent : theme.border,
-                    backgroundColor: soundProfile === prof ? `${theme.accent}20` : 'transparent',
+                    borderColor: soundProfile === prof ? 'rgba(255,255,255,0.38)' : theme.border,
+                    backgroundColor: soundProfile === prof ? 'rgba(255,255,255,0.07)' : 'transparent',
                     color: theme.text,
                   }}
                 >
@@ -402,7 +402,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="flex flex-col space-y-6">
         {/* AI Key Config */}
         <form onSubmit={handleSaveAI} className="flex flex-col space-y-3 border-t pt-4" style={{ borderColor: theme.border }}>
-          <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.accent }}>
+          <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.subtext }}>
             <Key size={15} />
             <span>Подключение ИИ (BYOK / OpenAI-Compatible)</span>
           </label>
@@ -446,7 +446,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <button
             type="submit"
             className="w-full py-2.5 rounded-xl font-bold text-xs flex items-center justify-center space-x-1.5 transition-all mt-1"
-            style={{ backgroundColor: theme.accent, color: theme.bg }}
+            style={{ backgroundColor: '#fafafa', color: '#0a0a0a' }}
           >
             {savedSuccess ? <Check size={14} /> : <Sparkles size={14} />}
             <span>{savedSuccess ? 'Настройки сохранены!' : 'Сохранить параметры ИИ'}</span>
@@ -458,7 +458,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         <div className="flex flex-col space-y-6">
         {/* UI Reset */}
         <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
-          <label className="text-xs font-bold uppercase tracking-wider opacity-60">
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
             Сброс внешнего вида
           </label>
           <button
@@ -474,7 +474,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
           {/* Autostart with the operating system */}
         <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
-          <label className="text-xs font-bold uppercase tracking-wider opacity-60">
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
             Запуск вместе с системой
           </label>
           <button
@@ -495,8 +495,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             }}
             className="p-2.5 rounded-xl border flex items-center justify-between text-xs transition-all"
             style={{
-              borderColor: autostartEnabled ? theme.accent : theme.border,
-              backgroundColor: autostartEnabled ? `${theme.accent}15` : 'transparent',
+              borderColor: autostartEnabled ? 'rgba(255,255,255,0.38)' : theme.border,
+              backgroundColor: autostartEnabled ? 'rgba(255,255,255,0.06)' : 'transparent',
               color: theme.text,
             }}
           >
@@ -510,7 +510,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
         {/* Global hotkeys reference */}
         <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
-          <label className="text-xs font-bold uppercase tracking-wider opacity-60">
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
             Горячие клавиши (работают из любой программы)
           </label>
           <div className="flex flex-col space-y-1 text-[11px]" style={{ color: theme.subtext }}>
@@ -523,7 +523,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
       {/* Data Management: Export / Import JSON */}
         <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
-          <label className="text-xs font-bold uppercase tracking-wider opacity-60">
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
             Управление данными (Резервная копия)
           </label>
           <div className="grid grid-cols-2 gap-2">
