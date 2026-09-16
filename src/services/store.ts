@@ -1,4 +1,5 @@
 import { LazyStore } from '@tauri-apps/plugin-store';
+import { invoke } from '@tauri-apps/api/core';
 import { DEFAULT_AI_SETTINGS, DEFAULT_SCHEDULES } from '../constants/defaults';
 import { DEFAULT_DYNAMIC_UI, DynamicUIConfig } from '../types/dynamicUi';
 import { AISettings, AlarmItem, Schedule, ScheduleStep, ExerciseStep, TaskItem, SessionRecord } from '../types';
@@ -101,16 +102,34 @@ function sanitizeAlarm(raw: unknown, index: number): AlarmItem | null {
   };
 }
 
+/**
+ * Reads the model connection settings.
+ *
+ * The API key that used to live here is deliberately not carried over. Keeping
+ * it worked against the reason it was moved out: this file is exactly what the
+ * app exports as a backup, so a key still in it travels to whoever receives that
+ * export — and through any bug report that happens to include the file. The key
+ * now lives in the OS credential store, and a legacy one is cleared here rather
+ * than left behind. `StoreService.hydrate` hands it to the credential store
+ * first, so the user does not have to type it again.
+ */
 function sanitizeAiSettings(raw: unknown): AISettings {
   if (!isRecord(raw)) return { ...DEFAULT_AI_SETTINGS };
   return {
-    apiKey: asString(raw.apiKey, ''),
+    apiKey: '',
     baseUrl: asString(raw.baseUrl, DEFAULT_AI_SETTINGS.baseUrl),
     model: asString(raw.model, DEFAULT_AI_SETTINGS.model),
     systemPrompt: typeof raw.systemPrompt === 'string' ? raw.systemPrompt : undefined,
     enabled: asBoolean(raw.enabled, true),
     autoAdjustIntervals: asBoolean(raw.autoAdjustIntervals, false),
   };
+}
+
+/** A key left in a plaintext file by a version that stored it there. */
+export function legacyApiKey(raw: unknown): string | null {
+  if (!isRecord(raw) || !isRecord(raw.aiSettings)) return null;
+  const key = raw.aiSettings.apiKey;
+  return typeof key === 'string' && key.trim().length > 0 ? key : null;
 }
 
 function sanitizeDynamicUi(raw: unknown): DynamicUIConfig {
@@ -357,11 +376,28 @@ export class StoreService {
       raw = null;
     }
 
+    // A key stored by an older version is moved into the credential store before
+    // the file is rewritten without it, so the user keeps their connection and
+    // the key stops travelling inside every backup export.
+    const legacyKey = legacyApiKey(raw);
+
     const migrated = migrate(raw);
     if (Object.keys(migrated.preferences).length === 0) {
       migrated.preferences = readLegacyPreferences();
     }
     cache = migrated;
+
+    if (legacyKey && isTauri()) {
+      try {
+        await invoke('set_api_key', { key: legacyKey });
+        migrated.aiSettings.enabled = true;
+        // Re-persist so the plaintext copy is gone from disk, not just ignored.
+        await StoreService.persist(migrated);
+      } catch (e) {
+        console.warn('Could not migrate the stored API key:', e);
+      }
+    }
+
     return cache;
   }
 

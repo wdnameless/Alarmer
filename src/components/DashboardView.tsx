@@ -55,11 +55,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   const t = I18nService.t();
 
   const tabs: Array<{ id: SubModule; label: string; title: string; icon: React.ReactNode }> = [
-    { id: 'today', label: 'Сегодня', title: 'Что сейчас и что дальше', icon: <CalendarDays size={13} /> },
-    { id: 'timer', label: t.timer, title: 'Таймер', icon: <TimerIcon size={13} /> },
-    { id: 'tasks', label: 'Задачи', title: 'Что нужно сделать', icon: <ListTodo size={13} /> },
-    { id: 'alarms', label: t.alarms, title: 'Будильники', icon: <Bell size={13} /> },
-    { id: 'stats', label: 'Итоги', title: 'Сколько сделано', icon: <TrendingUp size={13} /> },
+    { id: 'today', label: t.today, title: t.todayTitle, icon: <CalendarDays size={13} /> },
+    { id: 'timer', label: t.timer, title: t.timerTitle, icon: <TimerIcon size={13} /> },
+    { id: 'tasks', label: t.tasks, title: t.tasksTitle, icon: <ListTodo size={13} /> },
+    { id: 'alarms', label: t.alarms, title: t.alarmsTitle, icon: <Bell size={13} /> },
+    { id: 'stats', label: t.stats, title: t.statsTitle, icon: <TrendingUp size={13} /> },
   ];
 
   return (
@@ -104,7 +104,12 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <Timer theme={theme} dynamicUi={dynamicUi} initialMinutes={timerMinutes} />
         </div>
         <div className={`w-full flex-1 flex flex-col items-center justify-start overflow-y-auto ${subModule === 'tasks' ? '' : 'hidden'}`}>
-          <TasksView theme={theme} tasks={tasks} onUpdateTasks={onUpdateTasks} />
+          <TasksView
+            theme={theme}
+            tasks={tasks}
+            onUpdateTasks={onUpdateTasks}
+            schedules={schedules}
+          />
         </div>
         <div className={`w-full flex-1 flex flex-col items-center justify-center ${subModule === 'alarms' ? '' : 'hidden'}`}>
           <Alarms

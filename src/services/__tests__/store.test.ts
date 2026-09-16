@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach } from 'vitest';
-import { StoreService, SCHEMA_VERSION, migrate } from '../store';
+import { StoreService, SCHEMA_VERSION, migrate, legacyApiKey } from '../store';
 import { DEFAULT_DYNAMIC_UI } from '../../types/dynamicUi';
 
 /**
@@ -96,14 +96,38 @@ describe('store schema migration', () => {
   it('round-trips a valid backup through export and import', async () => {
     await StoreService.persist({
       alarms: [],
-      aiSettings: { apiKey: 'sk-test', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
+      aiSettings: { apiKey: '', baseUrl: 'https://api.openai.com/v1', model: 'gpt-4o-mini' },
       chatMessages: [],
       preferences: {},
     });
     const exported = StoreService.exportJson();
     StoreService.resetCache();
     const imported = await StoreService.importJson(exported);
-    expect(imported.aiSettings.apiKey).toBe('sk-test');
+    expect(imported.aiSettings.model).toBe('gpt-4o-mini');
+  });
+
+  it('never writes an API key into the exported backup', async () => {
+    // The export is the file a user mails to someone else; a key in it leaks
+    // their credential. The key belongs in the OS credential store, and this is
+    // the contract that keeps it out.
+    const state = migrate({
+      aiSettings: { apiKey: 'sk-leaked', baseUrl: 'https://api.openai.com/v1', model: 'm' },
+    });
+
+    expect(state.aiSettings.apiKey).toBe('');
+
+    await StoreService.persist(state);
+    expect(StoreService.exportJson()).not.toContain('sk-leaked');
+  });
+
+  it('still finds a legacy key so it can be migrated out of the file', () => {
+    // Dropping the key silently would make an existing user re-enter it, so the
+    // value is read once — by the migration that moves it into the credential
+    // store — and then left out of the state entirely.
+    expect(legacyApiKey({ aiSettings: { apiKey: 'sk-old' } })).toBe('sk-old');
+    expect(legacyApiKey({ aiSettings: { apiKey: '   ' } })).toBeNull();
+    expect(legacyApiKey({ aiSettings: {} })).toBeNull();
+    expect(legacyApiKey(null)).toBeNull();
   });
 
   it('persists preferences with numeric, boolean and string coercion', () => {

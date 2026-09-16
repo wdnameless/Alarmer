@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
-import { Bell } from 'lucide-react';
+import { Bell, BellOff } from 'lucide-react';
 import type { AlarmItem, Schedule, ScheduleStep, SessionRecord, ThemeColors } from '../types';
 import { findStepByFiringId } from '../services/scheduleEngine';
 import { soundService } from '../services/sound';
@@ -10,6 +10,14 @@ import { BlockPlayer } from './BlockPlayer';
 import { isTauri } from '../services/platform';
 
 type BlockStep = Extract<ScheduleStep, { kind: 'block' }>;
+
+/** "на 12 мин позже" — how far past its own time a missed alarm was noticed. */
+function formatLate(minutes: number): string {
+  if (minutes < 60) return `на ${minutes} мин позже`;
+  const hours = Math.floor(minutes / 60);
+  const rest = minutes % 60;
+  return rest === 0 ? `на ${hours} ч позже` : `на ${hours} ч ${rest} мин позже`;
+}
 
 /** What the backend reports when an alarm rings. */
 interface FiredPayload {
@@ -35,7 +43,21 @@ interface AlarmCenterProps {
   onDisableAlarm?: (id: string) => void;
   /** A finished interval block, so its focus time can be recorded. */
   onSession?: (session: SessionRecord) => void;
+  /** Alarms whose moment passed without ringing, so they can be shown. */
+  missed: MissedAlarm[];
+  /** Acknowledges the missed list. */
+  onDismissMissed: () => void;
+  /** False until the stored schedule has been read. */
+  hydrated: boolean;
   children: React.ReactNode;
+}
+
+/** An alarm whose moment passed while nothing was listening. */
+export interface MissedAlarm {
+  id: string;
+  label: string;
+  time: string;
+  late_by_minutes: number;
 }
 
 /**
@@ -55,6 +77,9 @@ export const AlarmCenter: React.FC<AlarmCenterProps> = ({
   alarmEnabled,
   onDisableAlarm,
   onSession,
+  missed,
+  onDismissMissed,
+  hydrated,
   children,
 }) => {
   const [ringing, setRinging] = useState<AlarmItem | null>(null);
@@ -62,8 +87,13 @@ export const AlarmCenter: React.FC<AlarmCenterProps> = ({
   const [runningBlockSchedule, setRunningBlockSchedule] = useState<string | undefined>(undefined);
 
   // Push the effective schedule down whenever it changes.
+  //
+  // Gated on hydration: before the store has been read, `firings` is the empty
+  // default set, and syncing that first would burn the backend's one-time
+  // catch-up chance on nothing — the restored alarms that arrived in the next
+  // sync would then look newly created and be silently suppressed.
   useEffect(() => {
-    if (!isTauri()) return;
+    if (!isTauri() || !hydrated) return;
     void invoke('sync_alarms', {
       alarms: firings.map((a) => ({
         id: a.id,
@@ -76,7 +106,7 @@ export const AlarmCenter: React.FC<AlarmCenterProps> = ({
         voice_prompt: a.voicePrompt ?? null,
       })),
     }).catch((e) => console.warn('Failed to sync alarms to scheduler:', e));
-  }, [firings]);
+  }, [firings, hydrated]);
 
   // Keep the backend's own ringer at the user's volume, so an alarm that rings
   // while the window is hidden is as loud as one that rings on screen.
@@ -108,11 +138,20 @@ export const AlarmCenter: React.FC<AlarmCenterProps> = ({
         voicePrompt: payload.voice_prompt ?? undefined,
       };
 
-      if (payload.consumed) onDisableAlarm?.(payload.id);
+      // Whoever can play owns the sound. The backend only starts its own ringer
+      // when the window is hidden — and it reveals the window right after, at
+      // which point this listener fires. Silencing the backend *before* starting
+      // the webview ramp is what stops the alarm sounding twice: once through
+      // the OS device and once through the webview, out of phase.
+      void invoke('stop_alarm_sound')
+        .catch(() => {})
+        .then(() => {
+          if (payload.consumed) onDisableAlarm?.(payload.id);
 
-      setRinging(alarm);
-      soundService.startAlarmRamp(alarm.sound, alarm.id);
-      soundService.speak(payload.voice_prompt || `Внимание! Будильник: ${payload.label}`);
+          setRinging(alarm);
+          soundService.startAlarmRamp(alarm.sound, alarm.id);
+          soundService.speak(payload.voice_prompt || `Внимание! Будильник: ${payload.label}`);
+        });
     }).then((fn) => {
       if (cancelled) fn();
       else unlisten = fn;
@@ -133,7 +172,13 @@ export const AlarmCenter: React.FC<AlarmCenterProps> = ({
       .then((id) => {
         if (!id) return;
         const alarm = firings.find((a) => a.id === id);
-        if (alarm) setRinging(alarm);
+        if (!alarm) return;
+
+        // The window has just become visible, so the webview can play from here
+        // on; letting the backend keep going would sound the alarm twice.
+        void invoke('stop_alarm_sound').catch(() => {});
+        setRinging(alarm);
+        soundService.startAlarmRamp(alarm.sound, alarm.id);
       })
       .catch(() => {});
     // Deliberately keyed on mount only: this is a start-up reconciliation.
@@ -176,6 +221,48 @@ export const AlarmCenter: React.FC<AlarmCenterProps> = ({
   return (
     <>
       {children}
+
+      {/* An alarm that never rang is worse than one that did: the user believed
+          something would remind them. The backend reports it, so it is said out
+          loud rather than left in a list only the backend can see. */}
+      {missed.length > 0 && !ringing && (
+        <div
+          className="fixed top-3 left-1/2 -translate-x-1/2 z-[65] max-w-[340px] w-[calc(100%-24px)] rounded-2xl border backdrop-blur-2xl px-3.5 py-2.5"
+          style={{
+            backgroundColor: 'rgba(20,20,20,0.92)',
+            borderColor: 'rgba(255,255,255,0.16)',
+            boxShadow: '0 18px 48px rgba(0,0,0,0.55)',
+          }}
+        >
+          <div className="flex items-start gap-2">
+            <BellOff size={13} className="mt-0.5 shrink-0" style={{ color: theme.subtext }} />
+            <div className="flex flex-col min-w-0 flex-1">
+              <span className="text-[11px] font-semibold" style={{ color: theme.text }}>
+                Пропущено сегодня: {missed.length}
+              </span>
+              {missed.slice(0, 3).map((alarm) => (
+                <span key={alarm.id} className="text-[10px] truncate" style={{ color: theme.subtext }}>
+                  {alarm.time} · {alarm.label} · {formatLate(alarm.late_by_minutes)}
+                </span>
+              ))}
+              {missed.length > 3 && (
+                <span className="text-[10px]" style={{ color: theme.subtext }}>
+                  и ещё {missed.length - 3}
+                </span>
+              )}
+            </div>
+            <button
+              onClick={onDismissMissed}
+              className="text-[10px] px-1.5 py-0.5 rounded-lg shrink-0 transition-colors hover:bg-white/10"
+              style={{ color: theme.subtext }}
+              title="Скрыть"
+              aria-label="Скрыть список пропущенных"
+            >
+              Скрыть
+            </button>
+          </div>
+        </div>
+      )}
 
       {runningBlock && (
         <div

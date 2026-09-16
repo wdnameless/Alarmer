@@ -14,10 +14,12 @@ import { I18nService } from './services/i18n';
 import { AppMode, ThemeId, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig, TaskItem, SessionRecord } from './types';
 import { StoreService } from './services/store';
 import { buildFirings } from './services/scheduleEngine';
-import { AlarmCenter } from './components/AlarmCenter';
+import { AlarmCenter, type MissedAlarm } from './components/AlarmCenter';
 import { trimSessions } from './services/session';
+import { TimerService } from './services/timer';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { invoke } from '@tauri-apps/api/core';
+import { listen } from '@tauri-apps/api/event';
 import { isTauri } from './services/platform';
 
 /** First message shown in a brand-new conversation. */
@@ -52,6 +54,8 @@ export const App: React.FC = () => {
   const [alarmEnabled, setAlarmEnabled] = useState<boolean>(() =>
     StoreService.getPreference('alarmer_alarm_enabled', true),
   );
+  /** Alarms whose moment passed without ringing; shown until acknowledged. */
+  const [missedAlarms, setMissedAlarms] = useState<MissedAlarm[]>([]);
   /** Gates writing until the stored file has been read, to avoid clobbering it. */
   const [hydrated, setHydrated] = useState(false);
   const [chatMessages, setChatMessages] = useState<ChatMessage[]>(() => {
@@ -174,6 +178,68 @@ export const App: React.FC = () => {
     setSessions((prev) => trimSessions([...prev, session]));
   };
 
+  /**
+   * Records completed countdowns.
+   *
+   * Subscribed here rather than inside the Timer view: the backend measures
+   * focus, and a session must still land in the log when the timer runs while
+   * the user is on another screen or the window is hidden.
+   */
+  useEffect(() => {
+    return TimerService.onSession((event) => {
+      recordSession({
+        id: `timer_${event.ended_at_ms}`,
+        label: 'Таймер',
+        focusedSec: event.focused_secs,
+        startedAt: new Date(event.started_at_ms).toISOString(),
+        endedAt: new Date(event.ended_at_ms).toISOString(),
+        completed: event.completed,
+      });
+    });
+  }, []);
+
+  /**
+   * Collects alarms the backend had to skip, plus anything missed before this
+   * window existed — an app that was closed through an alarm's minute still owes
+   * the user that information.
+   *
+   * Runs after hydration: the backend only reports what it has been given, and
+   * before the first sync it has been given nothing.
+   */
+  useEffect(() => {
+    if (!isTauri() || !hydrated) return;
+
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    void listen<MissedAlarm>('alarm://missed', (event) => {
+      setMissedAlarms((prev) =>
+        prev.some((m) => m.id === event.payload.id) ? prev : [...prev, event.payload],
+      );
+    }).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+
+    // The sync is an IPC round-trip, so the first tick that can report a missed
+    // alarm may not have happened yet; ask again shortly after.
+    const ask = () =>
+      void invoke<MissedAlarm[]>('missed_alarms_today')
+        .then((list) => {
+          if (!cancelled && list.length > 0) setMissedAlarms(list);
+        })
+        .catch(() => {});
+
+    ask();
+    const retry = window.setTimeout(ask, 1500);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(retry);
+      unlisten?.();
+    };
+  }, [hydrated]);
+
   // Mouse drag handlers for splitter between Dashboard and AI Wing
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
@@ -212,6 +278,9 @@ export const App: React.FC = () => {
     id: themeKey,
   };
   const t = I18nService.t();
+  /** Repaints the chrome when the interface language changes. */
+  const [, setLangTick] = useState(0);
+  useEffect(() => I18nService.subscribe(() => setLangTick((n) => n + 1)), []);
 
   return (
     <AlarmCenter
@@ -222,6 +291,9 @@ export const App: React.FC = () => {
       alarmEnabled={alarmEnabled}
       onDisableAlarm={handleAlarmConsumed}
       onSession={recordSession}
+      missed={missedAlarms}
+      onDismissMissed={() => setMissedAlarms([])}
+      hydrated={hydrated}
     >
     <div className="w-screen h-screen m-0 p-0 bg-transparent overflow-hidden select-none">
       <div

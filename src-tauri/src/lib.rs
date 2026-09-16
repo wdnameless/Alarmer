@@ -280,6 +280,15 @@ async fn missed_alarms_today() -> Result<Vec<scheduler::MissedAlarm>, String> {
     Ok(scheduler::missed_today())
 }
 
+/// Passed to the executable when the OS starts it, so the app can come up in the
+/// tray instead of throwing a window at someone who has not asked for one.
+const START_MINIMIZED_FLAG: &str = "--minimized";
+
+/// True when this process was launched by the OS at login rather than by hand.
+fn started_minimized() -> bool {
+    std::env::args().any(|arg| arg == START_MINIMIZED_FLAG)
+}
+
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
     // Both `aws-lc-rs` and `ring` are compiled into the dependency graph (the
@@ -299,7 +308,9 @@ pub fn run() {
         .plugin(tauri_plugin_store::Builder::new().build())
         .plugin(tauri_plugin_autostart::init(
             tauri_plugin_autostart::MacosLauncher::LaunchAgent,
-            None,
+            // The settings screen promises the app starts in the tray, so the
+            // login entry has to say so — otherwise logging in pops a window.
+            Some(vec![START_MINIMIZED_FLAG]),
         ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
         .invoke_handler(tauri::generate_handler![
@@ -393,6 +404,14 @@ pub fn run() {
 
             // The countdown outlives any screen it is displayed on.
             timer::spawn(app.handle().clone());
+
+            // Started by the OS at login: come up in the tray, as promised, and
+            // let the scheduler wake the window when an alarm actually rings.
+            if started_minimized() {
+                if let Some(window) = app.get_webview_window("main") {
+                    let _ = window.hide();
+                }
+            }
 
             // Timer control from any application, no window focus needed.
             let handle = app.handle().clone();

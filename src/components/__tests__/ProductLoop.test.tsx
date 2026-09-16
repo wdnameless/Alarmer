@@ -140,7 +140,7 @@ describe('statistics view', () => {
     expect(screen.getByText('Пока нечего считать')).toBeDefined();
   });
 
-  it('shows the week total and streak once there is history', () => {
+  it('shows the week total, the streak and the session history', () => {
     const today = new Date();
     const session: SessionRecord = {
       id: 's1',
@@ -153,10 +153,28 @@ describe('statistics view', () => {
 
     render(<StatsView theme={theme} sessions={[session]} tasks={[]} />);
 
-    expect(screen.getByText('30 мин')).toBeDefined();
+    expect(screen.getByText('За 7 дней')).toBeDefined();
     // Today has focus, so the streak reads one day.
     expect(screen.getByText('день')).toBeDefined();
-    expect(screen.getByText('За 7 дней')).toBeDefined();
+    // 30 мин appears twice by design: as the week total and in the history row.
+    expect(screen.getAllByText('30 мин').length).toBeGreaterThanOrEqual(2);
+    expect(screen.getByText('Последние сессии')).toBeDefined();
+    expect(screen.getByText('Разминка')).toBeDefined();
+  });
+
+  it('marks an interrupted session as unfinished in the history', () => {
+    const session: SessionRecord = {
+      id: 's1',
+      label: 'Таймер',
+      focusedSec: 120,
+      startedAt: new Date().toISOString(),
+      endedAt: new Date().toISOString(),
+      completed: false,
+    };
+
+    render(<StatsView theme={theme} sessions={[session]} tasks={[]} />);
+
+    expect(screen.getByText('не завершена')).toBeDefined();
   });
 });
 
@@ -166,7 +184,7 @@ describe('tasks view', () => {
   it('adds a task and shows progress', () => {
     function Harness() {
       const [tasks, setTasks] = useState<Parameters<typeof TasksView>[0]['tasks']>([]);
-      return <TasksView theme={theme} tasks={tasks} onUpdateTasks={setTasks} />;
+      return <TasksView theme={theme} tasks={tasks} onUpdateTasks={setTasks} schedules={[]} />;
     }
 
     render(<Harness />);
@@ -187,7 +205,7 @@ describe('tasks view', () => {
       const [tasks, setTasks] = useState<Parameters<typeof TasksView>[0]['tasks']>([
         { id: 't1', title: 'Задача', done: false, createdAt: new Date().toISOString() },
       ]);
-      return <TasksView theme={theme} tasks={tasks} onUpdateTasks={setTasks} />;
+      return <TasksView theme={theme} tasks={tasks} onUpdateTasks={setTasks} schedules={[]} />;
     }
 
     render(<Harness />);
@@ -197,5 +215,75 @@ describe('tasks view', () => {
 
     expect(screen.getByText('1 / 1')).toBeDefined();
     expect(screen.getByText('Выполнено')).toBeDefined();
+  });
+
+  it('turns a schedule step into a task that keeps the link back to it', () => {
+    const schedule: Parameters<typeof TasksView>[0]['schedules'][number] = {
+      id: 'sched-1',
+      name: 'Утренняя программа',
+      days: [1, 2, 3, 4, 5],
+      enabled: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      steps: [{ id: 'st1', kind: 'moment', time: '07:00', label: 'Подъём' }],
+    };
+
+    let latest: Parameters<typeof TasksView>[0]['tasks'] = [];
+
+    function Harness() {
+      const [tasks, setTasks] = useState<Parameters<typeof TasksView>[0]['tasks']>([]);
+      latest = tasks;
+      return (
+        <TasksView theme={theme} tasks={tasks} onUpdateTasks={setTasks} schedules={[schedule]} />
+      );
+    }
+
+    render(<Harness />);
+    expect(screen.getByText('Из расписания')).toBeDefined();
+
+    act(() => {
+      screen.getByTitle('Добавить «Подъём» из «Утренняя программа»').click();
+    });
+
+    // The link is the whole point: a task that knows its program can be shown
+    // beside it on the Today screen and counted against it.
+    expect(latest).toHaveLength(1);
+    expect(latest[0]).toMatchObject({ title: 'Подъём', scheduleId: 'sched-1', stepId: 'st1' });
+  });
+
+  it('stops offering a step once it has become a task', () => {
+    const schedule: Parameters<typeof TasksView>[0]['schedules'][number] = {
+      id: 'sched-1',
+      name: 'Программа',
+      days: [],
+      enabled: true,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      steps: [{ id: 'st1', kind: 'moment', time: '07:00', label: 'Подъём' }],
+    };
+
+    render(
+      <TasksView
+        theme={theme}
+        tasks={[{ id: 't1', title: 'Подъём', done: false, createdAt: '', stepId: 'st1' }]}
+        onUpdateTasks={() => {}}
+        schedules={[schedule]}
+      />,
+    );
+
+    expect(screen.queryByText('Из расписания')).toBeNull();
+  });
+
+  it('ignores disabled schedules when offering steps', () => {
+    const schedule: Parameters<typeof TasksView>[0]['schedules'][number] = {
+      id: 'sched-1',
+      name: 'Выключенная',
+      days: [],
+      enabled: false,
+      createdAt: '2026-01-01T00:00:00.000Z',
+      steps: [{ id: 'st1', kind: 'moment', time: '07:00', label: 'Подъём' }],
+    };
+
+    render(<TasksView theme={theme} tasks={[]} onUpdateTasks={() => {}} schedules={[schedule]} />);
+
+    expect(screen.queryByText('Из расписания')).toBeNull();
   });
 });

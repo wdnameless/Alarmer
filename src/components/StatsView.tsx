@@ -1,5 +1,5 @@
 import React from 'react';
-import { Flame, Clock, TrendingUp } from 'lucide-react';
+import { Flame, Clock, TrendingUp, History } from 'lucide-react';
 import type { SessionRecord, TaskItem, ThemeColors } from '../types';
 import {
   currentStreak,
@@ -10,6 +10,7 @@ import {
   totalFocusedSec,
   trailingDays,
 } from '../services/stats';
+import { recentSessions } from '../services/session';
 
 interface StatsViewProps {
   theme: ThemeColors;
@@ -162,6 +163,40 @@ export const StatsView: React.FC<StatsViewProps> = ({ theme, sessions, tasks }) 
             {sessions.length}
           </span>
         </div>
+      </div>
+
+      {/* What was actually done, newest first. The numbers above say how much;
+          this says what — and it is the only place a mistyped session can be
+          recognised for what it was. */}
+      <div
+        className="rounded-2xl border px-4 py-3 flex flex-col space-y-2"
+        style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}
+      >
+        <span className="text-[10px] uppercase tracking-[0.16em] flex items-center gap-1" style={{ color: theme.subtext }}>
+          <History size={10} /> Последние сессии
+        </span>
+        {recentSessions(sessions, 8).map((session) => {
+          const ended = new Date(session.endedAt);
+          const when = `${String(ended.getDate()).padStart(2, '0')}.${String(ended.getMonth() + 1).padStart(2, '0')} ${String(ended.getHours()).padStart(2, '0')}:${String(ended.getMinutes()).padStart(2, '0')}`;
+          return (
+            <div key={session.id} className="flex items-center gap-2 text-[11px]">
+              <span className="font-mono tabular-nums shrink-0" style={{ color: theme.subtext }}>
+                {when}
+              </span>
+              <span className="truncate flex-1" style={{ color: theme.text }}>
+                {session.label}
+              </span>
+              {!session.completed && (
+                <span className="shrink-0 text-[9px] opacity-70" style={{ color: theme.subtext }}>
+                  не завершена
+                </span>
+              )}
+              <span className="font-mono tabular-nums shrink-0" style={{ color: theme.text }}>
+                {formatFocus(session.focusedSec)}
+              </span>
+            </div>
+          );
+        })}
       </div>
     </div>
   );

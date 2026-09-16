@@ -15,6 +15,16 @@ export default defineConfig({
       reporter: ['text-summary'],
       include: ['src/**/*.{ts,tsx}'],
       exclude: ['src/**/*.{test,spec}.{ts,tsx}', 'src/test/**', 'src/vite-env.d.ts'],
+      // Floors sit just under today's numbers so the check is a ratchet against
+      // regressions rather than an aspiration nobody meets. Both P0 defects this
+      // project shipped lived in the untested lifecycle of a component, which is
+      // the gap these thresholds exist to stop widening.
+      thresholds: {
+        statements: 48,
+        branches: 44,
+        functions: 46,
+        lines: 49,
+      },
     },
   },
 });

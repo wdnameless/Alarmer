@@ -15,6 +15,10 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - run: bun install --frozen-lockfile
       - run: bun run check
+      # Enforces the coverage floors in vitest.config.ts. Both P0 defects this
+      # project shipped lived in untested component lifecycle, so the gate is a
+      # ratchet against that specific gap reopening.
+      - run: bun run test:coverage
 
   backend:
     # The scheduler derives local time from the Windows timezone API, so the

@@ -1,30 +1,36 @@
 import { StoreService } from './store';
 
+/**
+ * Interface language.
+ *
+ * The app is Russian-first: the schedule parser, the AI prompts and every voice
+ * line are written for Russian, so only the navigation chrome is translated.
+ * That boundary is deliberate — English mode relabels the app you navigate but
+ * does not pretend the model or the assistant speaks English. The keys for the
+ * removed fitness/stopwatch modules are gone, since a translation for a screen
+ * that no longer exists is just a lie waiting to be read.
+ */
+
 export type Language = 'en' | 'ru';
 
 export interface Translations {
   dashboard: string;
-  aiCopilot: string;
   settings: string;
+  today: string;
+  todayTitle: string;
   timer: string;
-  fitness: string;
-  laps: string;
+  timerTitle: string;
+  tasks: string;
+  tasksTitle: string;
   alarms: string;
+  alarmsTitle: string;
+  stats: string;
+  statsTitle: string;
+  aiCopilot: string;
   start: string;
   pause: string;
   reset: string;
-  voicePrompt: string;
   language: string;
-  audioSettings: string;
-  uiClicks: string;
-  clockTicks: string;
-  clickVolume: string;
-  alarmVolume: string;
-  soundProfile: string;
-  aiSettings: string;
-  apiKey: string;
-  save: string;
-  testVoice: string;
   systemSettings: string;
   settingsDesc: string;
 }
@@ -32,53 +38,43 @@ export interface Translations {
 export const TRANSLATIONS: Record<Language, Translations> = {
   en: {
     dashboard: 'Dashboard',
-    aiCopilot: 'AI Co-Pilot',
     settings: 'Settings',
+    today: 'Today',
+    todayTitle: 'What is now and what is next',
     timer: 'Timer',
-    fitness: 'Fitness',
-    laps: 'Stopwatch',
+    timerTitle: 'Timer',
+    tasks: 'Tasks',
+    tasksTitle: 'What needs doing',
     alarms: 'Alarms',
+    alarmsTitle: 'Alarms',
+    stats: 'Review',
+    statsTitle: 'How much got done',
+    aiCopilot: 'AI Co-Pilot',
     start: 'Start',
     pause: 'Pause',
     reset: 'Reset',
-    voicePrompt: 'Cloud Neural Voice',
-    language: 'Language',
-    audioSettings: 'Sound Effects & Clicks',
-    uiClicks: 'Button & Tab Clicks',
-    clockTicks: 'Second-by-second Clock Tick',
-    clickVolume: 'Click & UI Volume',
-    alarmVolume: 'Alarm & Alert Volume',
-    soundProfile: 'Click Sound Profile',
-    aiSettings: 'AI Configuration (BYOK)',
-    apiKey: 'API Key',
-    save: 'Save',
-    testVoice: 'Test Voice',
-    systemSettings: 'System Settings',
-    settingsDesc: 'Voice audio, AI models and interface parameters',
+    language: 'Interface language',
+    systemSettings: 'System settings',
+    settingsDesc: 'Voice, models and interface parameters',
   },
   ru: {
     dashboard: 'Дашборд',
-    aiCopilot: 'AI Co-Pilot',
     settings: 'Настройки',
+    today: 'Сегодня',
+    todayTitle: 'Что сейчас и что дальше',
     timer: 'Таймер',
-    fitness: 'Фитнес',
-    laps: 'Круги',
+    timerTitle: 'Таймер',
+    tasks: 'Задачи',
+    tasksTitle: 'Что нужно сделать',
     alarms: 'Алармы',
+    alarmsTitle: 'Будильники',
+    stats: 'Итоги',
+    statsTitle: 'Сколько сделано',
+    aiCopilot: 'AI Co-Pilot',
     start: 'Старт',
     pause: 'Пауза',
     reset: 'Сброс',
-    voicePrompt: 'Голосовая озвучка (Cloud Neural TTS)',
     language: 'Язык интерфейса',
-    audioSettings: 'Звуковые эффекты и клики',
-    uiClicks: 'Клики кнопок и вкладок',
-    clockTicks: 'Тиканье секунд часов (каждую сек)',
-    clickVolume: 'Громкость кликов интерфейса',
-    alarmVolume: 'Громкость будильников и таймера',
-    soundProfile: 'Профиль звука кликов',
-    aiSettings: 'Подключение ИИ (BYOK / OpenAI-compatible)',
-    apiKey: 'API Ключ',
-    save: 'Сохранить',
-    testVoice: 'Тест голоса',
     systemSettings: 'Настройки системы',
     settingsDesc: 'Озвучка, нейросети и параметры интерфейса',
   },
@@ -91,6 +87,21 @@ export class I18nService {
 
   static setLang(lang: Language) {
     StoreService.setPreference('alarmer_lang', lang);
+    this.listeners.forEach((listener) => listener());
+  }
+
+  private static listeners = new Set<() => void>();
+
+  /**
+   * Notifies when the language changes.
+   *
+   * The chrome is rendered from `t()` at the top of the tree, so switching the
+   * language has to re-render it — a stored preference alone leaves the tab
+   * labels in the previous language until something else happens to redraw them.
+   */
+  static subscribe(listener: () => void): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
   }
 
   static t(): Translations {

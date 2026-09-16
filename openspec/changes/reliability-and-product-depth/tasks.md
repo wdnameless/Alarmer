@@ -28,3 +28,35 @@ The unit tests could not have caught these; both were surfaced by the live pass.
 - `RingChip`-style label uppercasing (`text-transform`) meant `innerText` and
   `textContent` disagreed; the first live assertion on the takeover was wrong
   because of it, not because the UI was.
+
+## Second pass — loop, promises, honesty
+
+The first pass fixed what crashed. This one fixed what lied.
+
+- [x] Timer sessions: the Rust clock measures focus and reports it, so the
+      "or timer" the stats screen promises is true <!-- id: 15 -->
+- [x] Missed alarms surface in a banner, including those missed while the app
+      was closed <!-- id: 16 -->
+- [x] The webview silences the backend ringer when it takes over, so a hidden
+      alarm that reveals the window rings once <!-- id: 17 -->
+- [x] Tasks link to schedule steps, and the link is persisted <!-- id: 18 -->
+- [x] Session history list on the stats screen <!-- id: 19 -->
+- [x] A legacy plaintext API key is moved to the credential store and scrubbed
+      from the file <!-- id: 20 -->
+- [x] Autostart launches minimised to tray, as the settings screen claims <!-- id: 21 -->
+- [x] Coverage thresholds in CI, ratcheted to the current floor <!-- id: 22 -->
+- [x] i18n covers the navigation chrome and repaints on change; dead keys
+      removed <!-- id: 23 -->
+- [x] Speech queues: lines finish instead of cutting each other off <!-- id: 24 -->
+- [x] Verify: 149 vitest, 39 cargo, clippy clean, coverage thresholds met <!-- id: 25 -->
+
+### Found by the second live pass
+
+- **A double sync burned the catch-up chance.** `AlarmCenter` synced on mount,
+  when `firings` was still the empty pre-hydration default. That empty sync set
+  `synced_once`, so the real schedule arrived as "newly created" and a restored
+  alarm was marked handled — silently swallowing exactly the missed alarms the
+  feature exists to report. Gated on `hydrated`.
+- **`speak()` resolved when the queue drained, not when its own line ended**, so
+  a caller waited on every later utterance. Each line now releases its own.
+

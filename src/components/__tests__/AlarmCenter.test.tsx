@@ -67,8 +67,8 @@ const theme = {
 };
 
 /** Delivers a fire event exactly as `scheduler.rs` emits it. */
-function fireAlarm(overrides: Partial<Record<string, unknown>> = {}) {
-  act(() => {
+async function fireAlarm(overrides: Partial<Record<string, unknown>> = {}) {
+  await act(async () => {
     listeners.get('alarm://fired')?.({
       payload: {
         id: 'a1',
@@ -91,9 +91,9 @@ describe('AlarmCenter', () => {
     cleanup();
   });
 
-  it('pushes the effective schedule to the backend', () => {
+  it('pushes the effective schedule to the backend', async () => {
     render(
-      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled>
+      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled missed={[]} onDismissMissed={() => {}} hydrated>
         <div />
       </AlarmCenter>,
     );
@@ -104,18 +104,18 @@ describe('AlarmCenter', () => {
     expect(payload?.alarms[0]).toMatchObject({ id: 'a1', time: '07:00', repeat: 'days' });
   });
 
-  it('shows the ringing takeover whichever screen is mounted underneath', () => {
+  it('shows the ringing takeover whichever screen is mounted underneath', async () => {
     // Regression: ringing used to live inside the Alarms sub-tab, so an alarm
     // that fired while the user was on any other screen made no sound and no
     // visible takeover. Children here stand in for that other screen.
     render(
-      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled>
+      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled missed={[]} onDismissMissed={() => {}} hydrated>
         <div data-testid="other-screen">Сегодня</div>
       </AlarmCenter>,
     );
 
     expect(screen.queryByText('Остановить')).toBeNull();
-    fireAlarm();
+    await fireAlarm();
 
     expect(screen.getByText('Остановить')).toBeDefined();
     expect(screen.getByText('07:00')).toBeDefined();
@@ -123,13 +123,13 @@ describe('AlarmCenter', () => {
     expect(screen.getByTestId('other-screen')).toBeDefined();
   });
 
-  it('tells the backend to dismiss and closes the takeover on Stop', () => {
+  it('tells the backend to dismiss and closes the takeover on Stop', async () => {
     render(
-      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled>
+      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled missed={[]} onDismissMissed={() => {}} hydrated>
         <div />
       </AlarmCenter>,
     );
-    fireAlarm();
+    await fireAlarm();
 
     act(() => {
       screen.getByText('Остановить').click();
@@ -139,13 +139,13 @@ describe('AlarmCenter', () => {
     expect(screen.queryByText('Остановить')).toBeNull();
   });
 
-  it('snoozes for the chosen number of minutes', () => {
+  it('snoozes for the chosen number of minutes', async () => {
     render(
-      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled>
+      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled missed={[]} onDismissMissed={() => {}} hydrated>
         <div />
       </AlarmCenter>,
     );
-    fireAlarm();
+    await fireAlarm();
 
     act(() => {
       screen.getByText('+10 мин').click();
@@ -155,20 +155,20 @@ describe('AlarmCenter', () => {
     expect(screen.queryByText('Остановить')).toBeNull();
   });
 
-  it('mirrors a consumed one-shot alarm as switched off', () => {
+  it('mirrors a consumed one-shot alarm as switched off', async () => {
     const onDisable = vi.fn();
     render(
-      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled onDisableAlarm={onDisable}>
+      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled missed={[]} onDismissMissed={() => {}} hydrated onDisableAlarm={onDisable}>
         <div />
       </AlarmCenter>,
     );
 
-    fireAlarm({ consumed: true });
+    await fireAlarm({ consumed: true });
 
     expect(onDisable).toHaveBeenCalledWith('a1');
   });
 
-  it('offers to run an interval block straight from its ring', () => {
+  it('offers to run an interval block straight from its ring', async () => {
     const blockAlarm: AlarmItem = { ...alarm, id: 'sched:s1:st2', label: 'Разминка' };
     const schedule = {
       id: 's1',
@@ -191,27 +191,112 @@ describe('AlarmCenter', () => {
     };
 
     render(
-      <AlarmCenter theme={theme} firings={[blockAlarm]} schedules={[schedule]} alarmVolume={0.8} alarmEnabled>
+      <AlarmCenter theme={theme} firings={[blockAlarm]} schedules={[schedule]} alarmVolume={0.8} alarmEnabled missed={[]} onDismissMissed={() => {}} hydrated>
         <div />
       </AlarmCenter>,
     );
 
-    fireAlarm({ id: 'sched:s1:st2', label: 'Разминка' });
+    await fireAlarm({ id: 'sched:s1:st2', label: 'Разминка' });
 
     // The whole point of a block is that it is runnable; making the user go find
     // it while the alarm is ringing is how the feature gets missed.
     expect(screen.getByText('Начать блок')).toBeDefined();
   });
 
-  it('does not offer a block player for a plain moment alarm', () => {
+  it('does not offer a block player for a plain moment alarm', async () => {
     render(
-      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled>
+      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled missed={[]} onDismissMissed={() => {}} hydrated>
         <div />
       </AlarmCenter>,
     );
 
-    fireAlarm();
+    await fireAlarm();
 
     expect(screen.queryByText('Начать блок')).toBeNull();
+  });
+
+  it('silences the backend ringer before the webview starts its own', async () => {
+    // Regression: the backend rings only while the window is hidden, then
+    // reveals it — at which point this listener fires and played a second copy
+    // of the alarm over the first.
+    render(
+      <AlarmCenter theme={theme} firings={[alarm]} schedules={[]} alarmVolume={0.8} alarmEnabled missed={[]} onDismissMissed={() => {}} hydrated>
+        <div />
+      </AlarmCenter>,
+    );
+
+    await fireAlarm();
+
+    expect(invokeMock).toHaveBeenCalledWith('stop_alarm_sound', undefined);
+  });
+
+  it('shows alarms that were missed instead of hiding them', async () => {
+    const missed = [
+      { id: 'a9', label: 'Тренировка', time: '07:15', late_by_minutes: 90 },
+    ];
+
+    render(
+      <AlarmCenter
+        theme={theme}
+        firings={[]}
+        schedules={[]}
+        alarmVolume={0.8}
+        alarmEnabled
+        missed={missed}
+        onDismissMissed={() => {}}
+        hydrated
+      >
+        <div />
+      </AlarmCenter>,
+    );
+
+    expect(screen.getByText('Пропущено сегодня: 1')).toBeDefined();
+    expect(screen.getByText(/07:15 · Тренировка · на 1 ч 30 мин позже/)).toBeDefined();
+  });
+
+  it('lets the missed list be acknowledged', async () => {
+    const onDismiss = vi.fn();
+    render(
+      <AlarmCenter
+        theme={theme}
+        firings={[]}
+        schedules={[]}
+        alarmVolume={0.8}
+        alarmEnabled
+        missed={[{ id: 'a9', label: 'X', time: '07:15', late_by_minutes: 30 }]}
+        onDismissMissed={onDismiss}
+        hydrated
+      >
+        <div />
+      </AlarmCenter>,
+    );
+
+    act(() => {
+      screen.getByLabelText('Скрыть список пропущенных').click();
+    });
+
+    expect(onDismiss).toHaveBeenCalled();
+  });
+
+  it('keeps the missed banner out of the way while an alarm is ringing', async () => {
+    render(
+      <AlarmCenter
+        theme={theme}
+        firings={[alarm]}
+        schedules={[]}
+        alarmVolume={0.8}
+        alarmEnabled
+        missed={[{ id: 'a9', label: 'X', time: '07:15', late_by_minutes: 30 }]}
+        onDismissMissed={() => {}}
+        hydrated
+      >
+        <div />
+      </AlarmCenter>,
+    );
+
+    await fireAlarm();
+
+    // The takeover owns the screen; a second notice on top of it is noise.
+    expect(screen.queryByText('Пропущено сегодня: 1')).toBeNull();
   });
 });

@@ -35,6 +35,20 @@ const IDLE: TimerSnapshot = {
 export const MIN_MINUTES = 1;
 export const MAX_MINUTES = 180;
 
+/**
+ * A finished stretch of focus reported by the backend timer.
+ *
+ * The clock lives in Rust, so the measurement of how long the user actually
+ * focused has to come from there: a webview that was hidden or unmounted never
+ * saw the seconds go by.
+ */
+export interface TimerSessionEvent {
+  focused_secs: number;
+  started_at_ms: number;
+  ended_at_ms: number;
+  completed: boolean;
+}
+
 export class TimerService {
   /**
    * Snapshot of the current timer state.
@@ -81,6 +95,29 @@ export class TimerService {
   static async setMode(mode: TimerMode): Promise<void> {
     if (!isTauri()) return;
     await invoke('timer_set_mode', { mode });
+  }
+
+  /**
+   * Subscribes to completed stretches of focus.
+   *
+   * Unlike the tick subscription this is keyed to the event itself, so the
+   * recording of a session does not depend on any component being mounted.
+   */
+  static onSession(handler: (session: TimerSessionEvent) => void): () => void {
+    if (!isTauri()) return () => {};
+
+    let unlisten: (() => void) | undefined;
+    let cancelled = false;
+
+    void listen<TimerSessionEvent>('timer://session', (e) => handler(e.payload)).then((fn) => {
+      if (cancelled) fn();
+      else unlisten = fn;
+    });
+
+    return () => {
+      cancelled = true;
+      unlisten?.();
+    };
   }
 
   /**

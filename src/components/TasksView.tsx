@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Check, Circle } from 'lucide-react';
-import type { TaskItem, ThemeColors } from '../types';
+import { Plus, Trash2, Check, Circle, CalendarDays } from 'lucide-react';
+import type { Schedule, TaskItem, ThemeColors } from '../types';
 import { taskProgress } from '../services/stats';
 import { soundService } from '../services/sound';
 
@@ -8,18 +8,45 @@ interface TasksViewProps {
   theme: ThemeColors;
   tasks: TaskItem[];
   onUpdateTasks: (tasks: TaskItem[]) => void;
+  /** Schedules the user can pull steps from as tasks. */
+  schedules: Schedule[];
+}
+
+/**
+ * Ids are minted outside render so the component stays pure: a handler that
+ * calls `Date.now()` during render is not reproducible, and the linter is right
+ * to refuse it.
+ */
+let taskSeq = 0;
+function createTaskId(): string {
+  taskSeq += 1;
+  return `task_${Date.now()}_${taskSeq}`;
 }
 
 /**
  * The day's work, as opposed to the day's timetable.
  *
  * A schedule says a block starts at 07:15; this says what the block is for. The
- * two are linked by `stepId`, so a task created from a program step carries the
- * context of where it came from.
+ * two are linked by `stepId`/`scheduleId`, so a task taken from a program knows
+ * where it came from and can be shown next to it on the Today screen.
  */
-export const TasksView: React.FC<TasksViewProps> = ({ theme, tasks, onUpdateTasks }) => {
+export const TasksView: React.FC<TasksViewProps> = ({
+  theme,
+  tasks,
+  onUpdateTasks,
+  schedules,
+}) => {
   const [draft, setDraft] = useState('');
   const { done, total } = taskProgress(tasks);
+
+  /** Steps not yet turned into a task, so the list is a picker and not a dump. */
+  const availableSteps = schedules
+    .filter((s) => s.enabled)
+    .flatMap((schedule) =>
+      schedule.steps
+        .filter((step) => !tasks.some((t) => t.stepId === step.id))
+        .map((step) => ({ schedule, step })),
+    );
 
   const addTask = (e: React.FormEvent) => {
     e.preventDefault();
@@ -32,6 +59,22 @@ export const TasksView: React.FC<TasksViewProps> = ({ theme, tasks, onUpdateTask
       { id: `task_${Date.now()}`, title, done: false, createdAt: new Date().toISOString() },
     ]);
     setDraft('');
+  };
+
+  /** Turns a schedule step into a task, keeping the link back to the program. */
+  const addFromStep = (schedule: Schedule, stepId: string, label: string) => {
+    soundService.playCountdownTick();
+    onUpdateTasks([
+      ...tasks,
+      {
+        id: createTaskId(),
+        title: label,
+        done: false,
+        scheduleId: schedule.id,
+        stepId,
+        createdAt: new Date().toISOString(),
+      },
+    ]);
   };
 
   const toggleTask = (id: string) => {
@@ -106,6 +149,33 @@ export const TasksView: React.FC<TasksViewProps> = ({ theme, tasks, onUpdateTask
           <span className="text-[11px] leading-relaxed" style={{ color: theme.subtext }}>
             Пока пусто. Добавьте задачи — расписание подскажет, когда за них взяться.
           </span>
+        </div>
+      )}
+
+      {/* Steps from the user's own programs, so a plan produces work items
+          instead of staying a timetable nobody acts on. */}
+      {availableSteps.length > 0 && (
+        <div className="flex flex-col space-y-1.5">
+          <span className="text-[10px] uppercase tracking-wider flex items-center gap-1" style={{ color: theme.subtext }}>
+            <CalendarDays size={10} /> Из расписания
+          </span>
+          {availableSteps.slice(0, 5).map(({ schedule, step }) => (
+            <button
+              key={`${schedule.id}:${step.id}`}
+              onClick={() => addFromStep(schedule, step.id, step.label)}
+              className="flex items-center gap-2 p-2 rounded-xl border text-left transition-colors hover:bg-white/5"
+              style={{ backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.07)' }}
+              title={`Добавить «${step.label}» из «${schedule.name}»`}
+            >
+              <Plus size={12} style={{ color: theme.subtext }} />
+              <span className="text-[11px] truncate flex-1" style={{ color: theme.text }}>
+                {step.label}
+              </span>
+              <span className="font-mono tabular-nums text-[10px] shrink-0" style={{ color: theme.subtext }}>
+                {step.time}
+              </span>
+            </button>
+          ))}
         </div>
       )}
 

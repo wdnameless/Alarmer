@@ -2,7 +2,10 @@
   "compilerOptions": {
     "target": "ES2020",
     "useDefineForClassFields": true,
-    "lib": ["ES2020", "DOM"],
+    // ES2024 for `Promise.withResolvers`, which the speech queue uses to await
+    // each utterance. The target stays ES2020: this only widens the type surface
+    // to include APIs the runtime already provides.
+    "lib": ["ES2024", "DOM"],
     "module": "ESNext",
     "skipLibCheck": true,
 
