@@ -293,6 +293,51 @@ pub fn is_newer(candidate: &str, current: &str) -> bool {
 mod tests {
     use super::*;
 
+    /// A manifest shaped exactly as our release pipeline writes it, including
+    /// the custom `portable` section.
+    const MANIFEST: &str = r#"{
+      "version": "0.2.0",
+      "notes": "Alarmer 0.2.0",
+      "pub_date": "2026-09-17T08:00:00Z",
+      "platforms": {
+        "windows-x86_64": { "signature": "sig", "url": "https://example.test/a.exe" },
+        "linux-x86_64": { "signature": "sig", "url": "https://example.test/a.AppImage" }
+      },
+      "portable": {
+        "windows-x86_64": { "signature": "sig", "url": "https://example.test/p.zip" },
+        "linux-x86_64": { "signature": "sig", "url": "https://example.test/p.zip" }
+      }
+    }"#;
+
+    #[test]
+    fn the_installed_updater_accepts_our_manifest() {
+        // The release publishes a custom `portable` section alongside the
+        // standard one. If Tauri's own parser rejected unknown fields, every
+        // installed copy would stop seeing updates and nothing else would
+        // notice — so compatibility is pinned here against its real type.
+        let release: tauri_plugin_updater::RemoteRelease =
+            serde_json::from_str(MANIFEST).expect("the updater must accept our manifest");
+
+        assert_eq!(release.version.to_string(), "0.2.0");
+        assert!(
+            release.download_url("windows-x86_64").is_ok(),
+            "the standard platform entry must resolve"
+        );
+    }
+
+    #[test]
+    fn the_portable_section_does_not_disturb_the_standard_one() {
+        let release: tauri_plugin_updater::RemoteRelease =
+            serde_json::from_str(MANIFEST).unwrap();
+
+        // Both platforms survive parsing with the extra key present.
+        assert!(release.download_url("windows-x86_64").is_ok());
+        assert!(release.download_url("linux-x86_64").is_ok());
+        // A platform we did not publish is still reported as missing, not as an
+        // accidental success.
+        assert!(release.download_url("darwin-x86_64").is_err());
+    }
+
     #[test]
     fn staging_rejects_empty_bytes() {
         // A truncated download must not be staged as a usable update.
