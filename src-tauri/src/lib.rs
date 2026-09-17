@@ -12,8 +12,89 @@ use base64::Engine;
 mod ai;
 mod alarm_sound;
 mod credentials;
+mod portable_update;
 mod scheduler;
 mod timer;
+
+/// Whether this build keeps its data beside the executable.
+#[tauri::command]
+async fn is_portable_build() -> Result<bool, String> {
+    Ok(portable_update::is_portable())
+}
+
+/// Downloads, verifies and stages the portable update for this platform.
+///
+/// The URL is resolved here rather than passed in: the update source is
+/// therefore always our own release manifest, and a compromised webview cannot
+/// point the updater at an arbitrary binary. The artifact is verified against
+/// the project's signing key before anything is written to disk.
+#[tauri::command]
+async fn portable_stage_update() -> Result<(), String> {
+    let manifest = portable_update::fetch_manifest().await?;
+    let entry = manifest
+        .portable_entry()
+        .ok_or_else(|| "this release has no portable build for this platform".to_string())?;
+
+    let bytes = portable_update::download(&entry.url).await?;
+    portable_update::verify(&bytes, &entry.signature)?;
+    portable_update::stage(bytes)?;
+    Ok(())
+}
+
+/// True when a staged update is waiting to be applied.
+#[tauri::command]
+async fn portable_update_ready() -> Result<bool, String> {
+    Ok(portable_update::has_staged_update())
+}
+
+/// What a portable build found in the release manifest.
+#[derive(serde::Serialize)]
+pub struct PortableUpdateCheck {
+    /// Empty when the running version is already the newest.
+    version: String,
+    notes: String,
+    date: Option<String>,
+    /// Set when an update exists: where to download it from.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    url: Option<String>,
+}
+
+/// Checks our own release manifest for a newer portable build.
+#[tauri::command]
+async fn portable_check_update(app: tauri::AppHandle) -> Result<PortableUpdateCheck, String> {
+    let current = app.package_info().version.to_string();
+    let manifest = portable_update::fetch_manifest().await?;
+
+    let latest = manifest.version.trim_start_matches('v').to_string();
+    if !portable_update::is_newer(&latest, &current) {
+        return Ok(PortableUpdateCheck {
+            version: String::new(),
+            notes: String::new(),
+            date: None,
+            url: None,
+        });
+    }
+
+    let url = manifest
+        .portable_entry()
+        .map(|entry| entry.url)
+        .ok_or_else(|| format!("release {latest} has no portable build for this platform"))?;
+
+    Ok(PortableUpdateCheck {
+        version: latest,
+        notes: manifest.notes,
+        date: manifest.pub_date,
+        url: Some(url),
+    })
+}
+
+/// Swaps in the staged binary and restarts, then exits this process.
+#[tauri::command]
+async fn portable_apply_update(app: tauri::AppHandle) -> Result<(), String> {
+    portable_update::launch_swap_and_restart()?;
+    app.exit(0);
+    Ok(())
+}
 
 /// Asks the configured model for a completion.
 ///
@@ -306,7 +387,7 @@ async fn store_dir(app: tauri::AppHandle) -> Result<String, String> {
 }
 
 /// True when a `portable` marker file sits next to the executable.
-fn has_portable_marker() -> bool {
+pub fn has_portable_marker() -> bool {
     std::env::current_exe()
         .ok()
         .and_then(|exe| exe.parent().map(|d| d.join("portable").exists()))
@@ -345,6 +426,10 @@ pub fn run() {
             Some(vec![START_MINIMIZED_FLAG]),
         ))
         .plugin(tauri_plugin_global_shortcut::Builder::new().build())
+        // The updater checks our own GitHub releases for a newer signed build;
+        // `process` is what lets the app relaunch into the installed version.
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        .plugin(tauri_plugin_process::init())
         .invoke_handler(tauri::generate_handler![
             synthesize_speech,
             set_companion_mode,
@@ -359,6 +444,11 @@ pub fn run() {
             set_api_key,
             has_api_key,
             store_dir,
+            is_portable_build,
+            portable_stage_update,
+            portable_check_update,
+            portable_update_ready,
+            portable_apply_update,
             timer::timer_set_duration,
             timer::timer_start,
             timer::timer_pause,

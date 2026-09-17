@@ -1,12 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
-import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload, RefreshCw, Loader2 } from 'lucide-react';
 import { ThemeColors, ThemeId, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '../types';
 import { THEMES } from '../constants/themes';
 import { CLOUD_VOICES, EdgeTtsService } from '../services/edgeTts';
 import { soundService } from '../services/sound';
 import { I18nService, Language } from '../services/i18n';
 import { AIGateway } from '../services/aiGateway';
+import { checkForUpdate, currentVersion, detectPortable, installUpdate, type UpdateInfo } from '../services/update';
 import { StoreService } from '../services/store';
 
 interface SettingsViewProps {
@@ -66,6 +67,63 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     return StoreService.getPreference('alarmer_voice_volume', 0.8);
   });
   const [currentLang, setCurrentLang] = useState<Language>(() => I18nService.getLang());
+
+  /** Running version, resolved once so the panel can name it. */
+  const [appVersion, setAppVersion] = useState('…');
+  /** Whether this copy updates by replacing its own binary. */
+  const [portable, setPortable] = useState(false);
+  const [updatePhase, setUpdatePhase] = useState<
+    | { kind: 'idle' }
+    | { kind: 'checking' }
+    | { kind: 'current' }
+    | { kind: 'available'; info: UpdateInfo }
+    | { kind: 'downloading'; info: UpdateInfo; percent: number }
+    | { kind: 'installing'; info: UpdateInfo }
+    | { kind: 'ready'; info: UpdateInfo }
+    | { kind: 'error'; message: string }
+  >({ kind: 'idle' });
+
+  useEffect(() => {
+    void currentVersion().then(setAppVersion);
+    void detectPortable().then(setPortable);
+  }, []);
+
+  const updatePercent =
+    updatePhase.kind === 'downloading' ? updatePhase.percent : 0;
+
+  const handleCheckUpdate = async () => {
+    soundService.playUiClick();
+    setUpdatePhase({ kind: 'checking' });
+
+    const result = await checkForUpdate();
+    if (result.status === 'update') {
+      setUpdatePhase({ kind: 'available', info: result.info });
+    } else if (result.status === 'current') {
+      setUpdatePhase({ kind: 'current' });
+    } else {
+      setUpdatePhase({ kind: 'error', message: result.message });
+    }
+  };
+
+  const handleInstallUpdate = async () => {
+    if (updatePhase.kind !== 'available') return;
+    const info = updatePhase.info;
+    soundService.playCountdownTick();
+    setUpdatePhase({ kind: 'downloading', info, percent: 0 });
+
+    const result = await installUpdate(info, (downloaded, total) => {
+      const percent = total > 0 ? Math.round((downloaded / total) * 100) : 0;
+      setUpdatePhase({ kind: 'downloading', info, percent });
+    });
+
+    if (!result.ok) {
+      setUpdatePhase({ kind: 'error', message: result.message });
+      return;
+    }
+    // Installing restarts the app, so this state is only reached if the restart
+    // did not happen — in which case saying so beats an endless spinner.
+    setUpdatePhase({ kind: 'ready', info });
+  };
 
   const handleLangChange = (lang: Language) => {
     I18nService.setLang(lang);
@@ -510,6 +568,83 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       )}
       {activeTab === 'data' && (
         <div className="flex flex-col space-y-6">
+        {/* Updates */}
+        <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
+          <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
+            Обновления
+          </label>
+
+          <div className="flex items-center justify-between text-[11px]">
+            <span style={{ color: theme.subtext }}>Версия</span>
+            <span className="font-mono tabular-nums" style={{ color: theme.text }}>
+              {appVersion}
+            </span>
+          </div>
+
+          {portable && (
+            <span className="text-[10px] opacity-60 leading-relaxed">
+              Портативная сборка: обновление подменяет сам файл программы рядом с
+              данными — установщик не запускается.
+            </span>
+          )}
+
+          {/* The update state is always stated in words. A silent updater is one
+              the user cannot tell apart from a broken one. */}
+          {updatePhase.kind === 'checking' && (
+            <span className="text-[11px] flex items-center gap-1.5" style={{ color: theme.subtext }}>
+              <Loader2 size={11} className="animate-spin" /> Проверяем…
+            </span>
+          )}
+          {updatePhase.kind === 'current' && (
+            <span className="text-[11px]" style={{ color: theme.subtext }}>
+              Установлена последняя версия.
+            </span>
+          )}
+          {updatePhase.kind === 'available' && (
+            <span className="text-[11px]" style={{ color: theme.text }}>
+              Доступна версия {updatePhase.info.version}.
+            </span>
+          )}
+          {updatePhase.kind === 'ready' && (
+            <span className="text-[11px]" style={{ color: theme.text }}>
+              Версия {updatePhase.info.version} загружена — применится при перезапуске.
+            </span>
+          )}
+          {updatePhase.kind === 'error' && (
+            <span className="text-[11px] text-red-400 leading-snug">{updatePhase.message}</span>
+          )}
+
+          <div className="grid grid-cols-2 gap-2">
+            <button
+              type="button"
+              onClick={handleCheckUpdate}
+              disabled={updatePhase.kind === 'checking' || updatePhase.kind === 'installing'}
+              className="py-2.5 px-3 rounded-xl border text-xs font-semibold flex items-center justify-center space-x-1.5 hover:bg-white/5 disabled:opacity-40 transition-all"
+              style={{ borderColor: theme.border }}
+            >
+              <RefreshCw size={13} />
+              <span>Проверить</span>
+            </button>
+
+            <button
+              type="button"
+              onClick={handleInstallUpdate}
+              disabled={updatePhase.kind !== 'available'}
+              className="py-2.5 px-3 rounded-xl text-xs font-semibold flex items-center justify-center space-x-1.5 disabled:opacity-30 transition-all"
+              style={{ backgroundColor: '#fafafa', color: '#0a0a0a' }}
+            >
+              <Download size={13} />
+              <span>
+                {updatePhase.kind === 'downloading'
+                  ? `Загрузка ${updatePercent}%`
+                  : updatePhase.kind === 'installing'
+                  ? 'Устанавливаем…'
+                  : 'Обновить'}
+              </span>
+            </button>
+          </div>
+        </div>
+
         {/* UI Reset */}
         <div className="flex flex-col space-y-2 border-t pt-4" style={{ borderColor: theme.border }}>
           <label className="text-xs font-bold uppercase tracking-wider" style={{ color: theme.subtext }}>
