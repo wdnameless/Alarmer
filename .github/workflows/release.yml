@@ -61,14 +61,18 @@ jobs:
       # A portable bundle is the built binary plus an empty `portable` marker:
       # the app sees the marker and keeps its data beside itself rather than in
       # the per-user application data directory. No installer, no registry.
+      #
+      # `zip` is not present on Windows runners, so the archive is written with
+      # PowerShell there and with `zip` elsewhere.
       - name: Build portable bundle
-        shell: bash
+        shell: pwsh
         run: |
-          mkdir -p portable/alarmer
-          cp "src-tauri/target/release/${{ matrix.exeName }}" \
-             "portable/alarmer/${{ matrix.exeName }}"
-          touch portable/alarmer/portable
-          cd portable && zip -r ../alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}.zip alarmer
+          $name = "alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}"
+          New-Item -ItemType Directory -Force -Path portable/alarmer | Out-Null
+          Copy-Item "src-tauri/target/release/${{ matrix.exeName }}" "portable/alarmer/${{ matrix.exeName }}"
+          New-Item -ItemType File -Force -Path portable/alarmer/portable | Out-Null
+          Compress-Archive -Path portable/alarmer -DestinationPath "$name.zip" -Force
+          Write-Host "built $name.zip"
 
       # Collect every artifact this platform produced, so the publish job has
       # them all in one place.
