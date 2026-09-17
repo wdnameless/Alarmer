@@ -245,6 +245,124 @@ describe('editing an existing alarm', () => {
   });
 });
 
+describe('an alarm that could never ring', () => {
+  beforeEach(cleanup);
+
+  /*
+   * "days" mode with no days matches no weekday, so the alarm would sit in the
+   * list labelled "Каждый день" and never fire — indistinguishable from a
+   * working one until the morning it stays silent.
+   */
+
+  it('refuses to remove the last remaining weekday in the create form', () => {
+    render(<Harness />);
+
+    // Start from weekdays only, then remove all but Monday.
+    for (const day of ['Вт', 'Ср', 'Чт', 'Пт']) {
+      act(() => {
+        screen.getByTitle(`Звонить в ${day}`).click();
+      });
+    }
+    expect(screen.getByTitle('Звонить в Пн').getAttribute('aria-pressed')).toBe('true');
+
+    // The last one stays on.
+    act(() => {
+      screen.getByTitle('Звонить в Пн').click();
+    });
+    expect(screen.getByTitle('Звонить в Пн').getAttribute('aria-pressed')).toBe('true');
+  });
+
+  it('refuses to remove the last remaining weekday on an existing alarm', () => {
+    let latest: AlarmItem[] = [];
+    const mondayOnly: AlarmItem = { ...weekdayAlarm, days: [1] };
+
+    function Capture() {
+      const [alarms, setAlarms] = useState<AlarmItem[]>([mondayOnly]);
+      useEffect(() => {
+        latest = alarms;
+      }, [alarms]);
+      return (
+        <Alarms
+          theme={theme}
+          alarms={alarms}
+          schedules={[]}
+          onUpdateSchedules={() => {}}
+          onUpdateAlarms={setAlarms}
+          dynamicUi={undefined as never}
+        />
+      );
+    }
+
+    render(<Capture />);
+    act(() => {
+      screen.getByTitle('Убрать Пн').click();
+    });
+
+    // Still armed on Monday rather than silently dead.
+    expect(latest[0].days).toEqual([1]);
+  });
+
+  it('still allows removing a day when others remain', () => {
+    let latest: AlarmItem[] = [];
+    function Capture() {
+      const [alarms, setAlarms] = useState<AlarmItem[]>([weekdayAlarm]);
+      useEffect(() => {
+        latest = alarms;
+      }, [alarms]);
+      return (
+        <Alarms
+          theme={theme}
+          alarms={alarms}
+          schedules={[]}
+          onUpdateSchedules={() => {}}
+          onUpdateAlarms={setAlarms}
+          dynamicUi={undefined as never}
+        />
+      );
+    }
+
+    render(<Capture />);
+    act(() => {
+      screen.getByTitle('Убрать Пт').click();
+    });
+
+    expect(latest[0].days).toEqual([1, 2, 3, 4]);
+  });
+
+  it('cancels a description edit on Escape instead of saving it', () => {
+    let latest: AlarmItem[] = [];
+    function Capture() {
+      const [alarms, setAlarms] = useState<AlarmItem[]>([weekdayAlarm]);
+      useEffect(() => {
+        latest = alarms;
+      }, [alarms]);
+      return (
+        <Alarms
+          theme={theme}
+          alarms={alarms}
+          schedules={[]}
+          onUpdateSchedules={() => {}}
+          onUpdateAlarms={setAlarms}
+          dynamicUi={undefined as never}
+        />
+      );
+    }
+
+    render(<Capture />);
+    act(() => {
+      screen.getByTitle('Добавить описание').click();
+    });
+
+    const field = screen.getByLabelText('Описание будильника') as HTMLInputElement;
+    field.value = 'Случайно набрано';
+    fireEvent.keyDown(field, { key: 'Escape' });
+    // Escape blurs, and the blur that follows must not commit the abandoned text.
+    fireEvent.blur(field);
+
+    expect(latest[0].note).toBeUndefined();
+  });
+});
+
 describe('rows derived from a program', () => {
   beforeEach(cleanup);
 

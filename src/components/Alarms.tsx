@@ -43,14 +43,23 @@ export const Alarms: React.FC<AlarmsProps> = ({
   const [newDays, setNewDays] = useState<number[]>([1, 2, 3, 4, 5]);
   const [currentTime, setCurrentTime] = useState('');
 
-  /** Adds or removes a weekday, keeping the list sorted so labels read in order. */
+  /**
+   * Adds or removes a weekday, keeping the list sorted so labels read in order.
+   *
+   * The last remaining day cannot be removed: an alarm in "days" mode with no
+   * days matches nothing, so it would sit in the list labelled "Каждый день"
+   * and never ring. Refusing the last removal keeps every saved alarm able to
+   * fire.
+   */
   const toggleNewDay = (day: number) => {
     soundService.playUiClick();
-    setNewDays((prev) =>
-      prev.includes(day)
-        ? prev.filter((d) => d !== day)
-        : [...prev, day].sort((a, b) => a - b),
-    );
+    setNewDays((prev) => {
+      if (prev.includes(day)) {
+        if (prev.length === 1) return prev;
+        return prev.filter((d) => d !== day);
+      }
+      return [...prev, day].sort((a, b) => a - b);
+    });
   };
   /** The alarm whose note field is open; null when none is. */
   const [noteEditingId, setNoteEditingId] = useState<string | null>(null);
@@ -81,9 +90,15 @@ export const Alarms: React.FC<AlarmsProps> = ({
     patchAlarm(id, { time: value.padStart(5, '0') });
   };
 
-  /** Toggles one weekday on an existing alarm. */
+  /**
+   * Toggles one weekday on an existing alarm.
+   *
+   * Like the create form, the last day is not removable: an alarm that matches
+   * no weekday is indistinguishable from a broken one.
+   */
   const toggleAlarmDay = (alarm: AlarmItem, day: number) => {
     soundService.playUiClick();
+    if (alarm.days.includes(day) && alarm.days.length === 1) return;
     const days = alarm.days.includes(day)
       ? alarm.days.filter((d) => d !== day)
       : [...alarm.days, day].sort((a, b) => a - b);
@@ -464,12 +479,21 @@ export const Alarms: React.FC<AlarmsProps> = ({
                       defaultValue={alarm.note ?? ''}
                       placeholder="Описание к будильнику..."
                       onBlur={(e) => {
+                        // Escape already cancelled: the blur that follows would
+                        // otherwise save the text the user just abandoned.
+                        if (e.currentTarget.dataset.cancelled === 'true') {
+                          setNoteEditingId(null);
+                          return;
+                        }
                         setAlarmNote(alarm.id, e.target.value);
                         setNoteEditingId(null);
                       }}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter') e.currentTarget.blur();
-                        if (e.key === 'Escape') setNoteEditingId(null);
+                        if (e.key === 'Escape') {
+                          e.currentTarget.dataset.cancelled = 'true';
+                          e.currentTarget.blur();
+                        }
                       }}
                       className="mt-0.5 text-[10px] bg-black/40 px-1.5 py-1 rounded border border-white/10 focus:outline-none"
                       style={{ color: theme.text }}

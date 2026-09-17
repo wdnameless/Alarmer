@@ -95,20 +95,25 @@ function sanitizeAlarm(raw: unknown, index: number): AlarmItem | null {
   const days = asArray<unknown>(raw.days, [1, 2, 3, 4, 5]).filter(
     (d): d is number => typeof d === 'number' && d >= 0 && d <= 6,
   );
+  // Files written before `repeat` existed used an empty day list for a one-off
+  // and a populated one for specific days. Reading them back that way keeps an
+  // existing one-off alarm a one-off instead of arming it daily.
+  const repeat = oneOf(
+    raw.repeat,
+    ['once', 'daily', 'days'] as const,
+    days.length === 0 ? 'once' : 'days',
+  );
+  // `days` mode with no days matches no weekday at all: the alarm would sit in
+  // the list labelled "Каждый день" and never ring. Such a file is healed into
+  // a daily alarm rather than left silently broken.
+  const healedRepeat = repeat === 'days' && days.length === 0 ? 'daily' : repeat;
   return {
     id: asString(raw.id, `alarm_${index}`),
     title: asString(raw.title, label),
     label,
     time: time.padStart(5, '0'),
     days,
-    // Files written before `repeat` existed used an empty day list for a
-    // one-off and a populated one for specific days. Reading them back that way
-    // keeps an existing one-off alarm a one-off instead of arming it daily.
-    repeat: oneOf(
-      raw.repeat,
-      ['once', 'daily', 'days'] as const,
-      days.length === 0 ? 'once' : 'days',
-    ),
+    repeat: healedRepeat,
     note: typeof raw.note === 'string' ? raw.note : undefined,
     enabled: asBoolean(raw.enabled, true),
     sound: asString(raw.sound, 'gentle'),

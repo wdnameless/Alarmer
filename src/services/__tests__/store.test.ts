@@ -130,6 +130,34 @@ describe('store schema migration', () => {
     expect(legacyApiKey(null)).toBeNull();
   });
 
+  it('heals an alarm that could never ring', () => {
+    // "days" mode with no days matches no weekday: the alarm would show as
+    // "Каждый день" and stay silent. Reading it back as a daily alarm keeps it
+    // working instead of leaving a silently broken entry in the list.
+    const state = migrate({
+      alarms: [{ id: 'dead', time: '07:00', repeat: 'days', days: [] }],
+    });
+
+    expect(state.alarms[0].repeat).toBe('daily');
+  });
+
+  it('leaves a one-off alarm a one-off', () => {
+    const state = migrate({
+      alarms: [{ id: 'once', time: '07:00', repeat: 'once', days: [] }],
+    });
+
+    expect(state.alarms[0].repeat).toBe('once');
+  });
+
+  it('leaves a real day selection alone', () => {
+    const state = migrate({
+      alarms: [{ id: 'wk', time: '07:00', repeat: 'days', days: [1, 3, 5] }],
+    });
+
+    expect(state.alarms[0].repeat).toBe('days');
+    expect(state.alarms[0].days).toEqual([1, 3, 5]);
+  });
+
   it('persists preferences with numeric, boolean and string coercion', () => {
     // persist() updates the in-memory snapshot before its first await, so the
     // written value is readable synchronously right after setPreference returns.
