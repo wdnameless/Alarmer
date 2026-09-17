@@ -1,12 +1,13 @@
 import React, { useState } from "react";
-import { ThemeColors, DynamicUIConfig, AlarmItem, Schedule, AISettings, TaskItem, SessionRecord, NoteItem } from "../types";
+import { ThemeColors, DynamicUIConfig, AlarmItem, Schedule, AISettings, TaskItem, SessionRecord, NoteItem, Direction, BlockSettings } from "../types";
 import { Timer } from "./Timer";
 import { Alarms } from "./Alarms";
 import { TodayView } from "./TodayView";
 import { TasksView } from "./TasksView";
-import { StatsView } from "./StatsView";
+import { JournalView } from "./JournalView";
+import { TimerService } from '../services/timer';
 import { NotesView } from "./NotesView";
-import { Timer as TimerIcon, Bell, CalendarDays, ListTodo, TrendingUp, NotebookPen } from "lucide-react";
+import { Timer as TimerIcon, Bell, CalendarDays, ListTodo, BookOpen, NotebookPen } from "lucide-react";
 import { I18nService } from "../services/i18n";
 
 /** Modules reachable from the dashboard. */
@@ -30,6 +31,11 @@ interface DashboardViewProps {
   onSubModuleChange?: (sub: SubModule) => void;
   notes: NoteItem[];
   onUpdateNotes: (notes: NoteItem[]) => void;
+  directions?: Direction[];
+  onUpdateDirections?: (directions: Direction[]) => void;
+  onStartBlock?: (directionId: string) => void;
+  onRateQuality?: (quality: number) => void;
+  blockSettings?: BlockSettings;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -50,6 +56,11 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   timerMinutes,
   activeSubModule,
   onSubModuleChange,
+  directions = [],
+  onUpdateDirections,
+  onStartBlock,
+  onRateQuality,
+  blockSettings,
 }) => {
   const [localSubModule, setLocalSubModule] = useState<SubModule>("today");
   const subModule = activeSubModule ?? localSubModule;
@@ -64,7 +75,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     { id: 'timer', label: t.timer, title: t.timerTitle, icon: <TimerIcon size={13} /> },
     { id: 'tasks', label: t.tasks, title: t.tasksTitle, icon: <ListTodo size={13} /> },
     { id: 'alarms', label: t.alarms, title: t.alarmsTitle, icon: <Bell size={13} /> },
-    { id: 'stats', label: t.stats, title: t.statsTitle, icon: <TrendingUp size={13} /> },
+    { id: 'stats', label: t.stats, title: t.statsTitle, icon: <BookOpen size={13} /> },
     { id: 'notes', label: 'Заметки', title: 'Заметки и описания', icon: <NotebookPen size={13} /> },
   ];
 
@@ -104,10 +115,37 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           the countdown. */}
       <div className="w-full flex-1 flex flex-col items-center justify-center">
         <div className={`w-full flex-1 flex flex-col items-center justify-center ${subModule === 'today' ? '' : 'hidden'}`}>
-          <TodayView theme={theme} schedules={schedules} onSession={onSession} />
+          <TodayView
+            theme={theme}
+            schedules={schedules}
+            onSession={onSession}
+            directions={directions}
+            sessions={sessions}
+            onStartBlock={(dirId) => {
+              // Arm the backend here as well as telling the parent: the parent
+              // may not implement the callback at all, and a play button that
+              // only switches tabs would look exactly like a broken block.
+              void TimerService.setMode('block')
+                .then(() => TimerService.setDirection(dirId))
+                .then(() => TimerService.start())
+                .catch(() => {
+                  // Outside Tauri there is no backend to arm.
+                });
+              onStartBlock?.(dirId);
+              setSubModule('timer');
+            }}
+            onNavigateToJournal={() => setSubModule('stats')}
+            blockSettings={blockSettings}
+          />
         </div>
         <div className={`w-full flex-1 flex flex-col items-center justify-center ${subModule === 'timer' ? '' : 'hidden'}`}>
-          <Timer theme={theme} dynamicUi={dynamicUi} initialMinutes={timerMinutes} />
+          <Timer
+            theme={theme}
+            dynamicUi={dynamicUi}
+            initialMinutes={timerMinutes}
+            directions={directions}
+            onRateQuality={onRateQuality}
+          />
         </div>
         <div className={`w-full flex-1 flex flex-col items-center justify-start overflow-y-auto ${subModule === 'tasks' ? '' : 'hidden'}`}>
           <TasksView
@@ -139,7 +177,13 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           />
         </div>
         <div className={`w-full flex-1 flex flex-col items-center justify-start overflow-y-auto ${subModule === 'stats' ? '' : 'hidden'}`}>
-          <StatsView theme={theme} sessions={sessions} tasks={tasks} />
+          <JournalView
+            theme={theme}
+            sessions={sessions}
+            directions={directions}
+            tasks={tasks}
+            onUpdateDirections={onUpdateDirections}
+          />
         </div>
       </div>
     </div>

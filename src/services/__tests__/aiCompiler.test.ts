@@ -75,4 +75,35 @@ describe('AICompilerService offline intent compilation', () => {
     expect(result.ui).toBeUndefined();
     expect(result.explanation).not.toMatch(/ИИ применил изменения/);
   });
+
+  it('parses directions mutation in offline mode when creating directions', async () => {
+    const result = await compile('создай направление Кодинг с бюджетом 12 блоков');
+
+    expect(result.type).toBe('directions');
+    expect(result.directions).toBeDefined();
+    expect(result.directions?.length).toBe(1);
+    expect(result.directions?.[0].name).toBe('Кодинг');
+    expect(result.directions?.[0].weeklyBlockBudget).toBe(12);
+    expect(result.ui).toBeUndefined();
+  });
+
+  it('honestly reports empty journal when asked history question with empty history', async () => {
+    const emptyHistory = {
+      days: {},
+      directions: [],
+      byHour: new Array(24).fill(0),
+      totals: { sessions: 0, blocks: 0, minutes: 0 },
+    };
+
+    const result = await AICompilerService.compileUserIntent(
+      'когда я работаю лучше всего?',
+      DEFAULT_DYNAMIC_UI,
+      offlineSettings,
+      emptyHistory
+    );
+
+    expect(result.type).toBe('answer');
+    expect(result.ui).toBeUndefined();
+    expect(result.explanation).toMatch(/нет данных|нет записей|журнал пуст/i);
+  });
 });

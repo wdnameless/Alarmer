@@ -1,10 +1,13 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
-import { ThemeColors, DynamicUIConfig } from '../types';
+import { ThemeColors, DynamicUIConfig, Direction, SessionRecord } from '../types';
 import { RadialDial } from './RadialDial';
+import { QualityPrompt } from './QualityPrompt';
 import { soundService } from '../services/sound';
-import { TimerService, type TimerSnapshot, MAX_MINUTES, MIN_MINUTES } from '../services/timer';
+import { TimerService, type TimerSnapshot, type TimerPhase, MAX_MINUTES, MIN_MINUTES } from '../services/timer';
+import { MusicService } from '../services/music';
 import { StoreService } from '../services/store';
+import { blocksOnDay } from '../services/focusBudget';
 import confetti from 'canvas-confetti';
 import { listen } from '@tauri-apps/api/event';
 import { isTauri } from '../services/platform';
@@ -14,24 +17,38 @@ interface TimerProps {
   dynamicUi?: DynamicUIConfig;
   initialMinutes?: number;
   onFinish?: () => void;
+  directions?: Direction[];
+  onRateQuality?: (quality: number) => void;
+  sessions?: SessionRecord[];
 }
 
 /**
- * Renders the backend countdown.
+ * Renders the backend countdown, flow, or block timer.
  *
- * The component holds no clock of its own: mount and unmount are now free of
- * consequences, so switching sub-tabs — or hiding the window entirely — no
- * longer resets the timer or freezes the overlay.
+ * The component holds no clock of its own: mount and unmount are free of
+ * consequences, so switching sub-tabs no longer resets the timer or freezes
+ * the overlay.
  */
 export const Timer: React.FC<TimerProps> = ({
   theme,
   dynamicUi,
   initialMinutes,
   onFinish,
+  directions,
+  onRateQuality,
+  sessions,
 }) => {
   const [state, setState] = useState<TimerSnapshot | null>(null);
   /** Progress the user is dragging on the dial; null when not dragging. */
   const [dragging, setDragging] = useState<number | null>(null);
+  /** Showing the quality prompt after a focus phase finishes in block mode. */
+  const [showQualityPrompt, setShowQualityPrompt] = useState(false);
+  const [promptDirectionName, setPromptDirectionName] = useState<string | undefined>(undefined);
+
+  // Track previous phase and mode to detect focus -> rest transitions
+  const prevPhaseRef = useRef<TimerPhase | undefined>(undefined);
+  const prevModeRef = useRef<string | undefined>(undefined);
+  const prevStateRef = useRef<TimerSnapshot | null>(null);
 
   // Adopt the backend state on mount, then follow its broadcast.
   useEffect(() => {
@@ -40,85 +57,162 @@ export const Timer: React.FC<TimerProps> = ({
     // Restore the arming mode, which is a user preference rather than a
     // property of any one countdown.
     const savedMode = StoreService.getPreference<string>('alarmer_timer_mode', 'countdown');
-    if (savedMode === 'flow' || savedMode === 'countdown') {
+    if (savedMode === 'flow' || savedMode === 'countdown' || savedMode === 'block') {
       void TimerService.setMode(savedMode);
     }
 
     void TimerService.getState().then((initial) => {
-      if (active) setState(initial);
+      if (active) {
+        setState(initial);
+        prevPhaseRef.current = initial.phase;
+        prevModeRef.current = initial.mode;
+        prevStateRef.current = initial;
+      }
     });
-    const unsubscribe = TimerService.subscribe((next) => setState(next));
+
+    const unsubscribeTick = TimerService.subscribe((next) => {
+      if (!active) return;
+      setState(next);
+
+      const prevPhase = prevPhaseRef.current;
+      const prevMode = prevModeRef.current;
+
+      // When in block mode, transition from focus -> rest triggers the quality prompt
+      if (prevMode === 'block' && next.mode === 'block' && prevPhase === 'focus' && next.phase === 'rest') {
+        const activeDir = directions?.find((d) => d.id === next.direction_id);
+        setPromptDirectionName(activeDir?.name);
+        setShowQualityPrompt(true);
+      }
+
+      // Music playback tracking in block mode:
+      // Focus running -> MusicService.play(), else MusicService.stop()
+      if (next.mode === 'block') {
+        if (next.running && next.phase === 'focus') {
+          void MusicService.play();
+        } else {
+          void MusicService.stop();
+        }
+      }
+
+      prevPhaseRef.current = next.phase;
+      prevModeRef.current = next.mode;
+      prevStateRef.current = next;
+    });
+
+    // Also listen to timer session events directly, so the prompt still appears
+    // when the phase change lands while this view is mid-render.
+    const unsubscribeSession = TimerService.onSession((event) => {
+      if (!active) return;
+      if (event.phase === 'focus' && event.completed) {
+        const activeDir = directions?.find((d) => d.id === event.direction_id);
+        setPromptDirectionName(activeDir?.name);
+        setShowQualityPrompt(true);
+      }
+    });
+
     return () => {
       active = false;
-      unsubscribe();
+      unsubscribeTick?.();
+      unsubscribeSession?.();
+      void MusicService.stop();
     };
-  }, []);
+  }, [directions]);
 
   // An initial duration handed in from outside (e.g. "timer for 10 minutes" in
   // the chat) arms the backend and stops there.
   useEffect(() => {
-    if (initialMinutes === undefined) return;
-    void TimerService.setDuration(initialMinutes).then(() => TimerService.getState().then(setState));
+    if (typeof initialMinutes === 'number' && Number.isFinite(initialMinutes)) {
+      void TimerService.setDuration(Math.max(MIN_MINUTES, initialMinutes));
+    }
   }, [initialMinutes]);
 
   // Ring locally when the backend reports zero, plus confetti for a finished
   // countdown. The backend raises the OS notification when the window is hidden.
   useEffect(() => {
-    if (!isTauri()) return;
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
+    let unlistenDone: (() => void) | undefined;
 
-    void listen<TimerSnapshot>('timer://finished', (event) => {
-      soundService.playFinishAlarm();
-      soundService.speak('Время вышло!');
-      confetti({ particleCount: 60, spread: 60 });
-      onFinish?.();
-      setState(event.payload);
-    }).then((fn) => {
-      if (cancelled) fn();
-      else unlisten = fn;
-    });
+    const setup = async () => {
+      if (!isTauri()) return;
+      unlistenDone = await listen('timer-finished', () => {
+        soundService.playFinishAlarm();
+        soundService.speak('Таймер завершен');
+        void confetti({
+          particleCount: 80,
+          spread: 70,
+          origin: { y: 0.6 },
+          colors: [theme.accent, '#ffffff', theme.ringProgress],
+        });
+        onFinish?.();
+      });
+    };
+
+    void setup();
 
     return () => {
-      cancelled = true;
-      unlisten?.();
+      unlistenDone?.();
     };
-  }, [onFinish]);
+  }, [onFinish, theme.accent, theme.ringProgress]);
 
   if (!state) return null;
 
-  const { total_secs, remaining_secs, running, overtime, overtime_secs, mode } = state;
+  const {
+    total_secs,
+    remaining_secs,
+    running,
+    overtime,
+    overtime_secs,
+    mode,
+    phase,
+    block_index: blockIndex,
+    direction_id: directionId,
+  } = state;
+
+  const isBlockMode = mode === 'block';
+  const isFocusPhase = phase === 'focus';
+  const isRestPhase = phase === 'rest';
+
+  // Resolved active direction
+  const activeDirection = directionId
+    ? directions?.find((d) => d.id === directionId)
+    : undefined;
+
+  // Day's completed block count from sessions or blockIndex
+  const currentSessions = sessions ?? [];
+  const dayBlocksCompleted = blocksOnDay(currentSessions, new Date());
+  const displayBlockCount = isBlockMode ? (blockIndex > 0 ? blockIndex : dayBlocksCompleted + 1) : 0;
 
   const toggleRun = () => {
-    soundService.playCountdownTick();
-    void TimerService.toggle().then(() => TimerService.getState().then(setState));
+    soundService.playUiClick();
+    void TimerService.toggle();
   };
 
   const reset = () => {
-    soundService.playCountdownTick();
-    void TimerService.reset().then(() => TimerService.getState().then(setState));
+    soundService.playUiClick();
+    void TimerService.reset();
+    void MusicService.stop();
   };
 
   const armMinutes = (minutes: number) => {
-    soundService.playCountdownTick();
-    void TimerService.setDuration(minutes).then(() => TimerService.getState().then(setState));
+    soundService.playUiClick();
+    void TimerService.setDuration(minutes);
   };
 
   const toggleMode = () => {
-    soundService.playCountdownTick();
-    const next = mode === 'flow' ? 'countdown' : 'flow';
-    StoreService.setPreference('alarmer_timer_mode', next);
-    void TimerService.setMode(next).then(() => TimerService.getState().then(setState));
+    soundService.playUiClick();
+    const modes: ('countdown' | 'flow' | 'block')[] = ['countdown', 'flow', 'block'];
+    const currentIdx = modes.indexOf(mode);
+    const nextMode = modes[(currentIdx + 1) % modes.length];
+    StoreService.setPreference('alarmer_timer_mode', nextMode);
+    void TimerService.setMode(nextMode);
   };
 
   // Dial progress 0..1 over one hour, so 25 minutes is a little under half.
   const progress = Math.max(0, Math.min(1, remaining_secs / 3600));
 
   const formatSubDigital = (sec: number) => {
-    const h = Math.floor(sec / 3600);
-    const m = Math.floor((sec % 3600) / 60);
+    const m = Math.floor(sec / 60);
     const s = sec % 60;
-    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
+    return `${m}:${s.toString().padStart(2, '0')}`;
   };
 
   const formatPrimaryTime = (sec: number) => {
@@ -129,17 +223,28 @@ export const Timer: React.FC<TimerProps> = ({
 
   /** Live preview while dragging; the backend is only told on release. */
   const handleProgressChange = (newProgress: number) => {
-    if (!running) setDragging(newProgress);
+    if (!running && !isBlockMode) setDragging(newProgress);
   };
 
   // Dial release arms the duration and starts it — the gesture is the intent.
   const handleProgressCommit = (finalProgress: number) => {
-    const mins = Math.max(MIN_MINUTES, Math.min(MAX_MINUTES, Math.round(finalProgress * 60)));
+    if (isBlockMode) return;
+    const minutes = Math.max(
+      MIN_MINUTES,
+      Math.min(MAX_MINUTES, Math.round(finalProgress * 60)),
+    );
     setDragging(null);
-    soundService.playCountdownTick();
-    void TimerService.setDuration(mins)
-      .then(() => TimerService.start())
-      .then(() => TimerService.getState().then(setState));
+    armMinutes(minutes);
+    void TimerService.start();
+  };
+
+  const handleRateQuality = (quality: number) => {
+    setShowQualityPrompt(false);
+    onRateQuality?.(quality);
+  };
+
+  const handleSkipQuality = () => {
+    setShowQualityPrompt(false);
   };
 
   const btnRounding =
@@ -153,35 +258,72 @@ export const Timer: React.FC<TimerProps> = ({
   const displayedProgress = dragging !== null ? dragging : progress;
   const totalMinutes = Math.max(MIN_MINUTES, Math.round(total_secs / 60));
 
+  // Accent color overrides for block direction or rest phase
+  const ringAccent = isBlockMode
+    ? isRestPhase
+      ? '#38bdf8' // Sky blue for rest
+      : activeDirection?.color || theme.accent
+    : theme.accent;
+
   return (
     <div className={`flex flex-col items-center w-full ${dynamicUi?.layout?.contentAlignment === 'compact' ? 'justify-center my-auto' : ''}`}>
-      {/* Overtime banner: only reachable in flow mode, where the timer keeps
-          counting up instead of interrupting. */}
-      {overtime && (
-        <div
-          className="flex items-center space-x-2 px-3 py-1 rounded-full text-xs font-mono mb-2 animate-pulse"
-          style={{ backgroundColor: 'rgba(255,255,255,0.06)', color: theme.text, border: `1px solid ${theme.border}` }}
-        >
-          <span>⚡ ПОТОК +{Math.floor(overtime_secs / 60)}:{(overtime_secs % 60).toString().padStart(2, '0')}</span>
-          <button
-            onClick={() => {
-              void TimerService.pause().then(() => TimerService.getState().then(setState));
-            }}
-            className="underline text-[10px] ml-1"
-          >
-            стоп
-          </button>
+      {/* Block mode header badge: Phase + Block counter + Direction */}
+      {isBlockMode && (
+        <div className="flex flex-col items-center gap-1.5 mb-2 animate-in fade-in duration-200">
+          <div className="flex items-center gap-2">
+            <span
+              className="px-3 py-1 text-xs font-semibold rounded-full uppercase tracking-wider transition-colors"
+              style={{
+                backgroundColor: isRestPhase ? 'rgba(56, 189, 248, 0.15)' : 'rgba(255, 122, 26, 0.15)',
+                color: isRestPhase ? '#38bdf8' : (activeDirection?.color || theme.accent),
+                border: `1px solid ${isRestPhase ? 'rgba(56, 189, 248, 0.3)' : 'rgba(255, 122, 26, 0.3)'}`,
+              }}
+            >
+              {isFocusPhase ? 'Фокус' : 'Отдых'}
+            </span>
+            <span
+              className="px-2.5 py-1 text-xs font-medium rounded-full text-zinc-400 bg-zinc-800/60 border border-zinc-700/50"
+              title="Номер блока сегодня"
+            >
+              Блок {displayBlockCount}
+            </span>
+          </div>
+          {activeDirection && (
+            <div className="flex items-center gap-1.5 text-xs text-zinc-300 font-medium mt-0.5">
+              <span
+                className="w-2.5 h-2.5 rounded-full inline-block shrink-0"
+                style={{ backgroundColor: activeDirection.color }}
+              />
+              <span>{activeDirection.name}</span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Quality rating overlay prompt when a focus block completes */}
+      {showQualityPrompt && isBlockMode && (
+        <div className="w-full max-w-sm mb-4 px-2">
+          <QualityPrompt
+            theme={theme}
+            directionName={promptDirectionName}
+            onRate={handleRateQuality}
+            onSkip={handleSkipQuality}
+          />
         </div>
       )}
 
       <RadialDial
-        theme={theme}
+        theme={{
+          ...theme,
+          ringProgress: ringAccent,
+          accent: ringAccent,
+        }}
         progress={overtime ? 1 : displayedProgress}
         primaryText={overtime
           ? `+${Math.floor(overtime_secs / 60)}:${(overtime_secs % 60).toString().padStart(2, '0')}`
           : formatPrimaryTime(displayedRemaining)}
-        secondaryText={overtime ? 'OVERTIME' : dynamicUi?.layout?.showSubtimer !== false ? formatSubDigital(displayedRemaining) : undefined}
-        isInteractive={!running && !overtime}
+        secondaryText={overtime ? 'OVERTIME' : isBlockMode ? (isRestPhase ? 'ОТДЫХ' : 'ФОКУС') : formatSubDigital(displayedRemaining)}
+        isInteractive={!running && !isBlockMode}
         onProgressChange={handleProgressChange}
         onProgressCommit={handleProgressCommit}
         showTicks={dynamicUi?.dial?.showTicks ?? true}
@@ -193,71 +335,80 @@ export const Timer: React.FC<TimerProps> = ({
         glowIntensity={dynamicUi?.dial?.glowIntensity ?? 'none'}
       />
 
-      <div className={`grid ${dynamicUi?.layout?.showPresetButtons === false ? 'grid-cols-2 max-w-[150px]' : 'grid-cols-2 max-w-[210px]'} gap-3 mt-4 w-full`}>
-        <button
-          onClick={toggleRun}
-          className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 shadow-md`}
-          style={{
-            backgroundColor: theme.cardBg,
-            border: `1.5px solid ${running ? 'rgba(255,255,255,0.38)' : theme.border}`,
-            color: theme.text,
-          }}
-          title={running ? 'Пауза' : 'Старт'}
-        >
-          {running ? <Pause size={24} /> : <Play size={24} className="ml-1" />}
-        </button>
+      {/* Arming minutes pill row - only in countdown mode */}
+      {!isBlockMode && (
+        <div className="flex items-center gap-2 mt-4">
+          <button
+            onClick={() => armMinutes(Math.max(MIN_MINUTES, totalMinutes - 5))}
+            disabled={running || totalMinutes <= MIN_MINUTES}
+            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-zinc-800/60 hover:bg-zinc-700/60 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all text-zinc-300"
+            aria-label="Уменьшить на 5 минут"
+          >
+            -
+          </button>
+          <div
+            className="px-3 py-1 rounded-full text-sm font-semibold tracking-wide bg-zinc-800/40 border border-zinc-700/40"
+            style={{ color: theme.text }}
+          >
+            {totalMinutes} мин
+          </div>
+          <button
+            onClick={() => armMinutes(Math.min(MAX_MINUTES, totalMinutes + 5))}
+            disabled={running || totalMinutes >= MAX_MINUTES}
+            className="w-8 h-8 rounded-full flex items-center justify-center font-bold text-sm bg-zinc-800/60 hover:bg-zinc-700/60 active:scale-95 disabled:opacity-30 disabled:pointer-events-none transition-all text-zinc-300"
+            aria-label="Увеличить на 5 минут"
+          >
+            +
+          </button>
+        </div>
+      )}
 
+      {/* Primary controls */}
+      <div className="flex items-center gap-4 mt-6">
         <button
           onClick={reset}
-          className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 shadow-md`}
-          style={{
-            backgroundColor: theme.cardBg,
-            border: `1.5px solid ${theme.border}`,
-            color: theme.subtext,
-          }}
-          title="Сбросить время"
+          className={`p-3 bg-zinc-800/60 hover:bg-zinc-700/60 active:scale-95 transition-all text-zinc-300 ${btnRounding}`}
+          title="Сброс"
+          aria-label="Сбросить таймер"
         >
-          <RotateCcw size={22} />
+          <RotateCcw className="w-5 h-5" />
         </button>
 
-        {dynamicUi?.layout?.showPresetButtons !== false && (
-          <>
-            {/* Was labelled SET but cycled the armed minutes; it now says what
-                it does, and the neighbouring control is what it always looked
-                like: the current duration, tappable to change. */}
-            <button
-              onClick={toggleMode}
-              className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 font-black text-sm tracking-wider shadow-md`}
-              style={{
-                backgroundColor: theme.cardBg,
-                border: `1.5px solid ${theme.border}`,
-                color: theme.text,
-              }}
-              title={mode === 'flow'
-                ? 'Режим потока: после нуля продолжает считать вверх'
-                : 'Режим отсчёта: останавливается на нуле и звонит'}
-            >
-              {mode === 'flow' ? 'ПОТОК' : 'ОТСЧЁТ'}
-            </button>
+        <button
+          onClick={toggleRun}
+          className={`px-8 py-3 font-semibold text-white active:scale-95 transition-all shadow-lg flex items-center gap-2 ${btnRounding}`}
+          style={{
+            backgroundColor: ringAccent,
+            boxShadow: `0 0 20px ${ringAccent}40`,
+          }}
+          aria-label={running ? 'Пауза' : 'Старт'}
+        >
+          {running ? (
+            <>
+              <Pause className="w-5 h-5 fill-current" />
+              <span>Пауза</span>
+            </>
+          ) : (
+            <>
+              <Play className="w-5 h-5 fill-current" />
+              <span>Старт</span>
+            </>
+          )}
+        </button>
 
-            <button
-              onClick={() => {
-                const presets = [5, 10, 15, 20, 25, 30, 45, 60];
-                const idx = presets.indexOf(totalMinutes);
-                armMinutes(presets[(idx + 1) % presets.length]);
-              }}
-              className={`h-14 ${btnRounding} flex items-center justify-center transition-transform active:scale-95 font-mono font-extrabold text-2xl shadow-md`}
-              style={{
-                backgroundColor: theme.cardBg,
-                border: `1.5px solid ${theme.border}`,
-                color: theme.text,
-              }}
-              title="Нажмите чтобы переключить минуты"
-            >
-              {totalMinutes}
-            </button>
-          </>
-        )}
+        <button
+          onClick={toggleMode}
+          className={`px-3 py-2 text-xs font-semibold tracking-wider transition-all border ${btnRounding} ${
+            isBlockMode
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              : mode === 'flow'
+              ? 'bg-amber-500/20 text-amber-300 border-amber-500/40'
+              : 'bg-zinc-800/40 text-zinc-400 border-zinc-700/40 hover:text-zinc-200'
+          }`}
+          title="Переключить режим таймера (Таймер / Flow / Блоки)"
+        >
+          {isBlockMode ? 'БЛОКИ' : mode === 'flow' ? 'FLOW' : 'ТАЙМЕР'}
+        </button>
       </div>
     </div>
   );

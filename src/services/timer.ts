@@ -11,7 +11,8 @@ import { isTauri } from './platform';
  * not running. Here the frontend only issues commands and renders snapshots.
  */
 
-export type TimerMode = 'countdown' | 'flow';
+export type TimerPhase = 'focus' | 'rest';
+export type TimerMode = 'countdown' | 'flow' | 'block';
 
 export interface TimerSnapshot {
   total_secs: number;
@@ -20,6 +21,11 @@ export interface TimerSnapshot {
   mode: TimerMode;
   overtime_secs: number;
   overtime: boolean;
+  /** Which half of a block is running. Always `focus` outside block mode. */
+  phase: TimerPhase;
+  /** Completed focus phases today; the counter the user sees. */
+  block_index: number;
+  direction_id: string | null;
 }
 
 const IDLE: TimerSnapshot = {
@@ -29,6 +35,9 @@ const IDLE: TimerSnapshot = {
   mode: 'countdown',
   overtime_secs: 0,
   overtime: false,
+  phase: 'focus',
+  block_index: 0,
+  direction_id: null,
 };
 
 /** Mirrors the backend's clamp, so the UI never arms something it cannot set. */
@@ -47,6 +56,10 @@ export interface TimerSessionEvent {
   started_at_ms: number;
   ended_at_ms: number;
   completed: boolean;
+  /** Direction the finished block belonged to, when one was set. */
+  direction_id: string | null;
+  /** Phase that finished; only `focus` earns blocks. */
+  phase: TimerPhase;
 }
 
 export class TimerService {
@@ -95,6 +108,18 @@ export class TimerService {
   static async setMode(mode: TimerMode): Promise<void> {
     if (!isTauri()) return;
     await invoke('timer_set_mode', { mode });
+  }
+
+  /** Arms the focus/rest cycle lengths for block mode. */
+  static async setBlockSettings(focusMin: number, restMin: number): Promise<void> {
+    if (!isTauri()) return;
+    await invoke('timer_set_block_settings', { focusMin, restMin });
+  }
+
+  /** Points the timer at a direction, so finished blocks can be attributed. */
+  static async setDirection(directionId: string | null): Promise<void> {
+    if (!isTauri()) return;
+    await invoke('timer_set_direction', { directionId });
   }
 
   /**

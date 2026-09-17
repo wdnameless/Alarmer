@@ -4,6 +4,7 @@ import { Loader2, ArrowRight, Plus, Copy, Check } from 'lucide-react';
 import { soundService } from '../services/sound';
 import { ThemeColors, DynamicUIConfig, AISettings, AlarmItem, Schedule } from '../types';
 import { ScheduleParserService, ParsedSchedule } from '../services/scheduleParser';
+import type { DirectionDraft } from '../services/aiCompiler';
 import { describeDays } from '../services/scheduleEngine';
 
 /** Builds the message payload for a parsed schedule awaiting confirmation. */
@@ -41,6 +42,8 @@ interface AIChatDrawerProps {
   aiSettings: AISettings;
   onApplyUI: (newUi: DynamicUIConfig) => void;
   onApplyAlarms?: (alarms: AlarmItem[]) => void;
+  /** Directions the assistant created from chat. */
+  onApplyDirections?: (directions: DirectionDraft[]) => void;
   onSetTimerMinutes?: (minutes: number) => void;
   onNavigateToModule?: (module: 'today' | 'timer' | 'alarms') => void;
   messages: ChatMessage[];
@@ -59,6 +62,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
   aiSettings,
   onApplyUI,
   onApplyAlarms,
+  onApplyDirections,
   onSetTimerMinutes,
   onNavigateToModule,
   messages,
@@ -125,6 +129,10 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
       if (mutation.alarms && onApplyAlarms) {
         onApplyAlarms(mutation.alarms);
         onNavigateToModule?.('alarms');
+      }
+
+      if (mutation.directions?.length && onApplyDirections) {
+        onApplyDirections(mutation.directions);
       }
 
       // Check for timer intent in text
@@ -310,6 +318,11 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
                       <HandCheck size={10} color={theme.subtext} /> UI трансформирован
                     </span>
                   )}
+                  {m.mutation.directions?.length ? (
+                    <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 flex items-center gap-1">
+                      <HandCheck size={10} color={theme.subtext} /> Направления добавлены
+                    </span>
+                  ) : null}
                   {m.mutation.alarms && (
                     <span className="text-[9px] px-1.5 py-0.5 rounded bg-white/10 flex items-center gap-1">
                       <HandCheck size={10} color={theme.subtext} /> Будильники добавлены

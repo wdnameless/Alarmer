@@ -2,6 +2,7 @@ export type AppMode = 'dashboard' | 'ai' | 'settings';
 
 export type ThemeId = 'winter' | 'dark-neon' | 'cyberpunk' | 'amoled' | 'nordic' | 'sunset';
 export * from './dynamicUi';
+export * from './focus';
 
 export interface ThemeColors {
   id: ThemeId;
@@ -130,6 +131,28 @@ export interface SessionRecord {
   endedAt: string;
   /** True when the user ran it to completion rather than closing it early. */
   completed: boolean;
+  /**
+   * Direction this work belonged to. Absent means «Без направления»: it still
+   * counts toward total focus, but toward no budget — attributing it to a
+   * direction the user never chose would be inventing history.
+   */
+  directionId?: string;
+  /**
+   * Focus quality the user rated after the block, 1..10.
+   *
+   * Their headline signal, and the reason the block cycle asks at all: «качество
+   * фокуса — это и есть твоё желание и вовлечённость». Absent when skipped, which
+   * is deliberately different from a low score.
+   */
+  quality?: number;
+  /**
+   * Blocks earned, fractional (25 of 50 minutes = 0.5).
+   *
+   * Stored rather than always derived, so a later change to the block length
+   * does not silently rewrite what past sessions were worth. Absent on records
+   * written before blocks existed — derive those from `focusedSec`.
+   */
+  blocks?: number;
 }
 /**
  * A free-form note the user keeps.

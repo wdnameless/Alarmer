@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
-import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload, RefreshCw, Loader2 } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload, RefreshCw, Loader2, Music, Timer } from 'lucide-react';
 import { ThemeColors, ThemeId, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '../types';
+import { BLOCK_PRESETS, type BlockSettings } from '../types/focus';
 import { THEMES } from '../constants/themes';
 import { CLOUD_VOICES, EdgeTtsService } from '../services/edgeTts';
 import { soundService } from '../services/sound';
@@ -22,6 +23,9 @@ interface SettingsViewProps {
   aiSettings: AISettings;
   onUpdateAISettings: (settings: AISettings) => void;
   onUpdateUI: (ui: DynamicUIConfig) => void;
+  /** Focus/rest lengths for block mode. */
+  blockSettings: BlockSettings;
+  onBlockSettingsChange: (next: BlockSettings) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -34,6 +38,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   aiSettings,
   onUpdateAISettings,
   onUpdateUI,
+  blockSettings,
+  onBlockSettingsChange,
 }) => {
   const [selectedVoice, setSelectedVoice] = useState<string>(() => {
     return StoreService.getPreference('alarmer_voice_id', 'none');
@@ -65,6 +71,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   });
   const [voiceVolume, setVoiceVolume] = useState<number>(() => {
     return StoreService.getPreference('alarmer_voice_volume', 0.8);
+  });
+  const [musicUrl, setMusicUrl] = useState<string>(() => {
+    return StoreService.getPreference('alarmer_music_url', '');
   });
   const [currentLang, setCurrentLang] = useState<Language>(() => I18nService.getLang());
 
@@ -216,6 +225,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       .then(setAutostartEnabled)
       .catch(() => setAutostartEnabled(false));
   }, []);
+  const handleSaveMusicUrl = (url: string) => {
+    setMusicUrl(url);
+    void StoreService.setPreference('alarmer_music_url', url);
+  };
 
   const t = I18nService.t();
 
@@ -501,6 +514,103 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 </button>
               ))}
             </div>
+          </div>
+        </div>
+        {/* Block cycle lengths */}
+        <div className="flex flex-col space-y-3 border-t pt-4" style={{ borderColor: theme.border }}>
+          <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.subtext }}>
+            <Timer size={15} />
+            <span>Длина блока</span>
+          </label>
+
+          <div className="flex flex-wrap gap-2">
+            {BLOCK_PRESETS.map((preset) => {
+              const active =
+                blockSettings.focusMin === preset.focusMin && blockSettings.restMin === preset.restMin;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => onBlockSettingsChange({ focusMin: preset.focusMin, restMin: preset.restMin })}
+                  className="py-1.5 px-3 rounded-lg border text-[11px] font-medium transition-all"
+                  style={{
+                    borderColor: active ? 'rgba(255,255,255,0.38)' : theme.border,
+                    backgroundColor: active ? 'rgba(255,255,255,0.07)' : 'transparent',
+                    color: theme.text,
+                  }}
+                >
+                  {preset.label}
+                </button>
+              );
+            })}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] opacity-60 flex-1">Фокус, мин</label>
+            <input
+              type="number"
+              min={5}
+              max={180}
+              value={blockSettings.focusMin}
+              onChange={(e) => {
+                const value = Math.round(Number(e.target.value));
+                if (!Number.isFinite(value)) return;
+                // Clamped here as well as in the backend: a 0-minute focus phase
+                // would make the rest phase start instantly and the counter run away.
+                onBlockSettingsChange({
+                  ...blockSettings,
+                  focusMin: Math.min(180, Math.max(5, value)),
+                });
+              }}
+              className="w-16 px-2 py-1 rounded-lg text-xs border outline-none bg-black/30 text-right"
+              style={{ borderColor: theme.border, color: theme.text }}
+            />
+          </div>
+
+          <div className="flex items-center gap-2">
+            <label className="text-[10px] opacity-60 flex-1">Отдых, мин</label>
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={blockSettings.restMin}
+              onChange={(e) => {
+                const value = Math.round(Number(e.target.value));
+                if (!Number.isFinite(value)) return;
+                onBlockSettingsChange({
+                  ...blockSettings,
+                  restMin: Math.min(60, Math.max(1, value)),
+                });
+              }}
+              className="w-16 px-2 py-1 rounded-lg text-xs border outline-none bg-black/30 text-right"
+              style={{ borderColor: theme.border, color: theme.text }}
+            />
+          </div>
+
+          <span className="text-[10px] opacity-60 leading-relaxed">
+            Блок — это фокус и следующий за ним отдых. Перерыв начинается сам: смысл в том, чтобы он действительно случался.
+          </span>
+        </div>
+        {/* Focus Music (YouTube) */}
+        <div className="flex flex-col space-y-3 border-t pt-4" style={{ borderColor: theme.border }}>
+          <label className="text-xs font-bold uppercase tracking-wider flex items-center space-x-1.5" style={{ color: theme.subtext }}>
+            <Music size={15} />
+            <span>Фоновая музыка (YouTube)</span>
+          </label>
+
+          <div className="flex flex-col space-y-1">
+            <span className="text-[10px] opacity-60">Ссылка на видео или трансляцию YouTube</span>
+            <input
+              type="text"
+              value={musicUrl}
+              onChange={(e) => handleSaveMusicUrl(e.target.value)}
+              placeholder="https://www.youtube.com/watch?v=... или https://youtu.be/..."
+              className="w-full px-3 py-2 rounded-xl text-xs border outline-none bg-black/30"
+              style={{ borderColor: theme.border, color: theme.text }}
+            />
+            <span className="text-[10px] opacity-60 leading-relaxed">
+              Музыка играет автоматически во время фокуса и останавливается во время отдыха. Поддерживаются ссылки на YouTube видео, шортсы и трансляции.
+            </span>
           </div>
         </div>
         </div>

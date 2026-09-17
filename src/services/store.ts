@@ -2,6 +2,7 @@ import { LazyStore } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
 import { DEFAULT_AI_SETTINGS, DEFAULT_SCHEDULES } from '../constants/defaults';
 import { DEFAULT_DYNAMIC_UI, DynamicUIConfig } from '../types/dynamicUi';
+import { DIRECTION_COLORS, Direction } from '../types/focus';
 import { AISettings, AlarmItem, Schedule, ScheduleStep, ExerciseStep, TaskItem, SessionRecord, NoteItem } from '../types';
 import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../types/guards';
 
@@ -17,7 +18,7 @@ import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../type
  * render tree.
  */
 
-export const SCHEMA_VERSION = 5;
+export const SCHEMA_VERSION = 6;
 
 const STORE_FILE = 'alarmer.json';
 
@@ -39,6 +40,8 @@ export interface PersistedState {
   chatMessages: StoredChatMessage[];
   preferences: Record<string, unknown>;
   notes: NoteItem[];
+  /** Areas of focus with weekly block budgets. */
+  directions: Direction[];
 }
 
 
@@ -387,6 +390,17 @@ function sanitizeSession(raw: unknown, index: number): SessionRecord | null {
   if (!isRecord(raw)) return null;
   const focused = asNumber(raw.focusedSec, 0);
   if (focused <= 0) return null;
+
+  // Quality is 1..10 by definition. A stored 0, 42 or "great" is corruption, and
+  // keeping it would skew every average — so it is dropped, not clamped: a
+  // clamped 10 would read as a deliberate top score the user never gave.
+  const quality = asNumber(raw.quality, 0);
+  const hasQuality = Number.isInteger(quality) && quality >= 1 && quality <= 10;
+
+  // Blocks are fractional and non-negative. Absent stays absent.
+  const blocks = asNumber(raw.blocks, -1);
+  const hasBlocks = blocks > 0;
+
   return {
     id: asString(raw.id, `session_${index}`),
     scheduleId: typeof raw.scheduleId === 'string' ? raw.scheduleId : undefined,
@@ -396,6 +410,27 @@ function sanitizeSession(raw: unknown, index: number): SessionRecord | null {
     startedAt: asString(raw.startedAt, new Date().toISOString()),
     endedAt: asString(raw.endedAt, new Date().toISOString()),
     completed: asBoolean(raw.completed, true),
+    directionId: typeof raw.directionId === 'string' && raw.directionId !== ''
+      ? raw.directionId
+      : undefined,
+    quality: hasQuality ? quality : undefined,
+    blocks: hasBlocks ? blocks : undefined,
+  };
+}
+
+function sanitizeDirection(raw: unknown, index: number): Direction | null {
+  if (!isRecord(raw)) return null;
+  const name = asString(raw.name, '').trim();
+  if (!name) return null;
+  const budget = Math.round(asNumber(raw.weeklyBlockBudget, 0));
+  return {
+    id: asString(raw.id, `direction_${index}`),
+    name,
+    color: asString(raw.color, DIRECTION_COLORS[index % DIRECTION_COLORS.length]),
+    // A zero-block budget would render every direction permanently over, so the
+    // floor is one block.
+    weeklyBlockBudget: Math.min(200, Math.max(1, budget || 1)),
+    archived: asBoolean(raw.archived, false),
   };
 }
 
@@ -410,6 +445,10 @@ function sanitizeSession(raw: unknown, index: number): SessionRecord | null {
  * no history to import, and inventing one would be a lie in the statistics.
  *
  * v3 -> v4: added `notes`. Also starts empty; the key scrub is unchanged.
+ *
+ * v5 -> v6: added `directions`. Existing sessions gain no direction and no
+ * quality — those fields simply stay absent, so old work counts toward total
+ * focus while no budget claims it. Nothing is dropped or back-filled.
  *
  * v4 -> v5: `dynamicUi.colors` became an override layer over the chosen theme.
  * Older files store the entire Winter palette there, which used to be spread
@@ -453,6 +492,9 @@ export function migrate(raw: unknown): PersistedState {
     dynamicUi,
     chatMessages: sanitizeMessages(record.chatMessages),
     preferences: isRecord(record.preferences) ? record.preferences : {},
+    directions: asArray<unknown>(record.directions, [])
+      .map(sanitizeDirection)
+      .filter((d): d is Direction => d !== null),
   };
 }
 

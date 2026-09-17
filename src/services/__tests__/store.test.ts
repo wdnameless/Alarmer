@@ -114,6 +114,82 @@ describe('store schema migration', () => {
   });
 
 
+  it('keeps legacy sessions and gives them no direction', () => {
+    // A v5 file has sessions with no direction or quality. Dropping them would
+    // lose real history; inventing values would be worse.
+    const state = migrate({
+      schemaVersion: 5,
+      sessions: [
+        { id: 's1', label: 'Утро', focusedSec: 1800, startedAt: '2026-09-14T07:00:00Z', endedAt: '2026-09-14T07:30:00Z', completed: true },
+      ],
+    });
+
+    expect(state.sessions).toHaveLength(1);
+    expect(state.sessions[0].directionId).toBeUndefined();
+    expect(state.sessions[0].quality).toBeUndefined();
+    expect(state.sessions[0].blocks).toBeUndefined();
+  });
+
+  it('starts a v5 file with no directions at all', () => {
+    const state = migrate({ schemaVersion: 5 });
+    expect(state.schemaVersion).toBe(SCHEMA_VERSION);
+    expect(state.directions).toEqual([]);
+  });
+
+  it('round-trips directions, quality and blocks', () => {
+    const state = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      directions: [{ id: 'd1', name: 'Учёба', color: '#22c55e', weeklyBlockBudget: 30, archived: false }],
+      sessions: [
+        { id: 's1', label: 'Блок', focusedSec: 3000, startedAt: '2026-09-15T09:00:00Z', endedAt: '2026-09-15T09:50:00Z', completed: true, directionId: 'd1', quality: 8, blocks: 1 },
+      ],
+    });
+
+    expect(state.directions).toEqual([
+      { id: 'd1', name: 'Учёба', color: '#22c55e', weeklyBlockBudget: 30, archived: false },
+    ]);
+    expect(state.sessions[0].quality).toBe(8);
+    expect(state.sessions[0].blocks).toBe(1);
+    expect(state.sessions[0].directionId).toBe('d1');
+  });
+
+  it('drops a corrupt quality rather than clamping it', () => {
+    // A clamped 10 would read as a deliberate top score the user never gave.
+    const state = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      sessions: [
+        { id: 's1', label: 'a', focusedSec: 600, startedAt: '2026-09-15T09:00:00Z', endedAt: '2026-09-15T09:10:00Z', completed: true, quality: 42 },
+      ],
+    });
+    expect(state.sessions[0].quality).toBeUndefined();
+  });
+
+  it('keeps a fractional block value', () => {
+    const state = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      sessions: [
+        { id: 's1', label: 'a', focusedSec: 1500, startedAt: '2026-09-15T09:00:00Z', endedAt: '2026-09-15T09:25:00Z', completed: true, blocks: 0.5 },
+      ],
+    });
+    expect(state.sessions[0].blocks).toBe(0.5);
+  });
+
+  it('drops a nameless direction and floors a zero budget', () => {
+    const state = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      directions: [
+        { id: 'a', name: '   ', weeklyBlockBudget: 5 },
+        { id: 'b', name: 'Спорт', weeklyBlockBudget: 0 },
+      ],
+    });
+
+    expect(state.directions).toHaveLength(1);
+    expect(state.directions[0].name).toBe('Спорт');
+    // Zero would render the direction permanently over budget.
+    expect(state.directions[0].weeklyBlockBudget).toBe(1);
+    expect(state.directions[0].color).toBeTruthy();
+  });
+
   it('drops chat messages without text', () => {
     const state = migrate({
       chatMessages: [

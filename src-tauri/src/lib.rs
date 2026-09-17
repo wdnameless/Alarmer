@@ -455,6 +455,8 @@ pub fn run() {
             timer::timer_reset,
             timer::timer_shift_minutes,
             timer::timer_set_mode,
+            timer::timer_set_block_settings,
+            timer::timer_set_direction,
             timer::timer_get_state,
             register_shortcuts,
             toggle_mini_overlay,

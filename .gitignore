@@ -24,3 +24,8 @@ dist-ssr
 *.sw?
 .opencode
 .codegraph
+
+# Tool state, not project code: archmap writes a generated report and the
+# workflow tool keeps its lane bookkeeping here.
+.archmap
+.workflow

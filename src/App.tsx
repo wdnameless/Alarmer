@@ -6,13 +6,14 @@ import { AIChatDrawer } from './components/AIChatDrawer';
 import { THEMES } from './constants/themes';
 import { DashboardView, type SubModule } from './components/DashboardView';
 import { SettingsView } from './components/SettingsView';
+import { ThemeColors, ThemeId, AppMode, AlarmItem, Schedule, AISettings, TaskItem, SessionRecord, NoteItem, DynamicUIConfig, Direction } from './types';
 import { windowService } from './services/window';
 import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { I18nService } from './services/i18n';
-import { AppMode, ThemeId, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig, TaskItem, SessionRecord, NoteItem } from './types';
 import { StoreService } from './services/store';
+import { DEFAULT_BLOCK_SETTINGS, DIRECTION_COLORS, type BlockSettings } from './types/focus';
 import { buildFirings } from './services/scheduleEngine';
 import { AlarmCenter, type MissedAlarm } from './components/AlarmCenter';
 import { UpdateBanner } from './components/UpdateBanner';
@@ -97,6 +98,20 @@ export const App: React.FC = () => {
   const [sessions, setSessions] = useState<SessionRecord[]>(() => StoreService.snapshot().sessions);
   /** Free-form and attached notes. */
   const [notes, setNotes] = useState<NoteItem[]>(() => StoreService.snapshot().notes);
+  /** Areas of focus with weekly block budgets. */
+  const [directions, setDirections] = useState<Direction[]>(() => StoreService.snapshot().directions ?? []);
+
+  /**
+   * Focus and rest lengths for block mode.
+   *
+   * Kept in preferences rather than the store's structured state: it is a dial
+   * the user turns, not history, and it must survive independently of any
+   * direction they later archive.
+   */
+  const [blockSettings, setBlockSettings] = useState<BlockSettings>(() => ({
+    focusMin: StoreService.getPreference('alarmer_block_focus_min', DEFAULT_BLOCK_SETTINGS.focusMin),
+    restMin: StoreService.getPreference('alarmer_block_rest_min', DEFAULT_BLOCK_SETTINGS.restMin),
+  }));
 
   /**
    * What the scheduler actually receives: schedule steps expanded into firings,
@@ -116,10 +131,18 @@ export const App: React.FC = () => {
       tasks,
       sessions,
       notes,
+      directions,
       dynamicUi,
       chatMessages: chatMessages as never,
     });
-  }, [hydrated, aiSettings, alarms, schedules, tasks, sessions, notes, dynamicUi, chatMessages]);
+  }, [hydrated, aiSettings, alarms, schedules, tasks, sessions, notes, directions, dynamicUi, chatMessages]);
+
+  // Arms the backend with the current cycle lengths. Without this the timer
+  // would keep running whatever 50/10 it was built with and the setting would
+  // look saved while changing nothing.
+  useEffect(() => {
+    void TimerService.setBlockSettings(blockSettings.focusMin, blockSettings.restMin);
+  }, [blockSettings]);
 
   // Adopt the persisted store file on first mount (native file, not localStorage).
   useEffect(() => {
@@ -130,8 +153,8 @@ export const App: React.FC = () => {
         setTasks(state.tasks);
         setSessions(state.sessions);
         setNotes(state.notes);
+        setDirections(state.directions ?? []);
         setAISettings(state.aiSettings);
-        setDynamicUi(state.dynamicUi);
         if (state.chatMessages.length > 0) {
           setChatMessages(state.chatMessages as unknown as ChatMessage[]);
         }
@@ -200,6 +223,19 @@ export const App: React.FC = () => {
     setSessions((prev) => trimSessions([...prev, session]));
   };
 
+  const handleRateQuality = (quality: number) => {
+    setSessions((prev) => {
+      if (prev.length === 0) return prev;
+      const copy = [...prev];
+      const lastIdx = copy.length - 1;
+      copy[lastIdx] = {
+        ...copy[lastIdx],
+        quality,
+      };
+      return copy;
+    });
+  };
+
   /**
    * Records completed countdowns.
    *
@@ -209,6 +245,11 @@ export const App: React.FC = () => {
    */
   useEffect(() => {
     return TimerService.onSession((event) => {
+      const evt = event as unknown as Record<string, unknown>;
+      const rawDirectionId = (evt.directionId ?? evt.direction_id) as string | undefined;
+      const rawBlocks = (evt.blocks as number | undefined) ?? (evt.mode === 'block' ? 1 : undefined);
+      const rawQuality = evt.quality as number | undefined;
+
       recordSession({
         id: `timer_${event.ended_at_ms}`,
         label: 'Таймер',
@@ -216,6 +257,9 @@ export const App: React.FC = () => {
         startedAt: new Date(event.started_at_ms).toISOString(),
         endedAt: new Date(event.ended_at_ms).toISOString(),
         completed: event.completed,
+        directionId: rawDirectionId || undefined,
+        blocks: rawBlocks,
+        quality: rawQuality,
       });
     });
   }, []);
@@ -303,6 +347,11 @@ export const App: React.FC = () => {
   /** Repaints the chrome when the interface language changes. */
   const [, setLangTick] = useState(0);
   useEffect(() => I18nService.subscribe(() => setLangTick((n) => n + 1)), []);
+
+  useEffect(() => {
+    StoreService.setPreference('alarmer_block_focus_min', blockSettings.focusMin);
+    StoreService.setPreference('alarmer_block_rest_min', blockSettings.restMin);
+  }, [blockSettings]);
 
   /** A version found in the background, offered as a quiet bar. */
   const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
@@ -429,6 +478,7 @@ export const App: React.FC = () => {
                 onUpdateAlarms={setAlarms}
                 onOpenAISettings={() => setActiveTab('settings')}
                 timerMinutes={aiTimerMinutes}
+                blockSettings={blockSettings}
                 tasks={tasks}
                 onUpdateTasks={setTasks}
                 sessions={sessions}
@@ -437,6 +487,9 @@ export const App: React.FC = () => {
                 onUpdateNotes={setNotes}
                 activeSubModule={dashboardSubModule}
                 onSubModuleChange={setDashboardSubModule}
+                directions={directions}
+                onUpdateDirections={setDirections}
+                onRateQuality={handleRateQuality}
               />
               </ErrorBoundary>
             )}
@@ -444,6 +497,8 @@ export const App: React.FC = () => {
               <ErrorBoundary theme={theme} fallbackTitle="Модуль настроек">
               <SettingsView
                 theme={theme}
+                blockSettings={blockSettings}
+                onBlockSettingsChange={setBlockSettings}
                 themeKey={themeKey}
                 onSelectTheme={(next) => {
                   setThemeKey(next);
@@ -510,6 +565,33 @@ export const App: React.FC = () => {
                   });
                 }}
                 onApplyAlarms={(newAlarms: AlarmItem[]) => setAlarms((prev) => [...prev, ...newAlarms])}
+                onApplyDirections={(drafts) => {
+                  setDirections((prev) => {
+                    const next = [...prev];
+                    for (const draft of drafts) {
+                      // A same-named direction is edited rather than duplicated:
+                      // "raise the budget for Учёба" must not create a second
+                      // Учёба that then splits the same work across two budgets.
+                      const existing = next.findIndex((d) => d.name.toLowerCase() === draft.name.toLowerCase());
+                      if (existing >= 0) {
+                        next[existing] = {
+                          ...next[existing],
+                          weeklyBlockBudget: draft.weeklyBlockBudget,
+                          ...(draft.color ? { color: draft.color } : {}),
+                        };
+                      } else {
+                        next.push({
+                          id: `dir_${Date.now()}_${next.length}`,
+                          name: draft.name,
+                          color: draft.color ?? DIRECTION_COLORS[next.length % DIRECTION_COLORS.length],
+                          weeklyBlockBudget: draft.weeklyBlockBudget,
+                          archived: false,
+                        });
+                      }
+                    }
+                    return next;
+                  });
+                }}
                 onSetTimerMinutes={() => {
                   setDashboardSubModule('timer');
                   setActiveTab('dashboard');

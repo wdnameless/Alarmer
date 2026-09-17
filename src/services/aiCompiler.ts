@@ -1,6 +1,7 @@
 import { AISettings, DynamicUIConfig, AlarmItem, Schedule } from '../types';
-import { asArray, asBoolean, asString, isRecord, oneOf } from '../types/guards';
+import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../types/guards';
 import { AIGateway } from './aiGateway';
+import type { HistoryDigest } from './aiHistory';
 
 /**
  * Commands the local keyword map handles better than a model.
@@ -56,11 +57,18 @@ function isLocalUiCommand(lowerPrompt: string): boolean {
 /** A parsed draft carries the pasted text and the assistant note for the card. */
 export type ScheduleDraft = Schedule & { sourceText: string; note: string };
 
+export interface DirectionDraft {
+  name: string;
+  weeklyBlockBudget: number;
+  color?: string;
+}
+
 export interface AIPlatformMutation {
-  type: 'ui_change' | 'alarm_schedule' | 'workout_plan' | 'hybrid' | 'answer';
+  type: 'ui_change' | 'alarm_schedule' | 'workout_plan' | 'hybrid' | 'answer' | 'directions';
   explanation: string;
   ui?: Partial<DynamicUIConfig>;
   alarms?: AlarmItem[];
+  directions?: DirectionDraft[];
   autoApply: boolean;
 }
 
@@ -87,11 +95,17 @@ const NOTHING_TO_CHANGE =
   'Не понял запрос — я не изменил интерфейс. Опишите, что поменять (например: «сделай AMOLED и убери засечки»), либо подключите нейросеть в Настройках → Нейросеть, чтобы я отвечал на любые вопросы.';
 
 export class AICompilerService {
-  private static readonly SYSTEM_PROMPT = `Ты — AI-ассистент приложения Alarmer: таймер, будильники, программы дня, задачи и оформление интерфейса.
+  private static buildSystemPrompt(historyDigest?: HistoryDigest): string {
+    const digestSection = historyDigest
+      ? `\n\nСводка журнала фокуса (агрегированные данные за прошедшее время, без названий сессий):\n${JSON.stringify(historyDigest, null, 2)}\nЕсли история пуста (0 сессий) и пользователь спрашивает о статистике/работе/итогах недели, честно ответь в explanation, что данных в журнале пока нет, и не придумывай цифры.`
+      : '';
+
+    return `Ты — AI-ассистент приложения Alarmer: таймер, будильники, программы дня, направления фокуса, задачи и оформление интерфейса.${digestSection}
 
 Сначала реши, чего хочет пользователь:
-- Если это ВОПРОС или разговор (например «покажи расписание на завтра», «сколько я работал», «что ты умеешь»), ответь текстом в поле "explanation", поставь "type": "answer" и НЕ присылай "ui" и "alarms". Вопрос — это не команда менять интерфейс.
-- Если это КОМАНДА, выполни её и опиши в "explanation" ровно то, что изменил.
+- Если это ВОПРОС или разговор (например «покажи расписание на завтра», «сколько я работал», «куда ушла неделя», «когда я работаю лучше всего?», «что ты умеешь»), ответь текстом в поле "explanation", поставь "type": "answer" и НЕ присылай "ui", "alarms" или "directions". Отвечай строго на основе переданной сводки журнала, не выдумывай несуществующие данные. Если данных нет — честно скажи об этом.
+- Если это создание или настройка НАПРАВЛЕНИЙ (например «создай направление Код с бюджетом 10 блоков»), поставь "type": "directions", заполни массив "directions" и кратко объясни в "explanation".
+- Если это КОМАНДА настройки UI или будильников, выполни её и опиши в "explanation" ровно то, что изменил.
 
 Никогда не выдумывай изменения, которых пользователь не просил, и не описывай работу, которую не сделал.
 
@@ -99,9 +113,16 @@ export class AICompilerService {
 
 Отвечай ИСКЛЮЧИТЕЛЬНО в формате JSON со следующей структурой:
 {
-  "type": "ui" | "alarm" | "workout" | "hybrid",
-  "explanation": "Короткое понятное объяснение того, что изменилось на русском языке (1-2 предложения)",
+  "type": "ui" | "alarm" | "workout" | "hybrid" | "directions" | "answer",
+  "explanation": "Короткое понятное объяснение того, что изменилось или ответ на вопрос на русском языке (1-2 предложения)",
   "autoApply": true,
+  "directions": [
+    {
+      "name": "Название направления",
+      "weeklyBlockBudget": 10,
+      "color": "#hex (необязательно)"
+    }
+  ],
   "ui": {
     "colors": {
       "bg": "#hex",
@@ -156,11 +177,13 @@ export class AICompilerService {
     ]
   }
 }`;
+  }
 
   static async compileUserIntent(
     prompt: string,
     currentUi: DynamicUIConfig,
-    settings: AISettings
+    settings: AISettings,
+    historyDigest?: HistoryDigest,
   ): Promise<AIPlatformMutation> {
     const lowerPrompt = prompt.toLowerCase();
 
@@ -173,20 +196,19 @@ export class AICompilerService {
     const haveKey = Boolean(settings.apiKey?.trim()) || (await AIGateway.hasKey());
 
     if (isDirectUiCommand || !haveKey) {
-      return this.offlineFallbackCompiler(prompt, currentUi);
+      return this.offlineFallbackCompiler(prompt, currentUi, historyDigest);
     }
 
     const { value, error } = await AIGateway.requestJson({
-      system: this.SYSTEM_PROMPT,
+      system: this.buildSystemPrompt(historyDigest),
       user: `Текущий конфиг UI:\n${JSON.stringify(currentUi, null, 2)}\n\nЗапрос пользователя:\n"${prompt}"`,
       baseUrl: settings.baseUrl,
       model: settings.model || 'gpt-4o-mini',
     });
-
     if (error) {
       // Say so. Reporting a canned local edit as the model's work is how the
       // CSP-blocked endpoint went unnoticed.
-      const fallback = this.offlineFallbackCompiler(prompt, currentUi);
+      const fallback = this.offlineFallbackCompiler(prompt, currentUi, historyDigest);
       return { ...fallback, explanation: `${fallback.explanation} (модель недоступна: ${error})` };
     }
 
@@ -200,12 +222,25 @@ export class AICompilerService {
       };
     }
 
+    if (value.type === 'directions') {
+      const directions = this.toDirections(value.directions);
+      return {
+        type: 'directions',
+        explanation: asString(value.explanation, 'Созданы новые направления фокуса'),
+        directions: directions.length > 0 ? directions : undefined,
+        autoApply: directions.length > 0,
+      };
+    }
+
     return {
       type: value.type === 'hybrid' || value.type === 'alarm_schedule' ? 'hybrid' : 'ui_change',
       explanation: asString(value.explanation, 'Интерфейс обновлён'),
       ui: isRecord(value.ui) ? (value.ui as Partial<DynamicUIConfig>) : undefined,
       alarms: asArray<unknown>(value.alarms, []).length > 0
         ? this.toAlarms(value.alarms)
+        : undefined,
+      directions: asArray<unknown>(value.directions, []).length > 0
+        ? this.toDirections(value.directions)
         : undefined,
       autoApply: asBoolean(value.autoApply, true),
     };
@@ -234,12 +269,67 @@ export class AICompilerService {
       };
     });
   }
+  /** Validates direction drafts produced by the model. */
+  private static toDirections(raw: unknown): DirectionDraft[] {
+    return asArray<unknown>(raw, []).map((item) => {
+      const d = isRecord(item) ? item : {};
+      const name = asString(d.name, 'Новое направление').trim();
+      const weeklyBlockBudget = Math.max(0, Math.round(asNumber(d.weeklyBlockBudget, 10)));
+      const color = typeof d.color === 'string' && d.color.trim().length > 0 ? d.color.trim() : undefined;
+      return {
+        name: name || 'Новое направление',
+        weeklyBlockBudget,
+        ...(color ? { color } : {}),
+      };
+    }).filter((d) => d.name.length > 0);
+  }
+
 
   private static offlineFallbackCompiler(
     prompt: string,
-    currentUi: DynamicUIConfig
+    currentUi: DynamicUIConfig,
+    historyDigest?: HistoryDigest,
   ): AIPlatformMutation {
     const lower = prompt.toLowerCase();
+
+    // History-related questions in offline mode or empty history
+    const isHistoryQuestion =
+      lower.includes('лучше всего') ||
+      lower.includes('куда ушла неделя') ||
+      lower.includes('сколько я работал') ||
+      lower.includes('когда я работаю') ||
+      lower.includes('статистик') ||
+      lower.includes('итог');
+
+    if (isHistoryQuestion) {
+      if (!historyDigest || historyDigest.totals.sessions === 0) {
+        return {
+          type: 'answer',
+          explanation: 'В журнале пока нет данных о сессиях фокуса. Проведите несколько фокус-сессий, чтобы я мог рассказать о вашей продуктивности.',
+          autoApply: false,
+        };
+      }
+      return {
+        type: 'answer',
+        explanation: `Всего зафиксировано ${historyDigest.totals.sessions} сессий (${historyDigest.totals.blocks} блоков, ${historyDigest.totals.minutes} мин).`,
+        autoApply: false,
+      };
+    }
+
+    // Direction creation intent via keyword/offline: "создай направление X с бюджетом Y"
+    if (lower.includes('направлени') && (lower.includes('создай') || lower.includes('добавь'))) {
+      const budgetMatch = prompt.match(/(\d+)\s*(блок|ч|h)/i);
+      const budget = budgetMatch ? parseInt(budgetMatch[1], 10) : 10;
+      const nameMatch = prompt.match(/(?:направление|направлением)\s+([«"][^»"]+[»"]|\S+)/i);
+      const rawName = nameMatch ? nameMatch[1].replace(/[«»"]/g, '') : 'Новое направление';
+      return {
+        type: 'directions',
+        explanation: `Создано направление «${rawName}» с бюджетом ${budget} блоков в неделю.`,
+        directions: [{ name: rawName, weeklyBlockBudget: budget }],
+        autoApply: true,
+      };
+    }
+
 
     // If asking for capabilities
     if (lower.includes('что ты умеешь') || lower.includes('что умеешь') || lower.includes('помощь') || lower.includes('help')) {
