@@ -51,18 +51,12 @@ jobs:
             libsoup-3.0-dev \
             libasound2-dev
 
-      # Builds the app, produces the platform installers, and attaches them to
-      # the release for this tag.
-      - name: Build and bundle
-        uses: tauri-apps/tauri-action@v0
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        with:
-          tagName: ${{ github.ref_name }}
-          releaseName: 'Alarmer ${{ github.ref_name }}'
-          releaseBody: 'Portable builds store their data beside the executable. Installers integrate with the OS.'
-          releaseDraft: false
-          prerelease: false
+      # Build only: publishing is handled once, after every platform has built.
+      # `tauri-action` tried to create and then edit the same release from three
+      # jobs at once, and against an already-published release it fails with
+      # "Resource not accessible by integration" — after a successful build.
+      - name: Build
+        run: bun run tauri build
 
       # A portable bundle is the built binary plus an empty `portable` marker:
       # the app sees the marker and keeps its data beside itself rather than in
@@ -76,8 +70,37 @@ jobs:
           touch portable/alarmer/portable
           cd portable && zip -r ../alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}.zip alarmer
 
-      - name: Attach portable bundle to the release
-        uses: softprops/action-gh-release@v2
-        if: startsWith(github.ref, 'refs/tags/')
+      # Collect every artifact this platform produced, so the publish job has
+      # them all in one place.
+      - name: Collect artifacts
+        uses: actions/upload-artifact@v4
         with:
-          files: alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}.zip
+          name: alarmer-${{ matrix.platform }}
+          path: |
+            alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}.zip
+            src-tauri/target/release/bundle/**/*.deb
+            src-tauri/target/release/bundle/**/*.AppImage
+            src-tauri/target/release/bundle/**/*.dmg
+            src-tauri/target/release/bundle/**/*.app.tar.gz
+            src-tauri/target/release/bundle/**/*-setup.exe
+            src-tauri/target/release/bundle/**/*.msi
+          if-no-files-found: warn
+
+  # One job owns the release, so three parallel builds cannot race to edit it.
+  publish:
+    needs: release
+    runs-on: ubuntu-latest
+    if: startsWith(github.ref, 'refs/tags/')
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: artifacts/**
+          fail_on_unmatched_files: false
