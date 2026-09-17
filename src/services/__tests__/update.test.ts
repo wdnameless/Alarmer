@@ -1,5 +1,5 @@
 import { describe, expect, it, beforeEach, vi } from 'vitest';
-import { checkForUpdate, detectPortable, installUpdate, isPortable, canUpdate } from '../update';
+import { checkForUpdate, detectPortable, installUpdate, isPortable } from '../update';
 
 /**
  * The update path, which is easy to get wrong in ways nobody notices until a
@@ -54,11 +54,6 @@ describe('portable detection', () => {
     await detectPortable();
 
     expect(isPortable()).toBe(false);
-  });
-
-  it('cannot update outside the app', () => {
-    tauri = false;
-    expect(canUpdate()).toBe(false);
   });
 });
 

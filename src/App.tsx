@@ -448,6 +448,13 @@ export const App: React.FC = () => {
                 onSelectTheme={(next) => {
                   setThemeKey(next);
                   StoreService.setPreference('alarmer_theme', next);
+                  // Picking a theme is a request for that palette, so any
+                  // colours the AI left behind are dropped. Keeping them would
+                  // leave the new theme invisible — the same dead-button
+                  // symptom, just from a different cause.
+                  if (Object.keys(dynamicUi.colors).length > 0) {
+                    setDynamicUi((prev) => ({ ...prev, colors: {} }));
+                  }
                 }}
                 alarmVolume={alarmVolume}
                 alarmEnabled={alarmEnabled}

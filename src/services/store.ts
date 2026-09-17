@@ -17,7 +17,7 @@ import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../type
  * render tree.
  */
 
-export const SCHEMA_VERSION = 4;
+export const SCHEMA_VERSION = 5;
 
 const STORE_FILE = 'alarmer.json';
 
@@ -172,6 +172,63 @@ function sanitizeNote(raw: unknown, index: number): NoteItem | null {
   };
 }
 
+/**
+ * Copies only the keys that are present and are strings.
+ *
+ * Used for override maps where a missing key means "inherit", so absent keys
+ * must stay absent rather than being filled with a default.
+ */
+function pickStrings(
+  source: Record<string, unknown>,
+  keys: readonly string[],
+): Record<string, string> {
+  const out: Record<string, string> = {};
+  for (const key of keys) {
+    const value = source[key];
+    if (typeof value === 'string' && value.trim() !== '') out[key] = value;
+  }
+  return out;
+}
+
+/**
+ * The palette that `DEFAULT_DYNAMIC_UI.colors` used to ship, byte for byte.
+ *
+ * Kept only so the v5 migration can recognise it on disk. Values matching these
+ * were never a choice the user made — they were the default that overrode every
+ * theme — so they are dropped on sight.
+ */
+const LEGACY_DEFAULT_COLORS: Record<string, string> = {
+  bg: '#050505',
+  surface: '#0a0a0a',
+  cardBg: '#0f0f0f',
+  border: '#27272a',
+  text: '#fafafa',
+  subtext: '#a1a1aa',
+  accent: '#ff7a1a',
+  accentGlow: 'rgba(255, 122, 26, 0.28)',
+  ringTrack: '#1c1c1f',
+  ringProgress: '#ff7a1a',
+  ticks: '#3f3f46',
+};
+
+/**
+ * Drops overrides that only repeat the old shipped default.
+ *
+ * A colour the user genuinely picked (via the AI) differs from the default and
+ * survives; the untouched default does not.
+ */
+function dropLegacyDefaultColors(
+  colors: DynamicUIConfig['colors'],
+): DynamicUIConfig['colors'] {
+  const out: DynamicUIConfig['colors'] = {};
+  for (const [key, value] of Object.entries(colors)) {
+    if (value === undefined) continue;
+    if (LEGACY_DEFAULT_COLORS[key] === value) continue;
+    (out as Record<string, string>)[key] = value;
+  }
+  return out;
+}
+
 function sanitizeDynamicUi(raw: unknown): DynamicUIConfig {
   const base = DEFAULT_DYNAMIC_UI;
   if (!isRecord(raw)) return structuredClone(base);
@@ -181,19 +238,13 @@ function sanitizeDynamicUi(raw: unknown): DynamicUIConfig {
   const layout = isRecord(raw.layout) ? raw.layout : {};
 
   return {
-    colors: {
-      bg: asString(colors.bg, base.colors.bg),
-      surface: asString(colors.surface, base.colors.surface),
-      cardBg: asString(colors.cardBg, base.colors.cardBg),
-      border: asString(colors.border, base.colors.border),
-      text: asString(colors.text, base.colors.text),
-      subtext: asString(colors.subtext, base.colors.subtext),
-      accent: asString(colors.accent, base.colors.accent),
-      accentGlow: asString(colors.accentGlow, base.colors.accentGlow),
-      ringTrack: asString(colors.ringTrack, base.colors.ringTrack),
-      ringProgress: asString(colors.ringProgress, base.colors.ringProgress),
-      ticks: asString(colors.ticks, base.colors.ticks),
-    },
+    // Only colours the file actually sets survive. Filling the gaps with
+    // defaults here is exactly how a stale Winter palette got re-stamped onto
+    // every user's config and overrode their theme choice.
+    colors: pickStrings(colors, [
+      'bg', 'surface', 'cardBg', 'border', 'text', 'subtext',
+      'accent', 'accentGlow', 'ringTrack', 'ringProgress', 'ticks',
+    ]),
     typography: {
       fontFamily: asString(typography.fontFamily, base.typography.fontFamily),
       timeScale: asNumber(typography.timeScale, base.typography.timeScale),
@@ -359,10 +410,21 @@ function sanitizeSession(raw: unknown, index: number): SessionRecord | null {
  * no history to import, and inventing one would be a lie in the statistics.
  *
  * v3 -> v4: added `notes`. Also starts empty; the key scrub is unchanged.
+ *
+ * v4 -> v5: `dynamicUi.colors` became an override layer over the chosen theme.
+ * Older files store the entire Winter palette there, which used to be spread
+ * over the theme at render time and silently beat it — so every theme button
+ * appeared dead. Values that merely repeat the old shipped default are dropped;
+ * anything the user (or the AI) actually chose differently is kept.
  */
 export function migrate(raw: unknown): PersistedState {
   const record = isRecord(raw) ? raw : {};
   const version = asNumber(record.schemaVersion, 0);
+
+  const dynamicUi = sanitizeDynamicUi(record.dynamicUi);
+  if (version < 5) {
+    dynamicUi.colors = dropLegacyDefaultColors(dynamicUi.colors);
+  }
 
   const schedules = asArray<unknown>(record.schedules, [])
     .map(sanitizeSchedule)
@@ -388,7 +450,7 @@ export function migrate(raw: unknown): PersistedState {
       .map(sanitizeNote)
       .filter((n): n is NoteItem => n !== null),
     aiSettings: sanitizeAiSettings(record.aiSettings),
-    dynamicUi: sanitizeDynamicUi(record.dynamicUi),
+    dynamicUi,
     chatMessages: sanitizeMessages(record.chatMessages),
     preferences: isRecord(record.preferences) ? record.preferences : {},
   };

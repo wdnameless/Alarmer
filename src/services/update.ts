@@ -76,11 +76,6 @@ export function isPortable(): boolean {
   return StoreService.getPreference('alarmer_portable', false);
 }
 
-/** True when this build cannot update itself. */
-export function canUpdate(): boolean {
-  return isTauri();
-}
-
 /**
  * Looks for a newer release and reports what it found.
  *

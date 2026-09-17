@@ -1,16 +1,24 @@
 export interface DynamicUIConfig {
+  /**
+   * Colour *overrides* layered over the user's chosen base theme, not a palette
+   * of its own.
+   *
+   * Every field is optional and empty by default, and empty means "use the
+   * theme". Shipping a full palette here is what made all six theme buttons
+   * dead: the values spread over the theme at render time and won every time.
+   */
   colors: {
-    bg: string;
-    surface: string;
-    cardBg: string;
-    border: string;
-    text: string;
-    subtext: string;
-    accent: string;
-    accentGlow: string;
-    ringTrack: string;
-    ringProgress: string;
-    ticks: string;
+    bg?: string;
+    surface?: string;
+    cardBg?: string;
+    border?: string;
+    text?: string;
+    subtext?: string;
+    accent?: string;
+    accentGlow?: string;
+    ringTrack?: string;
+    ringProgress?: string;
+    ticks?: string;
   };
   typography: {
     fontFamily: string; // 'system-ui' | 'mono' | 'cyber' | 'serif'
@@ -35,19 +43,9 @@ export interface DynamicUIConfig {
 }
 
 export const DEFAULT_DYNAMIC_UI: DynamicUIConfig = {
-  colors: {
-    bg: '#050505',
-    surface: '#0a0a0a',
-    cardBg: '#0f0f0f',
-    border: '#27272a',
-    text: '#fafafa',
-    subtext: '#a1a1aa',
-    accent: '#ff7a1a',
-    accentGlow: 'rgba(255, 122, 26, 0.28)',
-    ringTrack: '#1c1c1f',
-    ringProgress: '#ff7a1a',
-    ticks: '#3f3f46',
-  },
+  // Empty on purpose: the base theme supplies the palette, and anything set here
+  // would silently override every theme the user picks.
+  colors: {},
   typography: {
     fontFamily: 'sans',
     timeScale: 1.0,

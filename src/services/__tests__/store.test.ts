@@ -33,8 +33,65 @@ describe('store schema migration', () => {
   it('produces a valid default state from nothing', () => {
     const state = migrate(null);
     expect(state.schemaVersion).toBe(SCHEMA_VERSION);
-    expect(state.dynamicUi.colors.accent).toBe(DEFAULT_DYNAMIC_UI.colors.accent);
     expect(state.aiSettings.apiKey).toBe('');
+  });
+
+  it('ships no colour overrides, so the chosen theme shows through', () => {
+    // A default palette here spreads over the base theme at render time and
+    // beats it — which made every theme button appear dead.
+    expect(DEFAULT_DYNAMIC_UI.colors).toEqual({});
+
+    const state = migrate(null);
+    expect(state.dynamicUi.colors).toEqual({});
+  });
+
+  it('keeps colours the user chose but drops the old default palette', () => {
+    // A v4 file carries the whole Winter palette, none of which the user picked.
+    // Their one real choice (the accent the AI set) must survive.
+    const state = migrate({
+      schemaVersion: 4,
+      dynamicUi: {
+        colors: {
+          bg: '#050505', // the old shipped default — not a choice
+          surface: '#0a0a0a',
+          cardBg: '#0f0f0f',
+          border: '#27272a',
+          text: '#fafafa',
+          subtext: '#a1a1aa',
+          accentGlow: 'rgba(255, 122, 26, 0.28)',
+          ringTrack: '#1c1c1f',
+          ringProgress: '#ff7a1a',
+          ticks: '#3f3f46',
+          accent: '#abcdef', // genuinely chosen
+        },
+      },
+    });
+
+    expect(state.dynamicUi.colors).toEqual({ accent: '#abcdef' });
+  });
+
+  it('does not strip a colour that only coincidentally matches the default', () => {
+    // After v5 the same value is a real choice and must not be rewritten.
+    const state = migrate({
+      schemaVersion: SCHEMA_VERSION,
+      dynamicUi: { colors: { bg: '#050505' } },
+    });
+
+    expect(state.dynamicUi.colors.bg).toBe('#050505');
+  });
+
+  it('falls back to defaults for corrupt nested UI config', () => {
+    const state = migrate({
+      dynamicUi: {
+        colors: { accent: '#abcdef' },
+        dial: { tickLength: 'enormous', glowIntensity: 42, showTicks: false },
+        layout: { buttonStyle: 'hexagon' },
+      },
+    });
+    expect(state.dynamicUi.colors.accent).toBe('#abcdef');
+    expect(state.dynamicUi.dial.tickLength).toBe(DEFAULT_DYNAMIC_UI.dial.tickLength);
+    expect(state.dynamicUi.dial.showTicks).toBe(false);
+    expect(state.dynamicUi.layout.buttonStyle).toBe(DEFAULT_DYNAMIC_UI.layout.buttonStyle);
   });
 
   it('rejects alarms with a malformed time instead of trusting them', () => {
@@ -56,20 +113,6 @@ describe('store schema migration', () => {
     expect(state.alarms[0].days).toEqual([1, 5]);
   });
 
-  it('falls back to defaults for corrupt nested UI config', () => {
-    const state = migrate({
-      dynamicUi: {
-        colors: { accent: '#abcdef' },
-        dial: { tickLength: 'enormous', glowIntensity: 42, showTicks: false },
-        layout: { buttonStyle: 'hexagon' },
-      },
-    });
-    expect(state.dynamicUi.colors.accent).toBe('#abcdef');
-    expect(state.dynamicUi.colors.bg).toBe(DEFAULT_DYNAMIC_UI.colors.bg);
-    expect(state.dynamicUi.dial.tickLength).toBe(DEFAULT_DYNAMIC_UI.dial.tickLength);
-    expect(state.dynamicUi.dial.showTicks).toBe(false);
-    expect(state.dynamicUi.layout.buttonStyle).toBe(DEFAULT_DYNAMIC_UI.layout.buttonStyle);
-  });
 
   it('drops chat messages without text', () => {
     const state = migrate({

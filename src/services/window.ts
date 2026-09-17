@@ -35,17 +35,6 @@ export class WindowService {
     return false;
   }
 
-  static async isMaximized(): Promise<boolean> {
-    if (this.isTauri()) {
-      try {
-        return await getCurrentWindow().isMaximized();
-      } catch (e) {
-        console.warn('Window isMaximized error:', e);
-      }
-    }
-    return false;
-  }
-
   static async close(): Promise<void> {
     if (this.isTauri()) {
       try {

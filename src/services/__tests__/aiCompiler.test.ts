@@ -56,12 +56,23 @@ describe('AICompilerService offline intent compilation', () => {
     expect(result.ui?.colors?.accent).not.toBe(DEFAULT_DYNAMIC_UI.colors.accent);
   });
 
-  it('returns a usable explanation for text with no recognised command', async () => {
+  it('admits it changed nothing when no command matches', async () => {
     const result = await compile('просто произвольный текст без совпадений шаблонов');
 
-    expect(result).toBeDefined();
-    expect(result.ui).toBeDefined();
-    expect(typeof result.explanation).toBe('string');
+    // The honest outcome: no edit to apply, and a message that says so.
+    // Returning a `ui` here made the caller apply nothing and still report
+    // "UI трансформирован".
+    expect(result.ui).toBeUndefined();
+    expect(result.autoApply).toBe(false);
     expect(result.explanation.length).toBeGreaterThan(0);
+  });
+
+  it('does not claim an edit when asked a question it cannot act on', async () => {
+    const result = await compile('покажи расписание на завтра');
+
+    // A question is not a UI command. Saying "changes applied" here is how the
+    // user asked a question and was told the interface had been redesigned.
+    expect(result.ui).toBeUndefined();
+    expect(result.explanation).not.toMatch(/ИИ применил изменения/);
   });
 });

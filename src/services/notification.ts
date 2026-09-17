@@ -1,51 +1,24 @@
-import {
-  isPermissionGranted,
-  requestPermission,
-  sendNotification,
-} from '@tauri-apps/plugin-notification';
+import { isPermissionGranted, requestPermission } from '@tauri-apps/plugin-notification';
 
+/**
+ * Asks the OS for permission to raise notifications once, at start-up.
+ *
+ * The notifications themselves are raised by the backend when an alarm rings
+ * with the window hidden — a webview that is not running cannot show one — so
+ * this exists only to get the prompt out of the way before the first alarm.
+ */
 export class NotificationService {
-  private static permissionChecked = false;
-  private static hasPermission = false;
-
   static async init(): Promise<boolean> {
     try {
-      let granted = await isPermissionGranted();
-      if (!granted) {
-        const permission = await requestPermission();
-        granted = permission === 'granted';
-      }
-      this.hasPermission = granted;
-      this.permissionChecked = true;
-      return granted;
+      const granted = await isPermissionGranted();
+      if (granted) return true;
+      return (await requestPermission()) === 'granted';
     } catch {
-      // Running in standard browser or unsupported host
-      if ('Notification' in window) {
-        if (Notification.permission === 'granted') {
-          this.hasPermission = true;
-        } else if (Notification.permission !== 'denied') {
-          const res = await Notification.requestPermission();
-          this.hasPermission = res === 'granted';
-        }
-      }
-      return this.hasPermission;
-    }
-  }
-
-  static async notify(title: string, body: string): Promise<void> {
-    if (!this.permissionChecked) {
-      await this.init();
-    }
-
-    try {
-      sendNotification({
-        title,
-        body,
-      });
-    } catch {
-      if ('Notification' in window && Notification.permission === 'granted') {
-        new Notification(title, { body });
-      }
+      // Running in a standard browser or an unsupported host.
+      if (!('Notification' in window)) return false;
+      if (Notification.permission === 'granted') return true;
+      if (Notification.permission === 'denied') return false;
+      return (await Notification.requestPermission()) === 'granted';
     }
   }
 }

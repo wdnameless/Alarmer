@@ -57,7 +57,7 @@ function isLocalUiCommand(lowerPrompt: string): boolean {
 export type ScheduleDraft = Schedule & { sourceText: string; note: string };
 
 export interface AIPlatformMutation {
-  type: 'ui_change' | 'alarm_schedule' | 'workout_plan' | 'hybrid';
+  type: 'ui_change' | 'alarm_schedule' | 'workout_plan' | 'hybrid' | 'answer';
   explanation: string;
   ui?: Partial<DynamicUIConfig>;
   alarms?: AlarmItem[];
@@ -77,11 +77,25 @@ export interface ChatMessage {
   scheduleDraft?: ScheduleDraft;
 }
 
-export class AICompilerService {
-  private static readonly SYSTEM_PROMPT = `Ты — ведущий AI-Дизайнер и Архитектор интерфейса приложения Alarmer.
-Твоя задача — трансформировать интерфейс, цвета, шрифты, расположение элементов и логику приложения строго по запросу пользователя.
+/**
+ * Said when the request matched no local action and no model was reachable.
+ *
+ * The offline compiler is a keyword map, not an assistant: admitting that is
+ * better than inventing an edit, which is what it used to do.
+ */
+const NOTHING_TO_CHANGE =
+  'Не понял запрос — я не изменил интерфейс. Опишите, что поменять (например: «сделай AMOLED и убери засечки»), либо подключите нейросеть в Настройках → Нейросеть, чтобы я отвечал на любые вопросы.';
 
-ВНИМАНИЕ: Не выбирай фиксированные шаблоны! Сгенерируй УНИКАЛЬНЫЙ гармоничный дизайн с hex-кодами, подходящими под настроение запроса.
+export class AICompilerService {
+  private static readonly SYSTEM_PROMPT = `Ты — AI-ассистент приложения Alarmer: таймер, будильники, программы дня, задачи и оформление интерфейса.
+
+Сначала реши, чего хочет пользователь:
+- Если это ВОПРОС или разговор (например «покажи расписание на завтра», «сколько я работал», «что ты умеешь»), ответь текстом в поле "explanation", поставь "type": "answer" и НЕ присылай "ui" и "alarms". Вопрос — это не команда менять интерфейс.
+- Если это КОМАНДА, выполни её и опиши в "explanation" ровно то, что изменил.
+
+Никогда не выдумывай изменения, которых пользователь не просил, и не описывай работу, которую не сделал.
+
+Когда пользователь просит изменить оформление — не бери фиксированные шаблоны, сгенерируй гармоничный дизайн с hex-кодами под настроение запроса. В "ui.colors" присылай ТОЛЬКО те цвета, которые меняешь: остальные берутся из выбранной пользователем темы.
 
 Отвечай ИСКЛЮЧИТЕЛЬНО в формате JSON со следующей структурой:
 {
@@ -174,6 +188,16 @@ export class AICompilerService {
       // CSP-blocked endpoint went unnoticed.
       const fallback = this.offlineFallbackCompiler(prompt, currentUi);
       return { ...fallback, explanation: `${fallback.explanation} (модель недоступна: ${error})` };
+    }
+
+    if (value.type === 'answer') {
+      // A conversational reply carries no mutation. Saying so explicitly keeps
+      // the caller from applying an empty edit and reporting success.
+      return {
+        type: 'answer',
+        explanation: asString(value.explanation, ''),
+        autoApply: false,
+      };
     }
 
     return {
@@ -316,7 +340,11 @@ export class AICompilerService {
       changes.push('шрифт: моноширинный');
     }
 
-    explanation += changes.length > 0 ? changes.join(', ') : 'оптимизированы параметры интерфейса';
+    // Say what actually happened. Claiming "UI трансформирован" while changing
+    // nothing is how a user asks a question and is told their interface was
+    // redesigned — the message and the effect have to agree.
+    const didChangeUi = changes.length > 0;
+    if (didChangeUi) explanation += changes.join(', ');
 
     // Alarms generation if asked
     let alarms: AlarmItem[] | undefined;
@@ -333,6 +361,19 @@ export class AICompilerService {
         sound: 'gentle',
         voicePrompt: `Время активности: ${t}. Выполните запланированное действие!`,
       }));
+    }
+
+    if (!didChangeUi) {
+      return {
+        type: alarms ? 'alarm_schedule' : 'ui_change',
+        explanation: alarms
+          ? 'Готово: будильники ниже.'
+          : NOTHING_TO_CHANGE,
+        // No `ui` at all: there is no edit to apply, and sending the unchanged
+        // config would let the caller report a successful mutation.
+        alarms,
+        autoApply: Boolean(alarms),
+      };
     }
 
     return {
