@@ -189,3 +189,47 @@ describe('installing an update', () => {
     if (!result.ok) expect(result.message).toContain('больше не доступно');
   });
 });
+
+describe('the background check at start-up', () => {
+  beforeEach(() => {
+    invokeMock.mockReset();
+    checkMock.mockReset();
+    prefs.clear();
+    tauri = true;
+  });
+
+  /*
+   * The app checks shortly after launch so a user who never opens settings
+   * still learns about a new version. The behaviour worth pinning is that it
+   * stays quiet unless there is genuinely something to offer.
+   */
+
+  it('produces something to show when a newer version exists', async () => {
+    prefs.set('alarmer_portable', false);
+    checkMock.mockResolvedValue({ version: '0.3.0', body: 'notes', date: null });
+
+    const result = await checkForUpdate();
+
+    expect(result.status).toBe('update');
+    if (result.status === 'update') expect(result.info.version).toBe('0.3.0');
+  });
+
+  it('produces nothing to show when already current', async () => {
+    prefs.set('alarmer_portable', false);
+    checkMock.mockResolvedValue(null);
+
+    // Not an error and not an update: nothing should appear on screen.
+    expect((await checkForUpdate()).status).toBe('current');
+  });
+
+  it('produces nothing to show when the check fails', async () => {
+    prefs.set('alarmer_portable', false);
+    checkMock.mockRejectedValue(new Error('offline'));
+
+    // A background check that cannot succeed must not interrupt the user.
+    const result = await checkForUpdate();
+
+    expect(result.status).toBe('error');
+    expect(result.status).not.toBe('update');
+  });
+});

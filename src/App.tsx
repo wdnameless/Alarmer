@@ -15,8 +15,10 @@ import { AppMode, ThemeId, AISettings, AlarmItem, Schedule, ThemeColors, Dynamic
 import { StoreService } from './services/store';
 import { buildFirings } from './services/scheduleEngine';
 import { AlarmCenter, type MissedAlarm } from './components/AlarmCenter';
+import { UpdateBanner } from './components/UpdateBanner';
 import { trimSessions } from './services/session';
 import { TimerService } from './services/timer';
+import { checkForUpdate, type UpdateInfo } from './services/update';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -302,6 +304,27 @@ export const App: React.FC = () => {
   const [, setLangTick] = useState(0);
   useEffect(() => I18nService.subscribe(() => setLangTick((n) => n + 1)), []);
 
+  /** A version found in the background, offered as a quiet bar. */
+  const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
+
+  /**
+   * Looks for an update shortly after launch.
+   *
+   * Without this the app only ever updates if the user goes looking in
+   * settings, which in practice means it does not update at all. Delayed so it
+   * never competes with start-up work, and silent on failure — a background
+   * check that cannot succeed is not worth interrupting anyone over.
+   */
+  useEffect(() => {
+    if (!isTauri()) return;
+    const timer = window.setTimeout(() => {
+      void checkForUpdate().then((result) => {
+        if (result.status === 'update') setPendingUpdate(result.info);
+      });
+    }, 8000);
+    return () => window.clearTimeout(timer);
+  }, []);
+
   return (
     <AlarmCenter
       theme={theme}
@@ -324,6 +347,13 @@ export const App: React.FC = () => {
         }}
       >
         <ResizeHandles />
+      {/* A newer version found in the background, offered quietly. */}
+      <UpdateBanner
+        theme={theme}
+        version={pendingUpdate?.version ?? null}
+        onOpenSettings={() => setActiveTab('settings')}
+        onDismiss={() => setPendingUpdate(null)}
+      />
       {/* Sleek Custom Windows / macOS Titlebar with Drag & Controls */}
       <TitleBar
         theme={theme}
