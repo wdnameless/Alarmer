@@ -45,6 +45,8 @@ export type ScheduleStep =
       /** Announced when the moment rings. */
       voicePrompt?: string;
       sound?: string;
+      /** A short description the user wrote, shown when the step rings. */
+      note?: string;
     }
   | {
       id: string;
@@ -55,6 +57,8 @@ export type ScheduleStep =
       exercises: ExerciseStep[];
       /** Spoken once when the block starts. */
       voicePrompt?: string;
+      /** A short description shown while the block plays. */
+      note?: string;
     };
 
 /**
@@ -127,6 +131,31 @@ export interface SessionRecord {
   /** True when the user ran it to completion rather than closing it early. */
   completed: boolean;
 }
+/**
+ * A free-form note the user keeps.
+ *
+ * Written in a deliberately small subset of Markdown (headings, emphasis, lists,
+ * code, links) so it reads well as plain text in the store and renders
+ * formatted in the UI. Bodies are never injected as HTML — the renderer builds
+ * them from text, so a note cannot break the app's CSP or inject a script.
+ */
+export interface NoteItem {
+  id: string;
+  /** Optional title; a note with only a body shows its first line instead. */
+  title: string;
+  /** Markdown body. */
+  body: string;
+  /** When set, the note is attached to a specific alarm or schedule step. */
+  alarmId?: string;
+  /** Schedule + step this note belongs to, when attached to a program. */
+  scheduleId?: string;
+  stepId?: string;
+  /** Pinned notes sort ahead of the rest. */
+  pinned: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
 
 export interface AlarmItem {
   id: string;
@@ -140,6 +169,8 @@ export interface AlarmItem {
   sound: string;
   voicePrompt?: string;
   voiceAnnouncement?: string;
+  /** A short description the user wrote, shown on the ringing takeover. */
+  note?: string;
   /** Set when this alarm was expanded from a schedule step. */
   scheduleId?: string;
 }

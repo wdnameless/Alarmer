@@ -11,7 +11,7 @@ import { soundService } from './services/sound';
 import { NotificationService } from './services/notification';
 import { ResizeHandles } from './components/ResizeHandles';
 import { I18nService } from './services/i18n';
-import { AppMode, ThemeId, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig, TaskItem, SessionRecord } from './types';
+import { AppMode, ThemeId, AISettings, AlarmItem, Schedule, ThemeColors, DynamicUIConfig, TaskItem, SessionRecord, NoteItem } from './types';
 import { StoreService } from './services/store';
 import { buildFirings } from './services/scheduleEngine';
 import { AlarmCenter, type MissedAlarm } from './components/AlarmCenter';
@@ -70,13 +70,31 @@ export const App: React.FC = () => {
   const [aiSettings, setAISettings] = useState<AISettings>(() => StoreService.snapshot().aiSettings);
 
   /** Standalone alarms the user created directly. */
-  const [alarms, setAlarms] = useState<AlarmItem[]>(() => StoreService.snapshot().alarms);
+  const [alarms, setAlarmsState] = useState<AlarmItem[]>(() => StoreService.snapshot().alarms);
+
+  /**
+   * Writes the standalone alarm list, refusing derived entries.
+   *
+   * The alarm list renders `firings` — schedules expanded into alarms — so any
+   * update built from what is on screen contains schedule steps too. Those are
+   * recomputed from their schedule on every render, and persisting one would
+   * store a stale copy as if the user had created it. The filter lives here
+   * rather than at each call site so no screen can leak them by omission.
+   */
+  const setAlarms: React.Dispatch<React.SetStateAction<AlarmItem[]>> = (action) => {
+    setAlarmsState((prev) => {
+      const next = typeof action === 'function' ? action(prev) : action;
+      return next.filter((a) => !a.scheduleId);
+    });
+  };
   /** Saved schedules — the primary object of the product. */
   const [schedules, setSchedules] = useState<Schedule[]>(() => StoreService.snapshot().schedules);
   /** Work the user intends to do, linked to schedule steps where applicable. */
   const [tasks, setTasks] = useState<TaskItem[]>(() => StoreService.snapshot().tasks);
   /** Log of completed focus sessions, the source of every statistic. */
   const [sessions, setSessions] = useState<SessionRecord[]>(() => StoreService.snapshot().sessions);
+  /** Free-form and attached notes. */
+  const [notes, setNotes] = useState<NoteItem[]>(() => StoreService.snapshot().notes);
 
   /**
    * What the scheduler actually receives: schedule steps expanded into firings,
@@ -95,10 +113,11 @@ export const App: React.FC = () => {
       schedules,
       tasks,
       sessions,
+      notes,
       dynamicUi,
       chatMessages: chatMessages as never,
     });
-  }, [hydrated, aiSettings, alarms, schedules, tasks, sessions, dynamicUi, chatMessages]);
+  }, [hydrated, aiSettings, alarms, schedules, tasks, sessions, notes, dynamicUi, chatMessages]);
 
   // Adopt the persisted store file on first mount (native file, not localStorage).
   useEffect(() => {
@@ -108,6 +127,7 @@ export const App: React.FC = () => {
         setSchedules(state.schedules);
         setTasks(state.tasks);
         setSessions(state.sessions);
+        setNotes(state.notes);
         setAISettings(state.aiSettings);
         setDynamicUi(state.dynamicUi);
         if (state.chatMessages.length > 0) {
@@ -369,6 +389,13 @@ export const App: React.FC = () => {
                 schedules={schedules}
                 onUpdateSchedules={setSchedules}
                 aiSettings={aiSettings}
+                /*
+                 * `alarms` above is the expanded firing list, but only the
+                 * standalone entries are real data — anything carrying a
+                 * `scheduleId` is recomputed from its schedule on every render.
+                 * `setAlarms` drops those, so no screen can persist a stale
+                 * copy of a schedule step.
+                 */
                 onUpdateAlarms={setAlarms}
                 onOpenAISettings={() => setActiveTab('settings')}
                 timerMinutes={aiTimerMinutes}
@@ -376,6 +403,8 @@ export const App: React.FC = () => {
                 onUpdateTasks={setTasks}
                 sessions={sessions}
                 onSession={recordSession}
+                notes={notes}
+                onUpdateNotes={setNotes}
                 activeSubModule={dashboardSubModule}
                 onSubModuleChange={setDashboardSubModule}
               />

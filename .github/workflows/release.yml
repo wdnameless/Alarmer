@@ -1,0 +1,76 @@
+name: Release
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+# Builds the app for all three desktop platforms and publishes a draft GitHub
+# Release with installers plus a portable bundle per platform.
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            platform: windows
+            exeName: alarmer.exe
+          - os: macos-latest
+            platform: macos
+            exeName: alarmer
+          - os: ubuntu-latest
+            platform: linux
+            exeName: alarmer
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: oven-sh/setup-bun@v2
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - run: bun install --frozen-lockfile
+
+      # Linux needs the WebKit/WebKitGTK stack to build.
+      - if: matrix.platform == 'linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libgtk-3-dev libayatana-appindicator3-dev librsvg2-dev libsoup-3.0-dev
+
+      # Builds the app, produces the platform installers, and creates the draft
+      # release with them attached.
+      - name: Build and bundle
+        uses: tauri-apps/tauri-action@v0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tagName: ${{ github.ref_name }}
+          releaseName: 'Alarmer ${{ github.ref_name }}'
+          releaseBody: 'See the assets below.'
+          releaseDraft: true
+          prerelease: false
+
+      # A portable bundle is the built binary plus an empty `portable` marker:
+      # the app sees the marker and keeps its data beside itself rather than in
+      # the per-user application data directory. No installer, no registry.
+      - name: Build portable bundle
+        shell: bash
+        run: |
+          mkdir -p portable/alarmer
+          cp "src-tauri/target/release/${{ matrix.exeName }}" \
+             "portable/alarmer/${{ matrix.exeName }}"
+          touch portable/alarmer/portable
+          cd portable && zip -r ../alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}.zip alarmer
+
+      - name: Attach portable bundle to the release
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/')
+        with:
+          files: alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}.zip
+          draft: true

@@ -1,15 +1,16 @@
 import React, { useState } from "react";
-import { ThemeColors, DynamicUIConfig, AlarmItem, Schedule, AISettings, TaskItem, SessionRecord } from "../types";
+import { ThemeColors, DynamicUIConfig, AlarmItem, Schedule, AISettings, TaskItem, SessionRecord, NoteItem } from "../types";
 import { Timer } from "./Timer";
 import { Alarms } from "./Alarms";
 import { TodayView } from "./TodayView";
 import { TasksView } from "./TasksView";
 import { StatsView } from "./StatsView";
-import { Timer as TimerIcon, Bell, CalendarDays, ListTodo, TrendingUp } from "lucide-react";
+import { NotesView } from "./NotesView";
+import { Timer as TimerIcon, Bell, CalendarDays, ListTodo, TrendingUp, NotebookPen } from "lucide-react";
 import { I18nService } from "../services/i18n";
 
 /** Modules reachable from the dashboard. */
-export type SubModule = 'today' | 'timer' | 'tasks' | 'alarms' | 'stats';
+export type SubModule = 'today' | 'timer' | 'tasks' | 'alarms' | 'stats' | 'notes';
 
 interface DashboardViewProps {
   theme: ThemeColors;
@@ -27,6 +28,8 @@ interface DashboardViewProps {
   timerMinutes?: number;
   activeSubModule?: SubModule;
   onSubModuleChange?: (sub: SubModule) => void;
+  notes: NoteItem[];
+  onUpdateNotes: (notes: NoteItem[]) => void;
 }
 
 export const DashboardView: React.FC<DashboardViewProps> = ({
@@ -42,6 +45,8 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   onUpdateTasks,
   sessions,
   onSession,
+  notes,
+  onUpdateNotes,
   timerMinutes,
   activeSubModule,
   onSubModuleChange,
@@ -60,6 +65,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     { id: 'tasks', label: t.tasks, title: t.tasksTitle, icon: <ListTodo size={13} /> },
     { id: 'alarms', label: t.alarms, title: t.alarmsTitle, icon: <Bell size={13} /> },
     { id: 'stats', label: t.stats, title: t.statsTitle, icon: <TrendingUp size={13} /> },
+    { id: 'notes', label: 'Заметки', title: 'Заметки и описания', icon: <NotebookPen size={13} /> },
   ];
 
   return (
@@ -121,6 +127,15 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             onUpdateAlarms={onUpdateAlarms}
             onOpenAISettings={onOpenAISettings}
             dynamicUi={dynamicUi}
+          />
+        </div>
+        <div className={`w-full flex-1 flex flex-col items-center justify-start overflow-y-auto ${subModule === 'notes' ? '' : 'hidden'}`}>
+          <NotesView
+            theme={theme}
+            notes={notes}
+            onUpdateNotes={onUpdateNotes}
+            alarms={alarms}
+            schedules={schedules}
           />
         </div>
         <div className={`w-full flex-1 flex flex-col items-center justify-start overflow-y-auto ${subModule === 'stats' ? '' : 'hidden'}`}>

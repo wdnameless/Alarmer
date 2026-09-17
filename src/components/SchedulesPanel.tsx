@@ -65,6 +65,13 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
     patchSchedule(schedule.id, { steps });
   };
 
+  /** Writes a step's note, dropping the field when it's emptied. */
+  const editStepNote = (schedule: Schedule, stepId: string, note: string) => {
+    const steps = schedule.steps.map((st) =>
+      st.id === stepId ? { ...st, note: note.trim() || undefined } : st,
+    );
+    patchSchedule(schedule.id, { steps });
+  };
   const deleteStep = (schedule: Schedule, stepId: string) => {
     const steps = schedule.steps.filter((st) => st.id !== stepId);
     // A schedule with no steps would silently stop working; drop it instead.
@@ -174,31 +181,43 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
                 style={{ borderColor: theme.border }}
               >
                 {schedule.steps.map((step) => (
-                  <div key={step.id} className="flex items-center gap-2 text-[11px]">
-                    <Clock size={11} style={{ color: theme.subtext }} />
+                  <div key={step.id} className="flex flex-col space-y-1">
+                    <div className="flex items-center gap-2 text-[11px]">
+                      <Clock size={11} style={{ color: theme.subtext }} />
+                      <input
+                        type="text"
+                        inputMode="numeric"
+                        defaultValue={step.time}
+                        onBlur={(e) => editStepTime(schedule, step.id, e.target.value)}
+                        className="bg-transparent font-mono tabular-nums shrink-0 outline-none border-b w-[46px]"
+                        style={{ color: theme.text, borderColor: 'rgba(255,255,255,0.12)' }}
+                        aria-label={`Время шага ${step.label}`}
+                        title="Время в формате 24 часа, например 22:30"
+                      />
+                      <span className="truncate" style={{ color: theme.text }}>
+                        {step.label}
+                      </span>
+                      <span className="ml-auto shrink-0" style={{ color: theme.subtext }}>
+                        {describeStep(step)}
+                      </span>
+                      <button
+                        onClick={() => deleteStep(schedule, step.id)}
+                        title="Удалить шаг"
+                        className="p-1 rounded transition-colors hover:bg-red-500/20 text-red-400 opacity-50 hover:opacity-100 shrink-0"
+                      >
+                        <Trash2 size={11} />
+                      </button>
+                    </div>
                     <input
                       type="text"
-                      inputMode="numeric"
-                      defaultValue={step.time}
-                      onBlur={(e) => editStepTime(schedule, step.id, e.target.value)}
-                      className="bg-transparent font-mono tabular-nums shrink-0 outline-none border-b w-[46px]"
-                      style={{ color: theme.text, borderColor: 'rgba(255,255,255,0.12)' }}
-                      aria-label={`Время шага ${step.label}`}
-                      title="Время в формате 24 часа, например 22:30"
+                      defaultValue={step.note ?? ''}
+                      placeholder="Описание шага (необязательно)..."
+                      onBlur={(e) => editStepNote(schedule, step.id, e.target.value)}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur(); }}
+                      className="text-[10px] bg-black/30 px-2 py-1 rounded-lg border border-white/10 focus:outline-none w-full"
+                      style={{ color: theme.text }}
+                      aria-label={`Описание шага ${step.label}`}
                     />
-                    <span className="truncate" style={{ color: theme.text }}>
-                      {step.label}
-                    </span>
-                    <span className="ml-auto shrink-0" style={{ color: theme.subtext }}>
-                      {describeStep(step)}
-                    </span>
-                    <button
-                      onClick={() => deleteStep(schedule, step.id)}
-                      title="Удалить шаг"
-                      className="p-1 rounded transition-colors hover:bg-red-500/20 text-red-400 opacity-50 hover:opacity-100 shrink-0"
-                    >
-                      <Trash2 size={11} />
-                    </button>
                   </div>
                 ))}
               </div>

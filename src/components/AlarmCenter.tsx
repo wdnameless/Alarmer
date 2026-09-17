@@ -316,6 +316,15 @@ export const AlarmCenter: React.FC<AlarmCenterProps> = ({
             </span>
           )}
 
+          {ringing.note && (
+            <span
+              className="mt-1.5 text-[11px] text-center max-w-[280px] leading-relaxed font-medium"
+              style={{ color: 'rgba(10,10,10,0.72)' }}
+            >
+              {ringing.note}
+            </span>
+          )}
+
           {ringingBlock?.step.kind === 'block' && (
             <button
               onClick={startRingingBlock}

@@ -280,11 +280,43 @@ async fn missed_alarms_today() -> Result<Vec<scheduler::MissedAlarm>, String> {
     Ok(scheduler::missed_today())
 }
 
+/// Resolves the directory the data file lives in.
+///
+/// A portable build keeps everything next to the executable: the app detects
+/// either the `ALARMER_PORTABLE` environment variable or a `portable` marker
+/// file beside the binary, and then writes `alarmer.json` into a `data` folder
+/// there instead of the per-user application data directory.
+#[tauri::command]
+async fn store_dir(app: tauri::AppHandle) -> Result<String, String> {
+    if std::env::var_os("ALARMER_PORTABLE").is_some() || has_portable_marker() {
+        if let Ok(exe) = std::env::current_exe() {
+            if let Some(dir) = exe.parent() {
+                let portable = dir.join("data");
+                std::fs::create_dir_all(&portable)
+                    .map_err(|e| format!("cannot create portable data dir: {e}"))?;
+                return Ok(portable.to_string_lossy().into_owned());
+            }
+        }
+    }
+
+    app.path()
+        .app_data_dir()
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| format!("no app data dir: {e}"))
+}
+
+/// True when a `portable` marker file sits next to the executable.
+fn has_portable_marker() -> bool {
+    std::env::current_exe()
+        .ok()
+        .and_then(|exe| exe.parent().map(|d| d.join("portable").exists()))
+        .unwrap_or(false)
+}
+
 /// Passed to the executable when the OS starts it, so the app can come up in the
 /// tray instead of throwing a window at someone who has not asked for one.
 const START_MINIMIZED_FLAG: &str = "--minimized";
 
-/// True when this process was launched by the OS at login rather than by hand.
 fn started_minimized() -> bool {
     std::env::args().any(|arg| arg == START_MINIMIZED_FLAG)
 }
@@ -326,6 +358,7 @@ pub fn run() {
             ai_complete,
             set_api_key,
             has_api_key,
+            store_dir,
             timer::timer_set_duration,
             timer::timer_start,
             timer::timer_pause,

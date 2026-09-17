@@ -2,7 +2,7 @@ import { LazyStore } from '@tauri-apps/plugin-store';
 import { invoke } from '@tauri-apps/api/core';
 import { DEFAULT_AI_SETTINGS, DEFAULT_SCHEDULES } from '../constants/defaults';
 import { DEFAULT_DYNAMIC_UI, DynamicUIConfig } from '../types/dynamicUi';
-import { AISettings, AlarmItem, Schedule, ScheduleStep, ExerciseStep, TaskItem, SessionRecord } from '../types';
+import { AISettings, AlarmItem, Schedule, ScheduleStep, ExerciseStep, TaskItem, SessionRecord, NoteItem } from '../types';
 import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../types/guards';
 
 /**
@@ -17,7 +17,7 @@ import { asArray, asBoolean, asNumber, asString, isRecord, oneOf } from '../type
  * render tree.
  */
 
-export const SCHEMA_VERSION = 3;
+export const SCHEMA_VERSION = 4;
 
 const STORE_FILE = 'alarmer.json';
 
@@ -38,7 +38,9 @@ export interface PersistedState {
   dynamicUi: DynamicUIConfig;
   chatMessages: StoredChatMessage[];
   preferences: Record<string, unknown>;
+  notes: NoteItem[];
 }
+
 
 export const PREFERENCE_KEYS = [
   'alarmer_click_volume',
@@ -67,7 +69,20 @@ function isTauri(): boolean {
 
 function getStore(): Promise<LazyStore> {
   if (!storePromise) {
-    storePromise = Promise.resolve(new LazyStore(STORE_FILE));
+    storePromise = (async () => {
+      // A portable build keeps the data file beside the executable, so the store
+      // path comes from the backend, which knows where the binary actually lives.
+      let path = STORE_FILE;
+      try {
+        if (isTauri()) {
+          const dir = await invoke<string>('store_dir');
+          path = `${dir}/${STORE_FILE}`;
+        }
+      } catch (e) {
+        console.warn('Could not resolve the store directory; using the default location:', e);
+      }
+      return new LazyStore(path);
+    })();
   }
   return storePromise;
 }
@@ -94,6 +109,7 @@ function sanitizeAlarm(raw: unknown, index: number): AlarmItem | null {
       ['once', 'daily', 'days'] as const,
       days.length === 0 ? 'once' : 'days',
     ),
+    note: typeof raw.note === 'string' ? raw.note : undefined,
     enabled: asBoolean(raw.enabled, true),
     sound: asString(raw.sound, 'gentle'),
     voicePrompt: typeof raw.voicePrompt === 'string' ? raw.voicePrompt : undefined,
@@ -130,6 +146,25 @@ export function legacyApiKey(raw: unknown): string | null {
   if (!isRecord(raw) || !isRecord(raw.aiSettings)) return null;
   const key = raw.aiSettings.apiKey;
   return typeof key === 'string' && key.trim().length > 0 ? key : null;
+}
+
+function sanitizeNote(raw: unknown, index: number): NoteItem | null {
+  if (!isRecord(raw)) return null;
+  const body = asString(raw.body, '');
+  const title = asString(raw.title, '');
+  // A note with neither title nor body is nothing to keep.
+  if (!body.trim() && !title.trim()) return null;
+  return {
+    id: asString(raw.id, `note_${index}`),
+    title,
+    body,
+    alarmId: typeof raw.alarmId === 'string' ? raw.alarmId : undefined,
+    scheduleId: typeof raw.scheduleId === 'string' ? raw.scheduleId : undefined,
+    stepId: typeof raw.stepId === 'string' ? raw.stepId : undefined,
+    pinned: asBoolean(raw.pinned, false),
+    createdAt: asString(raw.createdAt, new Date().toISOString()),
+    updatedAt: asString(raw.updatedAt, new Date().toISOString()),
+  };
 }
 
 function sanitizeDynamicUi(raw: unknown): DynamicUIConfig {
@@ -228,6 +263,7 @@ function sanitizeStep(raw: unknown, index: number): ScheduleStep | null {
       label,
       exercises,
       voicePrompt,
+      note: typeof raw.note === 'string' ? raw.note : undefined,
     };
   }
 
@@ -238,6 +274,7 @@ function sanitizeStep(raw: unknown, index: number): ScheduleStep | null {
     label,
     voicePrompt,
     sound: typeof raw.sound === 'string' ? raw.sound : undefined,
+    note: typeof raw.note === 'string' ? raw.note : undefined,
   };
 }
 
@@ -315,6 +352,8 @@ function sanitizeSession(raw: unknown, index: number): SessionRecord | null {
  *
  * v2 -> v3: added `tasks` and `sessions`. Both start empty: an existing user has
  * no history to import, and inventing one would be a lie in the statistics.
+ *
+ * v3 -> v4: added `notes`. Also starts empty; the key scrub is unchanged.
  */
 export function migrate(raw: unknown): PersistedState {
   const record = isRecord(raw) ? raw : {};
@@ -340,6 +379,9 @@ export function migrate(raw: unknown): PersistedState {
     sessions: asArray<unknown>(record.sessions, [])
       .map(sanitizeSession)
       .filter((s): s is SessionRecord => s !== null),
+    notes: asArray<unknown>(record.notes, [])
+      .map(sanitizeNote)
+      .filter((n): n is NoteItem => n !== null),
     aiSettings: sanitizeAiSettings(record.aiSettings),
     dynamicUi: sanitizeDynamicUi(record.dynamicUi),
     chatMessages: sanitizeMessages(record.chatMessages),

@@ -48,6 +48,7 @@ export function expandSchedule(schedule: Schedule): AlarmItem[] {
     voicePrompt: voiceForStep(step),
     voiceAnnouncement: voiceForStep(step),
     scheduleId: schedule.id,
+    note: step.note,
   }));
 }
 

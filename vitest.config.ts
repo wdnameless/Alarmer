@@ -20,10 +20,10 @@ export default defineConfig({
       // project shipped lived in the untested lifecycle of a component, which is
       // the gap these thresholds exist to stop widening.
       thresholds: {
-        statements: 48,
-        branches: 44,
-        functions: 46,
-        lines: 49,
+        statements: 52,
+        branches: 49,
+        functions: 50,
+        lines: 53,
       },
     },
   },

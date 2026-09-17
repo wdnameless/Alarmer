@@ -190,6 +190,12 @@ export const BlockPlayer: React.FC<BlockPlayerProps> = ({
           {index + 1} из {exercises.length}
         </span>
 
+        {block.note && (
+          <span className="text-[11px] text-center mb-5 leading-relaxed max-w-[260px]" style={{ color: theme.subtext }}>
+            {block.note}
+          </span>
+        )}
+
         <span
           className="font-mono tabular-nums font-bold leading-none mb-6"
           style={{ color: theme.text, fontSize: '72px' }}
