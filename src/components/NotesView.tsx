@@ -157,7 +157,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
       {editingId !== null && (
         <div
           className="rounded-2xl border p-3 space-y-2"
-          style={{ backgroundColor: 'rgba(255,255,255,0.045)', borderColor: 'rgba(255,255,255,0.12)' }}
+          style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
         >
           <input
             type="text"
@@ -212,7 +212,7 @@ export const NotesView: React.FC<NotesViewProps> = ({
       {sorted.length === 0 && editingId === null && (
         <div
           className="rounded-2xl border px-4 py-6 text-center"
-          style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}
+          style={{ backgroundColor: theme.surface, borderColor: theme.border }}
         >
           <Edit3 size={18} className="mx-auto mb-2 opacity-40" style={{ color: theme.subtext }} />
           <span className="text-[11px] leading-relaxed" style={{ color: theme.subtext }}>
@@ -227,8 +227,8 @@ export const NotesView: React.FC<NotesViewProps> = ({
             key={note.id}
             className="rounded-2xl border p-3"
             style={{
-              backgroundColor: note.pinned ? 'rgba(255,255,255,0.05)' : 'rgba(255,255,255,0.03)',
-              borderColor: note.pinned ? 'rgba(255,255,255,0.14)' : 'rgba(255,255,255,0.07)',
+              backgroundColor: note.pinned ? theme.cardBg : theme.surface,
+              borderColor: theme.border,
             }}
           >
             <div className="flex items-start justify-between gap-2">

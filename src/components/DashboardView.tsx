@@ -83,7 +83,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     <div className="flex flex-col items-center w-full h-full space-y-4">
       {/* Sub-selector Pills */}
       <div
-        className="flex items-center justify-between w-full max-w-[340px] p-0.5 rounded-xl border text-xs font-semibold overflow-hidden"
+        className="flex items-center w-full max-w-[340px] p-0.5 rounded-xl border text-xs font-semibold"
         style={{
           backgroundColor: theme.surface,
           borderColor: theme.border,
@@ -93,7 +93,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
           <button
             key={tab.id}
             onClick={() => setSubModule(tab.id)}
-            className="flex-1 flex items-center justify-center space-x-1 py-1 px-0.5 rounded-lg transition-all"
+            /* `min-w-0` is what lets a flex child shrink below its content
+               width; without it the six labels pushed the row 24px past its own
+               cap and the whole pane grew a horizontal scrollbar. */
+            className="flex-1 min-w-0 flex items-center justify-center gap-1 py-1 px-0.5 rounded-lg transition-all"
             style={{
               backgroundColor: subModule === tab.id ? "rgba(255,255,255,0.07)" : "transparent",
               color: subModule === tab.id ? theme.text : theme.subtext,
@@ -101,10 +104,10 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             }}
             title={tab.title}
           >
-            {tab.icon}
+            <span className="shrink-0 flex items-center">{tab.icon}</span>
             {/* The labels only fit once the pane is wide enough; below that the
                 icons carry the meaning. */}
-            <span className="hidden min-[330px]:inline text-[10px] truncate">{tab.label}</span>
+            <span className="hidden min-[380px]:inline text-[10px] truncate">{tab.label}</span>
           </button>
         ))}
       </div>

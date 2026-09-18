@@ -30,7 +30,7 @@ export const UpdateBanner: React.FC<UpdateBannerProps> = ({
   return (
     <div
       className="flex items-center gap-2 px-3 py-1.5 text-[10px] shrink-0"
-      style={{ backgroundColor: 'rgba(255,255,255,0.06)', borderBottom: `1px solid ${theme.border}` }}
+      style={{ backgroundColor: theme.border, borderBottom: `1px solid ${theme.border}` }}
       role="status"
     >
       <Sparkles size={11} style={{ color: theme.accent }} />

@@ -229,7 +229,7 @@ export const Alarms: React.FC<AlarmsProps> = ({
               onClick={() => setShowAiModal(true)}
               className="flex items-center space-x-1 px-2 py-0.5 text-[10px] font-bold rounded-lg transition-all shadow-sm shrink-0"
               style={{
-                backgroundColor: 'rgba(255,255,255,0.06)',
+                backgroundColor: theme.border,
                 color: theme.text,
                 border: `1px solid ${theme.border}`,
               }}
@@ -257,8 +257,8 @@ export const Alarms: React.FC<AlarmsProps> = ({
         <div
           className="p-4 rounded-2xl border backdrop-blur-2xl flex flex-col space-y-2 animate-in fade-in zoom-in-95 duration-150"
           style={{
-            backgroundColor: 'rgba(255,255,255,0.05)',
-            borderColor: 'rgba(255,255,255,0.10)',
+            backgroundColor: theme.cardBg,
+            borderColor: theme.border,
             boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
           }}
         >
@@ -323,7 +323,7 @@ export const Alarms: React.FC<AlarmsProps> = ({
       <form
         onSubmit={addAlarm}
         className="flex items-center gap-1.5 p-2 rounded-2xl border w-full"
-        style={{ backgroundColor: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.07)' }}
+        style={{ backgroundColor: theme.surface, borderColor: theme.border }}
       >
         <input
           type="time"
@@ -400,11 +400,9 @@ export const Alarms: React.FC<AlarmsProps> = ({
               key={alarm.id}
               className="flex items-center justify-between p-3 rounded-2xl border backdrop-blur-xl transition-all"
               style={{
-                backgroundColor: alarm.enabled
-                  ? 'rgba(255,255,255,0.045)'
-                  : 'rgba(255,255,255,0.015)',
+                backgroundColor: alarm.enabled ? theme.cardBg : theme.surface,
                 // Interactive rows keep a boundary that clears the 3.0 UI floor.
-                borderColor: alarm.enabled ? 'rgba(255,255,255,0.36)' : 'rgba(255,255,255,0.06)',
+                borderColor: theme.border,
                 boxShadow: alarm.enabled ? '0 8px 24px rgba(0,0,0,0.32)' : 'none',
                 opacity: alarm.enabled ? 1 : 0.55,
               }}

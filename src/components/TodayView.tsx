@@ -122,13 +122,12 @@ export const TodayView: React.FC<TodayViewProps> = ({
   const next = findNextUp(schedules, now);
 
   return (
-    <div className="flex flex-col w-full max-w-[340px] space-y-4">
+    <div className="flex flex-col w-full max-w-[340px] space-y-5">
       {/* Day's completed blocks & Focus Block Card */}
       <div
-        className="w-full rounded-3xl border backdrop-blur-2xl px-5 py-5"
+        className="w-full rounded-3xl px-6 py-6"
         style={{
-          backgroundColor: 'rgba(255,255,255,0.05)',
-          borderColor: 'rgba(255,255,255,0.10)',
+          backgroundColor: theme.cardBg,
           boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
         }}
       >
@@ -143,9 +142,8 @@ export const TodayView: React.FC<TodayViewProps> = ({
             data-testid="today-blocks-counter"
             className="text-[11px] font-medium px-2 py-0.5 rounded-full border"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.03)',
-              borderColor: 'rgba(255,255,255,0.08)',
-              color: theme.subtext,
+              backgroundColor: theme.surface,
+                  color: theme.subtext,
             }}
             title="Завершено блоков сегодня"
           >
@@ -154,7 +152,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
         </div>
 
         {activeDirections.length === 0 ? (
-          <div className="py-3 px-3 rounded-2xl border border-dashed text-center" style={{ borderColor: 'rgba(255,255,255,0.08)', backgroundColor: 'rgba(255,255,255,0.02)' }}>
+          <div className="py-3 px-3 rounded-2xl border border-dashed text-center" style={{ borderColor: theme.border, backgroundColor: theme.surface }}>
             <p className="text-[11px] leading-relaxed mb-1" style={{ color: theme.subtext }}>
               Нет активных направлений. Создайте направление в журнале, чтобы планировать бюджет фокуса.
             </p>
@@ -177,9 +175,8 @@ export const TodayView: React.FC<TodayViewProps> = ({
                 onClick={() => handleStartDirectionBlock(direction.id)}
                 className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-left group hover:scale-[1.01] active:scale-[0.98]"
                 style={{
-                  backgroundColor: 'rgba(255,255,255,0.03)',
-                  borderColor: 'rgba(255,255,255,0.06)',
-                }}
+                  backgroundColor: theme.surface,
+                        }}
               >
                 <div className="flex items-center gap-2.5 min-w-0">
                   <span
@@ -197,7 +194,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
                   </span>
                   <div
                     className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors"
-                    style={{ backgroundColor: 'rgba(255,255,255,0.08)', color: theme.text }}
+                    style={{ backgroundColor: theme.surface, color: theme.text }}
                   >
                     <Play size={10} className="fill-current ml-0.5" />
                   </div>
@@ -211,11 +208,10 @@ export const TodayView: React.FC<TodayViewProps> = ({
       {/* Schedules section */}
       {active.length === 0 ? (
         <div
-          className="w-full rounded-3xl border backdrop-blur-2xl px-5 py-6 flex flex-col items-center justify-center text-center"
+          className="w-full rounded-3xl px-6 py-7 flex flex-col items-center justify-center text-center"
           style={{
-            backgroundColor: 'rgba(255,255,255,0.035)',
-            borderColor: 'rgba(255,255,255,0.08)',
-            boxShadow: '0 18px 48px rgba(0,0,0,0.4)',
+            backgroundColor: theme.surface,
+              boxShadow: '0 18px 48px rgba(0,0,0,0.4)',
           }}
         >
           <CalendarDays size={22} className="mb-3 opacity-40" style={{ color: theme.subtext }} />
@@ -231,10 +227,9 @@ export const TodayView: React.FC<TodayViewProps> = ({
           {/* What is next — the headline answer. */}
           {next ? (
             <div
-              className="w-full rounded-3xl border backdrop-blur-2xl px-5 py-6"
+              className="w-full rounded-3xl px-6 py-7"
               style={{
-                backgroundColor: 'rgba(255,255,255,0.05)',
-                borderColor: 'rgba(255,255,255,0.10)',
+                backgroundColor: theme.cardBg,
                 boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
               }}
             >
@@ -264,8 +259,8 @@ export const TodayView: React.FC<TodayViewProps> = ({
                 <div
                   className="rounded-2xl p-3 mb-4 border space-y-1.5"
                   style={{
-                    backgroundColor: 'rgba(255,255,255,0.03)',
-                    borderColor: 'rgba(255,255,255,0.06)',
+                    backgroundColor: theme.surface,
+                    borderColor: theme.border,
                   }}
                 >
                   <div className="flex items-center justify-between text-[11px]">
@@ -302,10 +297,9 @@ export const TodayView: React.FC<TodayViewProps> = ({
             </div>
           ) : (
             <div
-              className="w-full rounded-3xl border backdrop-blur-2xl px-5 py-6 text-center"
+              className="w-full rounded-3xl px-6 py-7 text-center"
               style={{
-                backgroundColor: 'rgba(255,255,255,0.04)',
-                borderColor: 'rgba(255,255,255,0.08)',
+                backgroundColor: theme.cardBg,
               }}
             >
               <span className="text-xs" style={{ color: theme.subtext }}>
@@ -318,8 +312,8 @@ export const TodayView: React.FC<TodayViewProps> = ({
           <div
             className="w-full rounded-3xl border backdrop-blur-2xl p-4"
             style={{
-              backgroundColor: 'rgba(255,255,255,0.03)',
-              borderColor: 'rgba(255,255,255,0.07)',
+              backgroundColor: theme.surface,
+              borderColor: theme.border,
             }}
           >
             <span
@@ -335,7 +329,7 @@ export const TodayView: React.FC<TodayViewProps> = ({
                     <div
                       key={st.id}
                       className="flex items-center justify-between px-3 py-2 rounded-xl text-xs"
-                      style={{ backgroundColor: 'rgba(255,255,255,0.02)' }}
+                      style={{ backgroundColor: theme.surface }}
                     >
                       <div className="flex items-center gap-2 min-w-0">
                         <span className="w-1.5 h-1.5 rounded-full" style={{ backgroundColor: theme.accent }} />

@@ -87,8 +87,8 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
       <div
         className="w-full rounded-2xl border p-5 text-center"
         style={{
-          backgroundColor: 'rgba(255,255,255,0.03)',
-          borderColor: 'rgba(255,255,255,0.07)',
+          backgroundColor: theme.surface,
+          borderColor: theme.border,
         }}
       >
         <CalendarDays size={20} className="mx-auto mb-2 opacity-40" style={{ color: theme.subtext }} />
@@ -114,9 +114,9 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
               // hard border. An enabled program reads as raised, a disabled one
               // recedes.
               backgroundColor: schedule.enabled
-                ? 'rgba(255,255,255,0.05)'
-                : 'rgba(255,255,255,0.02)',
-              borderColor: schedule.enabled ? 'rgba(255,255,255,0.10)' : 'rgba(255,255,255,0.05)',
+                ? theme.cardBg
+                : theme.surface,
+              borderColor: theme.border,
               boxShadow: schedule.enabled ? '0 10px 30px rgba(0,0,0,0.38)' : 'none',
               opacity: schedule.enabled ? 1 : 0.6,
             }}
@@ -190,7 +190,7 @@ export const SchedulesPanel: React.FC<SchedulesPanelProps> = ({
                         defaultValue={step.time}
                         onBlur={(e) => editStepTime(schedule, step.id, e.target.value)}
                         className="bg-transparent font-mono tabular-nums shrink-0 outline-none border-b w-[46px]"
-                        style={{ color: theme.text, borderColor: 'rgba(255,255,255,0.12)' }}
+                        style={{ color: theme.text, borderColor: theme.border }}
                         aria-label={`Время шага ${step.label}`}
                         title="Время в формате 24 часа, например 22:30"
                       />

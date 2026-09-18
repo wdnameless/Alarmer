@@ -164,8 +164,8 @@ export const BlockPlayer: React.FC<BlockPlayerProps> = ({
       <div
         className="w-full rounded-3xl border backdrop-blur-2xl px-5 py-6 flex flex-col items-center"
         style={{
-          backgroundColor: 'rgba(255,255,255,0.045)',
-          borderColor: 'rgba(255,255,255,0.09)',
+          backgroundColor: theme.cardBg,
+          borderColor: theme.border,
           boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
         }}
       >
@@ -206,7 +206,7 @@ export const BlockPlayer: React.FC<BlockPlayerProps> = ({
         {/* Overall progress: the warm colour marks the present moment only. */}
         <div
           className="w-full h-[3px] rounded-full overflow-hidden mb-6"
-          style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}
+          style={{ backgroundColor: theme.border }}
         >
           <div
             className="h-full rounded-full transition-[width] duration-500"

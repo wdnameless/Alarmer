@@ -108,7 +108,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
       </div>
 
       {total > 0 && (
-        <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: 'rgba(255,255,255,0.08)' }}>
+        <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
           <div
             className="h-full rounded-full transition-[width] duration-300"
             style={{ width: `${(done / total) * 100}%`, backgroundColor: theme.accent }}
@@ -119,7 +119,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
       <form
         onSubmit={addTask}
         className="flex items-center gap-1.5 p-2 rounded-2xl border w-full"
-        style={{ backgroundColor: 'rgba(255,255,255,0.035)', borderColor: 'rgba(255,255,255,0.07)' }}
+        style={{ backgroundColor: theme.surface, borderColor: theme.border }}
       >
         <input
           type="text"
@@ -144,7 +144,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
       {total === 0 && (
         <div
           className="rounded-2xl border px-4 py-6 text-center"
-          style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}
+          style={{ backgroundColor: theme.surface, borderColor: theme.border }}
         >
           <span className="text-[11px] leading-relaxed" style={{ color: theme.subtext }}>
             Пока пусто. Добавьте задачи — расписание подскажет, когда за них взяться.
@@ -164,7 +164,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               key={`${schedule.id}:${step.id}`}
               onClick={() => addFromStep(schedule, step.id, step.label)}
               className="flex items-center gap-2 p-2 rounded-xl border text-left transition-colors hover:bg-white/5"
-              style={{ backgroundColor: 'transparent', borderColor: 'rgba(255,255,255,0.07)' }}
+              style={{ backgroundColor: 'transparent', borderColor: theme.border }}
               title={`Добавить «${step.label}» из «${schedule.name}»`}
             >
               <Plus size={12} style={{ color: theme.subtext }} />
@@ -184,7 +184,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
           <div
             key={task.id}
             className="flex items-center gap-2 p-2.5 rounded-xl border"
-            style={{ backgroundColor: 'rgba(255,255,255,0.045)', borderColor: 'rgba(255,255,255,0.10)' }}
+            style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
           >
             <button
               onClick={() => toggleTask(task.id)}
@@ -218,7 +218,7 @@ export const TasksView: React.FC<TasksViewProps> = ({
               <div
                 key={task.id}
                 className="flex items-center gap-2 p-2.5 rounded-xl border"
-                style={{ backgroundColor: 'rgba(255,255,255,0.02)', borderColor: 'rgba(255,255,255,0.06)' }}
+                style={{ backgroundColor: theme.surface, borderColor: theme.border }}
               >
                 <button
                   onClick={() => toggleTask(task.id)}

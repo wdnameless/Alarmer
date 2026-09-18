@@ -45,8 +45,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ theme, sessions, tasks }) 
         <div
           className="rounded-3xl border backdrop-blur-2xl px-5 py-8 flex flex-col items-center text-center"
           style={{
-            backgroundColor: 'rgba(255,255,255,0.035)',
-            borderColor: 'rgba(255,255,255,0.08)',
+            backgroundColor: theme.surface,
+            borderColor: theme.border,
           }}
         >
           <TrendingUp size={22} className="mb-3 opacity-40" style={{ color: theme.subtext }} />
@@ -67,7 +67,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ theme, sessions, tasks }) 
       <div className="grid grid-cols-2 gap-2">
         <div
           className="rounded-2xl border px-4 py-3"
-          style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.10)' }}
+          style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
         >
           <span className="text-[10px] uppercase tracking-[0.16em] block mb-1" style={{ color: theme.subtext }}>
             За 7 дней
@@ -79,7 +79,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ theme, sessions, tasks }) 
 
         <div
           className="rounded-2xl border px-4 py-3"
-          style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderColor: 'rgba(255,255,255,0.10)' }}
+          style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
         >
           <span className="text-[10px] uppercase tracking-[0.16em] flex items-center gap-1 mb-1" style={{ color: theme.subtext }}>
             <Flame size={10} /> Серия
@@ -96,7 +96,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ theme, sessions, tasks }) 
       {/* Daily bars. Empty days are drawn, not skipped: the gaps are the point. */}
       <div
         className="rounded-2xl border px-4 py-3"
-        style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}
+        style={{ backgroundColor: theme.surface, borderColor: theme.border }}
       >
         <span className="text-[10px] uppercase tracking-[0.16em] block mb-3" style={{ color: theme.subtext }}>
           Последние {WINDOW_DAYS} дней
@@ -113,8 +113,8 @@ export const StatsView: React.FC<StatsViewProps> = ({ theme, sessions, tasks }) 
                   // A zero day still gets a hairline, so the axis stays readable.
                   height: `${Math.max(3, ratio * 100)}%`,
                   backgroundColor: bucket.focusedSec > 0
-                    ? isToday ? theme.accent : 'rgba(255,255,255,0.34)'
-                    : 'rgba(255,255,255,0.08)',
+                    ? isToday ? theme.accent : theme.subtext
+                    : theme.border,
                 }}
                 title={`${bucket.key}: ${formatFocus(bucket.focusedSec)}`}
               />
@@ -126,7 +126,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ theme, sessions, tasks }) 
       {/* Secondary facts, only when there is something to say. */}
       <div
         className="rounded-2xl border px-4 py-3 flex flex-col space-y-2"
-        style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}
+        style={{ backgroundColor: theme.surface, borderColor: theme.border }}
       >
         {best > 0 && (
           <div className="flex items-center justify-between text-[11px]">
@@ -170,7 +170,7 @@ export const StatsView: React.FC<StatsViewProps> = ({ theme, sessions, tasks }) 
           recognised for what it was. */}
       <div
         className="rounded-2xl border px-4 py-3 flex flex-col space-y-2"
-        style={{ backgroundColor: 'rgba(255,255,255,0.03)', borderColor: 'rgba(255,255,255,0.07)' }}
+        style={{ backgroundColor: theme.surface, borderColor: theme.border }}
       >
         <span className="text-[10px] uppercase tracking-[0.16em] flex items-center gap-1" style={{ color: theme.subtext }}>
           <History size={10} /> Последние сессии

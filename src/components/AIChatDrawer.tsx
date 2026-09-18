@@ -191,7 +191,7 @@ export const AIChatDrawer: React.FC<AIChatDrawerProps> = ({
         <div className="flex items-center space-x-2">
           <div
             className="w-6 h-6 rounded-lg flex items-center justify-center shadow-lg"
-            style={{ backgroundColor: "rgba(255,255,255,0.06)", color: theme.text }}
+            style={{ backgroundColor: theme.surface, color: theme.text }}
           >
             <HandSparkle size={14} color={theme.text} />
           </div>
