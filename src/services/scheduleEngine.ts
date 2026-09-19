@@ -1,4 +1,4 @@
-import type { AlarmItem, Schedule, ScheduleStep } from '../types';
+import type { AlarmItem, Schedule, ScheduleStep, TaskItem } from '../types';
 
 /**
  * Projects saved schedules onto the firing model the scheduler consumes.
@@ -53,18 +53,79 @@ export function expandSchedule(schedule: Schedule): AlarmItem[] {
 }
 
 /**
- * Combines schedule-derived firings with standalone alarms.
+ * Expands task timers into alarms.
  *
- * Schedule-derived entries are recomputed from scratch every time, so edits and
+ * If a task has an enabled timer and is not done:
+ * - Interval timer: generates hourly/interval firings across the active day (08:00 to 22:00)
+ * - Fixed time timer: generates one firing at the designated time
+ */
+export function expandTaskTimers(tasks: TaskItem[]): AlarmItem[] {
+  const firings: AlarmItem[] = [];
+  for (const task of tasks) {
+    if (task.done || !task.timer?.enabled) continue;
+    const cfg = task.timer;
+    const sound = cfg.sound || 'gentle';
+    const voicePrompt = cfg.voicePrompt || `Задача: ${task.title}`;
+    const note = task.note || task.title;
+
+    if (cfg.type === 'time' && cfg.time) {
+      firings.push({
+        id: `task:${task.id}:time`,
+        title: task.title,
+        label: task.title,
+        time: cfg.time,
+        days: [],
+        repeat: 'days',
+        enabled: true,
+        sound,
+        voicePrompt,
+        voiceAnnouncement: voicePrompt,
+        note,
+      });
+    } else if (cfg.type === 'interval' && cfg.intervalMinutes && cfg.intervalMinutes > 0) {
+      const stepMin = cfg.intervalMinutes;
+      // Generate firings from 08:00 to 22:00 every stepMin
+      for (let min = 8 * 60; min <= 22 * 60; min += stepMin) {
+        const h = Math.floor(min / 60).toString().padStart(2, '0');
+        const m = (min % 60).toString().padStart(2, '0');
+        const time = `${h}:${m}`;
+        firings.push({
+          id: `task:${task.id}:int:${time}`,
+          title: task.title,
+          label: task.title,
+          time,
+          days: [],
+          repeat: 'days',
+          enabled: true,
+          sound,
+          voicePrompt,
+          voiceAnnouncement: voicePrompt,
+          note,
+        });
+      }
+    }
+  }
+  return firings;
+}
+
+/**
+ * Combines schedule-derived firings, standalone alarms, and task-scheduled timers.
+ *
+ * Schedule and task derived entries are recomputed from scratch every time, so edits and
  * toggles take effect immediately and no stale firings linger.
  */
-export function buildFirings(schedules: Schedule[], standaloneAlarms: AlarmItem[]): AlarmItem[] {
+export function buildFirings(
+  schedules: Schedule[],
+  standaloneAlarms: AlarmItem[],
+  tasks: TaskItem[] = [],
+): AlarmItem[] {
   // Anything tagged with a scheduleId is derived data: it is recomputed below,
   // so tagged entries are dropped here rather than carried over. This also
   // clears orphans left behind by a schedule that has since been deleted.
   const manual = standaloneAlarms.filter((a) => !a.scheduleId);
-  const expanded = schedules.flatMap(expandSchedule);
-  return [...manual, ...expanded];
+  const expandedSchedules = schedules.flatMap(expandSchedule);
+  const expandedTasks = expandTaskTimers(tasks);
+  return [...manual, ...expandedSchedules, ...expandedTasks];
 }
 
 /** The next step to run today across all enabled schedules, or null. */

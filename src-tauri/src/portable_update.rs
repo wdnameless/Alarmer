@@ -35,17 +35,53 @@ fn exe_name() -> Result<String, String> {
         .ok_or_else(|| "the executable has no file name".to_string())
 }
 
-/// Stages a downloaded executable so the next launch uses it.
+/// Stages a downloaded executable or zip archive so the next launch uses it.
 ///
-/// Returns the path the new binary was written to. Nothing is swapped yet: the
-/// running process cannot replace itself, so this only prepares the ground.
+/// If the downloaded payload is a zip archive (the portable release format),
+/// it extracts the matching binary from the archive. If it's a raw binary, it writes it directly.
 pub fn stage(bytes: Vec<u8>) -> Result<PathBuf, String> {
     if bytes.is_empty() {
         return Err("the downloaded update was empty".into());
     }
     let dir = portable_dir()?;
-    let staged = dir.join(format!("{}.new", exe_name()?));
-    std::fs::write(&staged, &bytes).map_err(|e| format!("cannot write the update: {e}"))?;
+    let target_name = exe_name()?;
+    let staged = dir.join(format!("{target_name}.new"));
+
+    // Check if the payload is a ZIP archive (starts with PK\x03\x04).
+    if bytes.len() >= 4 && &bytes[0..4] == b"PK\x03\x04" {
+        let reader = std::io::Cursor::new(&bytes);
+        let mut archive = zip::ZipArchive::new(reader)
+            .map_err(|e| format!("cannot open downloaded portable zip archive: {e}"))?;
+
+        let mut binary_found = false;
+        for i in 0..archive.len() {
+            let mut file = archive
+                .by_index(i)
+                .map_err(|e| format!("cannot read file in zip archive: {e}"))?;
+            let name = file.name().to_string();
+            // Match either the exact exe name or common names like alarmer / alarmer.exe
+            let is_match = name.ends_with(&target_name)
+                || name.ends_with("alarmer.exe")
+                || name.ends_with("/alarmer")
+                || name == "alarmer";
+
+            if is_match && !name.ends_with('/') {
+                let mut out = std::fs::File::create(&staged)
+                    .map_err(|e| format!("cannot write extracted binary: {e}"))?;
+                std::io::copy(&mut file, &mut out)
+                    .map_err(|e| format!("cannot extract binary from zip: {e}"))?;
+                binary_found = true;
+                break;
+            }
+        }
+
+        if !binary_found {
+            return Err(format!("executable '{target_name}' not found inside update zip archive"));
+        }
+    } else {
+        std::fs::write(&staged, &bytes).map_err(|e| format!("cannot write the update: {e}"))?;
+    }
+
     Ok(staged)
 }
 
@@ -368,6 +404,22 @@ mod tests {
     #[test]
     fn a_malformed_signature_is_refused() {
         assert!(verify(b"pretend binary", "not-base64!!").is_err());
+    }
+
+    #[test]
+    fn stage_extracts_binary_from_zip_archive() {
+        use std::io::Write;
+        let mut buf = Vec::new();
+        {
+            let mut zip = zip::ZipWriter::new(std::io::Cursor::new(&mut buf));
+            let options = zip::write::SimpleFileOptions::default();
+            zip.start_file("alarmer/alarmer.exe", options).unwrap();
+            zip.write_all(b"fake-exe-content").unwrap();
+            zip.start_file("alarmer/portable", options).unwrap();
+            zip.write_all(b"").unwrap();
+            zip.finish().unwrap();
+        }
+        assert!(buf.len() >= 4 && &buf[0..4] == b"PK\x03\x04");
     }
 
     #[test]

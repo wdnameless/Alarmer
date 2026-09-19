@@ -1,5 +1,5 @@
 import React from 'react';
-import { Minus, X, Maximize2, Minimize2, Pin, PinOff, Hourglass, PictureInPicture2 } from 'lucide-react';
+import { Minus, X, Maximize2, Minimize2, Pin, PinOff, Hourglass, PictureInPicture2, Globe, RefreshCw } from 'lucide-react';
 import { ThemeColors } from '../types';
 import { WindowService } from '../services/window';
 
@@ -10,6 +10,10 @@ interface TitleBarProps {
   onToggleCompact: () => void;
   onTogglePin: () => void;
   onToggleOverlay?: () => void;
+  currentLang?: string;
+  onToggleLang?: () => void;
+  updateStatus?: 'idle' | 'checking' | 'available' | 'up_to_date';
+  onCheckUpdate?: () => void;
 }
 
 export const TitleBar: React.FC<TitleBarProps> = ({
@@ -19,6 +23,10 @@ export const TitleBar: React.FC<TitleBarProps> = ({
   onToggleCompact,
   onTogglePin,
   onToggleOverlay,
+  currentLang,
+  onToggleLang,
+  updateStatus,
+  onCheckUpdate,
 }) => {
   return (
     <div
@@ -73,6 +81,43 @@ export const TitleBar: React.FC<TitleBarProps> = ({
       </div>
 
       <div className="flex items-center space-x-1.5" style={{ WebkitAppRegion: 'no-drag' } as React.CSSProperties}>
+        {/* Language switch RU/EN */}
+        {onToggleLang && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onToggleLang();
+            }}
+            title="Сменить язык (RU / EN)"
+            className="h-7 px-1.5 rounded-lg flex items-center justify-center space-x-1 bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+          >
+            <Globe size={11} />
+            <span className="text-[10px] font-bold tracking-wider uppercase">
+              {currentLang ?? 'RU'}
+            </span>
+          </button>
+        )}
+
+        {/* Check update button */}
+        {onCheckUpdate && (
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onCheckUpdate();
+            }}
+            title="Проверить обновления Alarmer"
+            className="w-7 h-7 rounded-lg flex items-center justify-center bg-white/5 hover:bg-white/10 text-white/60 hover:text-white transition-colors"
+          >
+            <RefreshCw
+              size={11}
+              className={updateStatus === 'checking' ? 'animate-spin text-accent' : ''}
+              style={{ color: updateStatus === 'up_to_date' ? '#22c55e' : undefined }}
+            />
+          </button>
+        )}
+
         {!isCompact && (
           <>
             {/* Always on top toggle */}

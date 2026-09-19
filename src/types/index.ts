@@ -99,6 +99,21 @@ export type RepeatMode = 'once' | 'daily' | 'days';
  * a task, a 09:00 block can only say "Начать блок" — it cannot say what the
  * block is for, and nothing survives the block to be counted afterwards.
  */
+export type TaskTimerType = 'interval' | 'time';
+
+export interface TaskTimerConfig {
+  enabled: boolean;
+  type: TaskTimerType;
+  /** Interval in minutes (e.g. 60 for every hour). Used when type is 'interval'. */
+  intervalMinutes?: number;
+  /** Fixed time "HH:MM" (24h). Used when type is 'time'. */
+  time?: string;
+  /** Sound profile to play when timer rings. Defaults to 'gentle'. */
+  sound?: string;
+  /** Optional voice speech reminder. */
+  voicePrompt?: string;
+}
+
 export interface TaskItem {
   id: string;
   title: string;
@@ -108,6 +123,8 @@ export interface TaskItem {
   /** Schedule step this task belongs to, when it came from a program. */
   stepId?: string;
   scheduleId?: string;
+  /** Optional recurring or scheduled timer attached to this task. */
+  timer?: TaskTimerConfig;
   /** ISO timestamps. */
   createdAt: string;
   completedAt?: string;

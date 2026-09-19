@@ -140,10 +140,10 @@ export const TodayView: React.FC<TodayViewProps> = ({
           </div>
           <div
             data-testid="today-blocks-counter"
-            className="text-[11px] font-medium px-2 py-0.5 rounded-full border"
+            className="text-[11px] font-medium px-2 py-0.5 rounded-full"
             style={{
               backgroundColor: theme.surface,
-                  color: theme.subtext,
+              color: theme.subtext,
             }}
             title="Завершено блоков сегодня"
           >

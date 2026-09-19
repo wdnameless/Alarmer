@@ -4,11 +4,12 @@ import {
   buildFirings,
   describeDays,
   expandSchedule,
+  expandTaskTimers,
   findNextUp,
   firingIdForStep,
   schedulesForToday,
 } from '../scheduleEngine';
-import type { AlarmItem, Schedule } from '../../types';
+import type { AlarmItem, Schedule, TaskItem } from '../../types';
 
 function schedule(overrides: Partial<Schedule> = {}): Schedule {
   return {
@@ -107,6 +108,52 @@ describe('building the firing list', () => {
     expect(result.some((f) => f.id === 'orphan')).toBe(false);
     // The still-valid schedule keeps producing its own firings.
     expect(result).toHaveLength(2);
+  });
+  it('expands task timers when enabled', () => {
+    const tasks: TaskItem[] = [
+      {
+        id: 'task-1',
+        title: 'Check email',
+        done: false,
+        createdAt: '2026-09-18T00:00:00Z',
+        timer: { enabled: true, type: 'time', time: '14:00' },
+      },
+      {
+        id: 'task-2',
+        title: 'Hourly stretch',
+        done: false,
+        createdAt: '2026-09-18T00:00:00Z',
+        timer: { enabled: true, type: 'interval', intervalMinutes: 60 },
+      },
+      {
+        id: 'task-3',
+        title: 'Done task with timer',
+        done: true,
+        createdAt: '2026-09-18T00:00:00Z',
+        timer: { enabled: true, type: 'time', time: '15:00' },
+      },
+      {
+        id: 'task-4',
+        title: 'Disabled timer',
+        done: false,
+        createdAt: '2026-09-18T00:00:00Z',
+        timer: { enabled: false, type: 'time', time: '16:00' },
+      },
+    ];
+
+    const firings = expandTaskTimers(tasks);
+    expect(firings.some((f) => f.id === 'task:task-1:time' && f.time === '14:00')).toBe(true);
+    // Hourly interval should produce 15 firings (08:00 to 22:00 inclusive)
+    const hourly = firings.filter((f) => f.id.startsWith('task:task-2:int:'));
+    expect(hourly).toHaveLength(15);
+    // Done and disabled tasks should produce nothing
+    expect(firings.some((f) => f.id.includes('task-3'))).toBe(false);
+    expect(firings.some((f) => f.id.includes('task-4'))).toBe(false);
+
+    // Test buildFirings with tasks
+    const combined = buildFirings([schedule()], [manual], tasks);
+    expect(combined.some((f) => f.id === 'task:task-1:time')).toBe(true);
+    expect(combined.some((f) => f.id === 'manual-1')).toBe(true);
   });
 });
 

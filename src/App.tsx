@@ -19,7 +19,7 @@ import { AlarmCenter, type MissedAlarm } from './components/AlarmCenter';
 import { UpdateBanner } from './components/UpdateBanner';
 import { trimSessions } from './services/session';
 import { TimerService } from './services/timer';
-import { checkForUpdate, type UpdateInfo } from './services/update';
+import { checkForUpdate, installUpdate, type UpdateInfo } from './services/update';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -117,7 +117,7 @@ export const App: React.FC = () => {
    * What the scheduler actually receives: schedule steps expanded into firings,
    * plus the standalone alarms. Derived, never stored twice.
    */
-  const firings = useMemo(() => buildFirings(schedules, alarms), [schedules, alarms]);
+  const firings = useMemo(() => buildFirings(schedules, alarms, tasks), [schedules, alarms, tasks]);
 
   // Single persistence funnel: structured state goes to the native store file.
   // Guarded until hydration completes, otherwise the initial defaults would be
@@ -355,6 +355,36 @@ export const App: React.FC = () => {
 
   /** A version found in the background, offered as a quiet bar. */
   const [pendingUpdate, setPendingUpdate] = useState<UpdateInfo | null>(null);
+  const [isUpdating, setIsUpdating] = useState(false);
+  const [manualCheckState, setManualCheckState] = useState<'idle' | 'checking' | 'available' | 'up_to_date'>('idle');
+
+  const handleManualUpdateCheck = async () => {
+    soundService.playUiClick();
+    setManualCheckState('checking');
+    try {
+      const res = await checkForUpdate();
+      if (res.status === 'update') {
+        setPendingUpdate(res.info);
+        setManualCheckState('available');
+      } else {
+        setManualCheckState('up_to_date');
+        setTimeout(() => setManualCheckState('idle'), 3000);
+      }
+    } catch {
+      setManualCheckState('idle');
+    }
+  };
+
+  const handleApplyUpdate = async () => {
+    if (!pendingUpdate) return;
+    setIsUpdating(true);
+    try {
+      await installUpdate(pendingUpdate);
+    } catch (err) {
+      console.error('Failed to install update from banner:', err);
+      setIsUpdating(false);
+    }
+  };
 
   /**
    * Looks for an update shortly after launch.
@@ -401,6 +431,8 @@ export const App: React.FC = () => {
         theme={theme}
         version={pendingUpdate?.version ?? null}
         onOpenSettings={() => setActiveTab('settings')}
+        onInstall={handleApplyUpdate}
+        installing={isUpdating}
         onDismiss={() => setPendingUpdate(null)}
       />
       {/* Sleek Custom Windows / macOS Titlebar with Drag & Controls */}
@@ -411,6 +443,14 @@ export const App: React.FC = () => {
         onToggleCompact={toggleCompact}
         onTogglePin={togglePin}
         onToggleOverlay={toggleMiniOverlay}
+        currentLang={I18nService.getLang().toUpperCase()}
+        onToggleLang={() => {
+          soundService.playUiClick();
+          const next = I18nService.getLang() === 'ru' ? 'en' : 'ru';
+          I18nService.setLang(next);
+        }}
+        updateStatus={manualCheckState}
+        onCheckUpdate={handleManualUpdateCheck}
       />
       {/* Main App Container */}
       {/* Main Split Layout: Left Primary Surface + Right Side AI Sidebar */}

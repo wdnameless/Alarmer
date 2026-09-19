@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { Plus, Trash2, Check, Circle, CalendarDays } from 'lucide-react';
-import type { Schedule, TaskItem, ThemeColors } from '../types';
+import { Plus, Trash2, Check, Circle, CalendarDays, Timer, Clock, ChevronDown, ChevronUp } from 'lucide-react';
+import type { Schedule, TaskItem, TaskTimerConfig, ThemeColors } from '../types';
 import { taskProgress } from '../services/stats';
 import { soundService } from '../services/sound';
 
@@ -8,28 +8,11 @@ interface TasksViewProps {
   theme: ThemeColors;
   tasks: TaskItem[];
   onUpdateTasks: (tasks: TaskItem[]) => void;
-  /** Schedules the user can pull steps from as tasks. */
   schedules: Schedule[];
 }
 
-/**
- * Ids are minted outside render so the component stays pure: a handler that
- * calls `Date.now()` during render is not reproducible, and the linter is right
- * to refuse it.
- */
-let taskSeq = 0;
-function createTaskId(): string {
-  taskSeq += 1;
-  return `task_${Date.now()}_${taskSeq}`;
-}
+const createTaskId = () => `task_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
 
-/**
- * The day's work, as opposed to the day's timetable.
- *
- * A schedule says a block starts at 07:15; this says what the block is for. The
- * two are linked by `stepId`/`scheduleId`, so a task taken from a program knows
- * where it came from and can be shown next to it on the Today screen.
- */
 export const TasksView: React.FC<TasksViewProps> = ({
   theme,
   tasks,
@@ -37,9 +20,13 @@ export const TasksView: React.FC<TasksViewProps> = ({
   schedules,
 }) => {
   const [draft, setDraft] = useState('');
+  const [showTimerOptions, setShowTimerOptions] = useState(false);
+  const [timerType, setTimerType] = useState<'interval' | 'time'>('interval');
+  const [intervalMinutes, setIntervalMinutes] = useState(60);
+  const [targetTime, setTargetTime] = useState('14:00');
+
   const { done, total } = taskProgress(tasks);
 
-  /** Steps not yet turned into a task, so the list is a picker and not a dump. */
   const availableSteps = schedules
     .filter((s) => s.enabled)
     .flatMap((schedule) =>
@@ -54,14 +41,30 @@ export const TasksView: React.FC<TasksViewProps> = ({
     if (!title) return;
 
     soundService.playCountdownTick();
+
+    const timerConfig: TaskTimerConfig | undefined = showTimerOptions
+      ? {
+          enabled: true,
+          type: timerType,
+          intervalMinutes: timerType === 'interval' ? Number(intervalMinutes) || 60 : undefined,
+          time: timerType === 'time' ? targetTime : undefined,
+        }
+      : undefined;
+
     onUpdateTasks([
       ...tasks,
-      { id: `task_${Date.now()}`, title, done: false, createdAt: new Date().toISOString() },
+      {
+        id: createTaskId(),
+        title,
+        done: false,
+        timer: timerConfig,
+        createdAt: new Date().toISOString(),
+      },
     ]);
     setDraft('');
+    setShowTimerOptions(false);
   };
 
-  /** Turns a schedule step into a task, keeping the link back to the program. */
   const addFromStep = (schedule: Schedule, stepId: string, label: string) => {
     soundService.playCountdownTick();
     onUpdateTasks([
@@ -88,6 +91,22 @@ export const TasksView: React.FC<TasksViewProps> = ({
     );
   };
 
+  const toggleTaskTimer = (id: string) => {
+    soundService.playCountdownTick();
+    onUpdateTasks(
+      tasks.map((t) => {
+        if (t.id !== id || !t.timer) return t;
+        return {
+          ...t,
+          timer: {
+            ...t.timer,
+            enabled: !t.timer.enabled,
+          },
+        };
+      }),
+    );
+  };
+
   const deleteTask = (id: string) => {
     soundService.playCountdownTick();
     onUpdateTasks(tasks.filter((t) => t.id !== id));
@@ -99,46 +118,129 @@ export const TasksView: React.FC<TasksViewProps> = ({
   return (
     <div className="flex flex-col w-full max-w-[340px] px-1 space-y-3">
       <div className="flex items-center justify-between">
-        <span className="text-xs font-bold tracking-wider uppercase opacity-90">Задачи</span>
-        {total > 0 && (
-          <span className="text-[10px] font-mono tabular-nums" style={{ color: theme.subtext }}>
-            {done} / {total}
+        <div className="flex items-center space-x-2">
+          <span className="text-[11px] font-semibold tracking-wider uppercase" style={{ color: theme.text }}>
+            Задачи
           </span>
-        )}
+          {total > 0 && (
+            <span
+              className="text-[10px] px-1.5 py-0.5 rounded-full font-mono"
+              style={{ backgroundColor: theme.surface, color: theme.subtext }}
+            >
+              {done} / {total}
+            </span>
+          )}
+        </div>
       </div>
 
       {total > 0 && (
         <div className="w-full h-[3px] rounded-full overflow-hidden" style={{ backgroundColor: theme.border }}>
           <div
-            className="h-full rounded-full transition-[width] duration-300"
+            className="h-full transition-all duration-300"
             style={{ width: `${(done / total) * 100}%`, backgroundColor: theme.accent }}
           />
         </div>
       )}
 
+      {/* Task Creation Form with optional Scheduled Timer */}
       <form
         onSubmit={addTask}
-        className="flex items-center gap-1.5 p-2 rounded-2xl border w-full"
+        className="flex flex-col p-2.5 rounded-2xl border w-full gap-2 transition-all"
         style={{ backgroundColor: theme.surface, borderColor: theme.border }}
       >
-        <input
-          type="text"
-          value={draft}
-          onChange={(e) => setDraft(e.target.value)}
-          placeholder="Что нужно сделать?"
-          className="min-w-0 flex-1 bg-black/40 text-xs px-2 py-1.5 rounded-lg border border-white/10 focus:outline-none"
-          style={{ color: theme.text }}
-          aria-label="Новая задача"
-        />
-        <button
-          type="submit"
-          disabled={!draft.trim()}
-          className="w-7 h-7 rounded-lg transition-transform active:scale-95 flex items-center justify-center shrink-0 disabled:opacity-30"
-          style={{ backgroundColor: '#fafafa', color: '#0a0a0a' }}
-          title="Добавить задачу"
-        >
-          <Plus size={15} />
-        </button>
+        <div className="flex items-center gap-1.5 w-full">
+          <input
+            type="text"
+            value={draft}
+            onChange={(e) => setDraft(e.target.value)}
+            placeholder="Что нужно сделать?"
+            className="min-w-0 flex-1 bg-black/40 text-xs px-2.5 py-1.5 rounded-lg border border-white/10 focus:outline-none"
+            style={{ color: theme.text }}
+            aria-label="Новая задача"
+          />
+          <button
+            type="button"
+            onClick={() => setShowTimerOptions(!showTimerOptions)}
+            className={`p-1.5 rounded-lg border text-xs transition-colors shrink-0 flex items-center gap-1 ${
+              showTimerOptions ? 'bg-white/10 border-white/20' : 'border-transparent hover:bg-white/5'
+            }`}
+            style={{ color: showTimerOptions ? theme.accent : theme.subtext }}
+            title="Настроить таймер/напоминание"
+          >
+            <Timer size={14} />
+            {showTimerOptions ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+          </button>
+          <button
+            type="submit"
+            disabled={!draft.trim()}
+            className="w-7 h-7 rounded-lg transition-transform active:scale-95 flex items-center justify-center shrink-0 disabled:opacity-30"
+            style={{ backgroundColor: '#fafafa', color: '#0a0a0a' }}
+            title="Добавить задачу"
+          >
+            <Plus size={15} />
+          </button>
+        </div>
+
+        {/* Expandable Timer Configuration */}
+        {showTimerOptions && (
+          <div className="flex flex-col gap-2 pt-2 border-t border-white/5 text-[11px]">
+            <div className="flex items-center justify-between">
+              <span style={{ color: theme.subtext }}>Тип таймера:</span>
+              <div className="flex gap-1 bg-black/30 p-0.5 rounded-lg border border-white/5">
+                <button
+                  type="button"
+                  onClick={() => setTimerType('interval')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    timerType === 'interval' ? 'bg-white/15 text-white' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Интервал
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setTimerType('time')}
+                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                    timerType === 'time' ? 'bg-white/15 text-white' : 'text-zinc-400 hover:text-white'
+                  }`}
+                >
+                  Точное время
+                </button>
+              </div>
+            </div>
+
+            {timerType === 'interval' ? (
+              <div className="flex items-center justify-between">
+                <span style={{ color: theme.subtext }}>Повторять каждые:</span>
+                <div className="flex items-center gap-1.5">
+                  <select
+                    value={intervalMinutes}
+                    onChange={(e) => setIntervalMinutes(Number(e.target.value))}
+                    className="bg-black/40 text-xs px-2 py-1 rounded border border-white/10 focus:outline-none"
+                    style={{ color: theme.text }}
+                  >
+                    <option value={15}>15 минут</option>
+                    <option value={30}>30 минут</option>
+                    <option value={45}>45 минут</option>
+                    <option value={60}>1 час</option>
+                    <option value={90}>1.5 часа</option>
+                    <option value={120}>2 часа</option>
+                  </select>
+                </div>
+              </div>
+            ) : (
+              <div className="flex items-center justify-between">
+                <span style={{ color: theme.subtext }}>Срабатывать в:</span>
+                <input
+                  type="time"
+                  value={targetTime}
+                  onChange={(e) => setTargetTime(e.target.value)}
+                  className="bg-black/40 text-xs px-2 py-0.5 rounded border border-white/10 focus:outline-none"
+                  style={{ color: theme.text }}
+                />
+              </div>
+            )}
+          </div>
+        )}
       </form>
 
       {total === 0 && (
@@ -152,38 +254,41 @@ export const TasksView: React.FC<TasksViewProps> = ({
         </div>
       )}
 
-      {/* Steps from the user's own programs, so a plan produces work items
-          instead of staying a timetable nobody acts on. */}
+      {/* Steps from the user's own programs */}
       {availableSteps.length > 0 && (
         <div className="flex flex-col space-y-1.5">
           <span className="text-[10px] uppercase tracking-wider flex items-center gap-1" style={{ color: theme.subtext }}>
-            <CalendarDays size={10} /> Из расписания
+            <CalendarDays size={11} /> Из расписания
           </span>
-          {availableSteps.slice(0, 5).map(({ schedule, step }) => (
-            <button
-              key={`${schedule.id}:${step.id}`}
-              onClick={() => addFromStep(schedule, step.id, step.label)}
-              className="flex items-center gap-2 p-2 rounded-xl border text-left transition-colors hover:bg-white/5"
-              style={{ backgroundColor: 'transparent', borderColor: theme.border }}
-              title={`Добавить «${step.label}» из «${schedule.name}»`}
+          {availableSteps.map(({ schedule, step }) => (
+            <div
+              key={step.id}
+              className="flex items-center justify-between p-2 rounded-xl border text-xs"
+              style={{ backgroundColor: theme.surface, borderColor: theme.border }}
             >
-              <Plus size={12} style={{ color: theme.subtext }} />
-              <span className="text-[11px] truncate flex-1" style={{ color: theme.text }}>
+              <span className="truncate flex-1 mr-2" style={{ color: theme.text }}>
                 {step.label}
               </span>
-              <span className="font-mono tabular-nums text-[10px] shrink-0" style={{ color: theme.subtext }}>
-                {step.time}
-              </span>
-            </button>
+              <button
+                type="button"
+                onClick={() => addFromStep(schedule, step.id, step.label)}
+                title={`Добавить «${step.label}» из «${schedule.name}»`}
+                className="px-2 py-0.5 rounded text-[11px] font-medium transition-colors hover:opacity-80 shrink-0"
+                style={{ backgroundColor: theme.accent, color: '#0a0a0a' }}
+              >
+                В задачи
+              </button>
+            </div>
           ))}
         </div>
       )}
 
+      {/* Task list with timers */}
       <div className="flex flex-col space-y-1.5">
         {open.map((task) => (
           <div
             key={task.id}
-            className="flex items-center gap-2 p-2.5 rounded-xl border"
+            className="flex items-center gap-2 p-2.5 rounded-xl border group"
             style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
           >
             <button
@@ -195,12 +300,40 @@ export const TasksView: React.FC<TasksViewProps> = ({
             >
               <Circle size={16} />
             </button>
-            <span className="flex-1 text-xs truncate" style={{ color: theme.text }}>
-              {task.title}
-            </span>
+            <div className="flex-1 min-w-0 flex flex-col">
+              <span className="text-xs truncate" style={{ color: theme.text }}>
+                {task.title}
+              </span>
+              {task.timer && (
+                <div className="flex items-center gap-1 mt-0.5">
+                  <button
+                    type="button"
+                    onClick={() => toggleTaskTimer(task.id)}
+                    className={`flex items-center gap-1 text-[10px] px-1.5 py-0.5 rounded border transition-colors ${
+                      task.timer.enabled
+                        ? 'border-emerald-500/30 text-emerald-400 bg-emerald-500/10'
+                        : 'border-zinc-700 text-zinc-500 bg-zinc-800/30'
+                    }`}
+                    title={task.timer.enabled ? 'Таймер активен (нажмите чтобы выключить)' : 'Таймер на паузе (нажмите чтобы включить)'}
+                  >
+                    {task.timer.type === 'interval' ? (
+                      <>
+                        <Timer size={10} />
+                        <span>каждые {task.timer.intervalMinutes} мин</span>
+                      </>
+                    ) : (
+                      <>
+                        <Clock size={10} />
+                        <span>в {task.timer.time}</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={() => deleteTask(task.id)}
-              className="p-1 rounded transition-colors hover:bg-red-500/20 text-red-400 opacity-50 hover:opacity-100 shrink-0"
+              className="p-1 rounded transition-colors hover:bg-red-500/20 text-red-400 opacity-0 group-hover:opacity-100 shrink-0 transition-opacity"
               title="Удалить"
               aria-label={`Удалить «${task.title}»`}
             >
