@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Play, Pause, RotateCcw } from 'lucide-react';
-import { ThemeColors, DynamicUIConfig, Direction, SessionRecord } from '../types';
+import { ThemeColors, DynamicUIConfig, Direction, SessionRecord, ClockStyle } from '../types';
 import { RadialDial } from './RadialDial';
 import { QualityPrompt } from './QualityPrompt';
 import { soundService } from '../services/sound';
@@ -41,6 +41,15 @@ export const Timer: React.FC<TimerProps> = ({
   const [state, setState] = useState<TimerSnapshot | null>(null);
   /** Progress the user is dragging on the dial; null when not dragging. */
   const [dragging, setDragging] = useState<number | null>(null);
+  const [clockStyle, setClockStyle] = useState<ClockStyle>(() =>
+    StoreService.getPreference<ClockStyle>('alarmer_clock_style', 'digital'),
+  );
+
+  const handleSelectClockStyle = (style: ClockStyle) => {
+    soundService.playUiClick();
+    setClockStyle(style);
+    StoreService.setPreference('alarmer_clock_style', style);
+  };
   /** Showing the quality prompt after a focus phase finishes in block mode. */
   const [showQualityPrompt, setShowQualityPrompt] = useState(false);
   const [promptDirectionName, setPromptDirectionName] = useState<string | undefined>(undefined);
@@ -326,7 +335,8 @@ export const Timer: React.FC<TimerProps> = ({
         isInteractive={!running && !isBlockMode}
         onProgressChange={handleProgressChange}
         onProgressCommit={handleProgressCommit}
-        showTicks={dynamicUi?.dial?.showTicks ?? true}
+        showTicks={false}
+        clockStyle={clockStyle}
         tickLength={dynamicUi?.dial?.tickLength ?? 'normal'}
         fontFamily={dynamicUi?.typography?.fontFamily ?? 'system-ui'}
         timeScale={dynamicUi?.typography?.timeScale ?? 1.0}
@@ -334,6 +344,34 @@ export const Timer: React.FC<TimerProps> = ({
         stylePreset={dynamicUi?.dial?.stylePreset ?? 'minimal'}
         glowIntensity={dynamicUi?.dial?.glowIntensity ?? 'none'}
       />
+
+      {/* Clock style selector (Digital / Classic / Sand) */}
+      <div className="flex items-center gap-1.5 mt-3 p-1 rounded-xl border bg-black/20" style={{ borderColor: theme.border }}>
+        {(
+          [
+            { id: 'digital', label: 'Цифровые' },
+            { id: 'classic', label: 'Классика' },
+            { id: 'sand', label: 'Песочные' },
+          ] as const
+        ).map((item) => (
+          <button
+            key={item.id}
+            type="button"
+            onClick={() => handleSelectClockStyle(item.id)}
+            className={`px-2.5 py-1 text-xs font-medium rounded-lg transition-all ${
+              clockStyle === item.id
+                ? 'shadow-sm font-semibold'
+                : 'opacity-60 hover:opacity-100'
+            }`}
+            style={{
+              backgroundColor: clockStyle === item.id ? theme.accent : 'transparent',
+              color: clockStyle === item.id ? '#000000' : theme.text,
+            }}
+          >
+            {item.label}
+          </button>
+        ))}
+      </div>
 
       {/* Arming minutes pill row - only in countdown mode */}
       {!isBlockMode && (

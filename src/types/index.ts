@@ -225,3 +225,5 @@ export interface AISettings {
 }
 
 export type SoundProfileId = 'mechanical' | 'soft' | 'neon' | 'arcade';
+
+export type ClockStyle = 'digital' | 'classic' | 'sand';

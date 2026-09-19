@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { enable, disable, isEnabled } from '@tauri-apps/plugin-autostart';
-import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload, RefreshCw, Loader2, Music, Timer } from 'lucide-react';
+import { Volume2, VolumeX, Sparkles, Key, RotateCcw, Check, Play, Download, Upload, RefreshCw, Loader2, Music, Timer, Sliders } from 'lucide-react';
 import { ThemeColors, ThemeId, AISettings, DynamicUIConfig, DEFAULT_DYNAMIC_UI } from '../types';
 import { BLOCK_PRESETS, type BlockSettings } from '../types/focus';
 import { THEMES } from '../constants/themes';
@@ -53,7 +53,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [testingVoice, setTestingVoice] = useState(false);
   const [importError, setImportError] = useState<string | null>(null);
   const [autostartEnabled, setAutostartEnabled] = useState(false);
-  const [activeTab, setActiveTab] = useState<'sound' | 'ai' | 'data'>('sound');
+  const [activeTab, setActiveTab] = useState<'general' | 'sound' | 'ai' | 'data'>('general');
   const [uiClicks, setUiClicks] = useState<boolean>(() => {
     return StoreService.getPreference('alarmer_ui_clicks', true);
   });
@@ -261,29 +261,34 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </div>
       </div>
 
-      {/* Phased sub-navigation: audio, AI, data */}
-      <div className="flex items-center space-x-1 p-1 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold">
+      {/* Segmented settings menu */}
+      <div className="flex items-center space-x-1 p-1 rounded-xl bg-white/5 border border-white/10 text-xs font-semibold overflow-x-auto">
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('sound');
-            soundService.playUiClick();
-          }}
-          className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
+          onClick={() => { setActiveTab('general'); soundService.playUiClick(); }}
+          className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 ${
+            activeTab === 'general' ? 'bg-white/20 font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
+          }`}
+          style={{ color: activeTab === 'general' ? theme.text : theme.subtext }}
+        >
+          <Sliders size={13} />
+          <span>Основные</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => { setActiveTab('sound'); soundService.playUiClick(); }}
+          className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 ${
             activeTab === 'sound' ? 'bg-white/20 font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
           }`}
           style={{ color: activeTab === 'sound' ? theme.text : theme.subtext }}
         >
           <Volume2 size={13} />
-          <span>Звук</span>
+          <span>Звук и Голос</span>
         </button>
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('ai');
-            soundService.playUiClick();
-          }}
-          className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
+          onClick={() => { setActiveTab('ai'); soundService.playUiClick(); }}
+          className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 ${
             activeTab === 'ai' ? 'bg-white/20 font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
           }`}
           style={{ color: activeTab === 'ai' ? theme.text : theme.subtext }}
@@ -293,11 +298,8 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         </button>
         <button
           type="button"
-          onClick={() => {
-            setActiveTab('data');
-            soundService.playUiClick();
-          }}
-          className={`flex-1 py-1.5 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
+          onClick={() => { setActiveTab('data'); soundService.playUiClick(); }}
+          className={`flex-1 py-1.5 px-3 rounded-lg flex items-center justify-center space-x-1.5 transition-all shrink-0 ${
             activeTab === 'data' ? 'bg-white/20 font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
           }`}
           style={{ color: activeTab === 'data' ? theme.text : theme.subtext }}

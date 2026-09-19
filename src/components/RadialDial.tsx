@@ -1,5 +1,5 @@
 import React, { useRef, useState, useCallback } from 'react';
-import { ThemeColors } from '../types';
+import { ThemeColors, ClockStyle } from '../types';
 
 interface RadialDialProps {
   theme: ThemeColors;
@@ -17,6 +17,7 @@ interface RadialDialProps {
   stylePreset?: 'neon' | 'vintage' | 'chronograph' | 'minimal';
   /** Halo strength around the progress arc; 'none' keeps it flat. */
   glowIntensity?: 'none' | 'subtle' | 'high';
+  clockStyle?: ClockStyle;
 }
 
 export const RadialDial: React.FC<RadialDialProps> = ({
@@ -28,12 +29,13 @@ export const RadialDial: React.FC<RadialDialProps> = ({
   onProgressChange,
   onProgressCommit,
   size = 180,
-  showTicks = true,
+  showTicks = false,
   tickLength = 'normal',
   fontFamily = 'system-ui',
   timeScale = 1.0,
   stylePreset = 'neon',
   glowIntensity = 'none',
+  clockStyle = 'digital',
 }) => {
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [dragProgress, setDragProgress] = useState<number | null>(null);
@@ -202,16 +204,18 @@ export const RadialDial: React.FC<RadialDialProps> = ({
           style={{ transition: dragProgress !== null ? 'none' : 'stroke-dasharray 0.8s ease' }}
         />
 
-        {/* Dieter Rams Swiss Precision Numerals: 12, 3, 6, 9 */}
-        <g opacity={0.5} fontSize={10} fontWeight={500} fontFamily="'JetBrains Mono', ui-monospace, monospace" fill={theme.subtext} textAnchor="middle" dominantBaseline="middle">
-          <text x={radius} y={radius - dialRadius + 22}>12</text>
-          <text x={radius + dialRadius - 22} y={radius}>3</text>
-          <text x={radius} y={radius + dialRadius - 22}>6</text>
-          <text x={radius - dialRadius + 22} y={radius}>9</text>
-        </g>
+        {/* Dieter Rams Swiss Precision Numerals: 12, 3, 6, 9 (only when showTicks) */}
+        {showTicks && (
+          <g opacity={0.5} fontSize={10} fontWeight={500} fontFamily="'JetBrains Mono', ui-monospace, monospace" fill={theme.subtext} textAnchor="middle" dominantBaseline="middle">
+            <text x={radius} y={radius - dialRadius + 22}>12</text>
+            <text x={radius + dialRadius - 22} y={radius}>3</text>
+            <text x={radius} y={radius + dialRadius - 22}>6</text>
+            <text x={radius - dialRadius + 22} y={radius}>9</text>
+          </g>
+        )}
 
         {/* Reference marker at 9 o'clock (square indicator) */}
-        {stylePreset !== 'vintage' && (
+        {showTicks && stylePreset !== 'vintage' && (
           <rect
             x={markerX - 4}
             y={markerY - 4}
@@ -235,30 +239,124 @@ export const RadialDial: React.FC<RadialDialProps> = ({
         />
       </svg>
 
-      {/* Center Labels */}
-      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center">
-        <span
-          className="font-semibold tracking-tight tabular-nums"
-          style={{
-            color: theme.text,
-            fontSize: `${34 * timeScale}px`,
-            fontFamily: fontFamily === 'cyber'
-              ? 'Courier New, monospace'
-              : "'JetBrains Mono', ui-monospace, monospace",
-          }}
-        >
-          {primaryText}
-        </span>
-        {secondaryText && (
-          <span
-            className="font-mono font-medium tracking-widest mt-1 opacity-80"
-            style={{
-              color: theme.subtext,
-              fontSize: `${12 * timeScale}px`,
-            }}
-          >
-            {secondaryText}
-          </span>
+      {/* Center Display according to clockStyle */}
+      <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none text-center select-none">
+        {clockStyle === 'digital' && (
+          <div className="flex flex-col items-center justify-center transition-transform duration-300 transform scale-100">
+            <span
+              className="font-semibold tracking-tight tabular-nums animate-pulse-subtle"
+              style={{
+                color: theme.text,
+                fontSize: `${36 * timeScale}px`,
+                fontFamily: fontFamily === 'cyber'
+                  ? 'Courier New, monospace'
+                  : "'JetBrains Mono', ui-monospace, monospace",
+              }}
+            >
+              {primaryText}
+            </span>
+            {secondaryText && (
+              <span
+                className="font-mono font-medium tracking-widest mt-1 opacity-70"
+                style={{
+                  color: theme.subtext,
+                  fontSize: `${12 * timeScale}px`,
+                }}
+              >
+                {secondaryText}
+              </span>
+            )}
+          </div>
+        )}
+
+        {clockStyle === 'classic' && (
+          <div className="relative flex flex-col items-center justify-center w-full h-full">
+            {/* Clock hands */}
+            <svg className="absolute inset-0 w-full h-full pointer-events-none" viewBox={`0 0 ${size} ${size}`}>
+              {/* Hour hand */}
+              <line
+                x1={radius}
+                y1={radius}
+                x2={radius + 35 * Math.sin(((activeProgress * 360) / 12) * (Math.PI / 180))}
+                y2={radius - 35 * Math.cos(((activeProgress * 360) / 12) * (Math.PI / 180))}
+                stroke={theme.subtext}
+                strokeWidth={3.5}
+                strokeLinecap="round"
+                className="transition-all duration-300"
+              />
+              {/* Minute hand */}
+              <line
+                x1={radius}
+                y1={radius}
+                x2={radius + 55 * Math.sin((activeProgress * 360) * (Math.PI / 180))}
+                y2={radius - 55 * Math.cos((activeProgress * 360) * (Math.PI / 180))}
+                stroke={theme.accent}
+                strokeWidth={2.5}
+                strokeLinecap="round"
+                className="transition-all duration-300"
+              />
+              {/* Center pivot point */}
+              <circle cx={radius} cy={radius} r={4.5} fill={theme.accent} />
+            </svg>
+            <div className="z-10 mt-14 flex flex-col items-center">
+              <span
+                className="font-mono text-xs font-semibold tabular-nums px-2 py-0.5 rounded-full"
+                style={{ backgroundColor: `${theme.cardBg}cc`, color: theme.text }}
+              >
+                {primaryText}
+              </span>
+            </div>
+          </div>
+        )}
+
+        {clockStyle === 'sand' && (
+          <div className="flex flex-col items-center justify-center transition-all duration-300">
+            {/* Hourglass Sand animation representation */}
+            <div className="relative w-14 h-16 flex flex-col items-center justify-between mb-1">
+              {/* Top glass cone */}
+              <div
+                className="w-12 h-7 border-t-2 border-l-2 border-r-2 rounded-t-xl overflow-hidden relative"
+                style={{ borderColor: theme.border }}
+              >
+                <div
+                  className="absolute bottom-0 inset-x-0 transition-all duration-500 ease-linear"
+                  style={{
+                    height: `${Math.max(0, activeProgress) * 100}%`,
+                    backgroundColor: theme.accent,
+                    opacity: 0.85,
+                  }}
+                />
+              </div>
+              {/* Middle trickle */}
+              <div
+                className="w-0.5 h-2 transition-opacity duration-300"
+                style={{
+                  backgroundColor: theme.accent,
+                  opacity: activeProgress > 0 ? 0.9 : 0,
+                }}
+              />
+              {/* Bottom glass cone */}
+              <div
+                className="w-12 h-7 border-b-2 border-l-2 border-r-2 rounded-b-xl overflow-hidden relative"
+                style={{ borderColor: theme.border }}
+              >
+                <div
+                  className="absolute bottom-0 inset-x-0 transition-all duration-500 ease-linear"
+                  style={{
+                    height: `${Math.max(0, 1 - activeProgress) * 100}%`,
+                    backgroundColor: theme.accent,
+                    opacity: 0.85,
+                  }}
+                />
+              </div>
+            </div>
+            <span
+              className="font-mono text-sm font-semibold tabular-nums tracking-wider mt-1"
+              style={{ color: theme.text }}
+            >
+              {primaryText}
+            </span>
+          </div>
         )}
       </div>
     </div>

@@ -63,6 +63,7 @@ export const PREFERENCE_KEYS = [
   'alarmer_timer_mode',
   'alarmer_window_width',
   'alarmer_window_height',
+  'alarmer_clock_style',
 ] as const;
 
 let storePromise: Promise<LazyStore> | null = null;

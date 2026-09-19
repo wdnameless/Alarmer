@@ -1,7 +1,8 @@
+import { HandSparkle } from './components/CustomIcons';
+import { LayoutDashboard, Timer as TimerNavIcon, ListTodo, Bell, NotebookPen, Settings as SettingsNavIcon } from 'lucide-react';
 import React, { useState, useEffect, useMemo } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { ChatMessage } from './services/aiCompiler';
-import { HandClock, HandGear, HandSparkle } from './components/CustomIcons';
 import { AIChatDrawer } from './components/AIChatDrawer';
 import { THEMES } from './constants/themes';
 import { DashboardView, type SubModule } from './components/DashboardView';
@@ -498,50 +499,160 @@ export const App: React.FC = () => {
         updateStatus={manualCheckState}
         onCheckUpdate={handleManualUpdateCheck}
       />
-      {/* Main App Container */}
-      {/* Main Split Layout: Left Primary Surface + Right Side AI Sidebar */}
+      {/* Main App Container with Left Sidebar Navigation */}
       <div className="flex-1 flex w-full h-full overflow-hidden relative">
-        {/* Left Pane: Timer / Settings (Clean, Fixed 340px primary surface) */}
+        {/* Left Vertical Sidebar */}
+        <aside
+          className="w-16 sm:w-48 flex flex-col justify-between p-2.5 border-r shrink-0 select-none transition-all"
+          style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
+        >
+          {/* Main Module Nav Items */}
+          <div className="flex flex-col space-y-1">
+            <button
+              onClick={() => {
+                handleSelectTab('dashboard');
+                setDashboardSubModule('today');
+              }}
+              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+                activeTab === 'dashboard' && dashboardSubModule === 'today'
+                  ? 'font-bold shadow-sm'
+                  : 'opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'dashboard' && dashboardSubModule === 'today'
+                  ? 'rgba(255,255,255,0.12)'
+                  : 'transparent',
+                color: activeTab === 'dashboard' && dashboardSubModule === 'today'
+                  ? theme.accent
+                  : theme.text,
+              }}
+              title={t.today}
+            >
+              <LayoutDashboard size={16} />
+              <span className="hidden sm:inline font-medium">{t.today}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                handleSelectTab('dashboard');
+                setDashboardSubModule('timer');
+              }}
+              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+                activeTab === 'dashboard' && dashboardSubModule === 'timer'
+                  ? 'font-bold shadow-sm'
+                  : 'opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'dashboard' && dashboardSubModule === 'timer'
+                  ? 'rgba(255,255,255,0.12)'
+                  : 'transparent',
+                color: activeTab === 'dashboard' && dashboardSubModule === 'timer'
+                  ? theme.accent
+                  : theme.text,
+              }}
+              title={t.timer}
+            >
+              <TimerNavIcon size={16} />
+              <span className="hidden sm:inline font-medium">{t.timer}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                handleSelectTab('dashboard');
+                setDashboardSubModule('tasks');
+              }}
+              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+                activeTab === 'dashboard' && dashboardSubModule === 'tasks'
+                  ? 'font-bold shadow-sm'
+                  : 'opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'dashboard' && dashboardSubModule === 'tasks'
+                  ? 'rgba(255,255,255,0.12)'
+                  : 'transparent',
+                color: activeTab === 'dashboard' && dashboardSubModule === 'tasks'
+                  ? theme.accent
+                  : theme.text,
+              }}
+              title={t.tasks}
+            >
+              <ListTodo size={16} />
+              <span className="hidden sm:inline font-medium">{t.tasks}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                handleSelectTab('dashboard');
+                setDashboardSubModule('alarms');
+              }}
+              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+                activeTab === 'dashboard' && dashboardSubModule === 'alarms'
+                  ? 'font-bold shadow-sm'
+                  : 'opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'dashboard' && dashboardSubModule === 'alarms'
+                  ? 'rgba(255,255,255,0.12)'
+                  : 'transparent',
+                color: activeTab === 'dashboard' && dashboardSubModule === 'alarms'
+                  ? theme.accent
+                  : theme.text,
+              }}
+              title={t.alarms}
+            >
+              <Bell size={16} />
+              <span className="hidden sm:inline font-medium">{t.alarms}</span>
+            </button>
+
+            <button
+              onClick={() => {
+                handleSelectTab('dashboard');
+                setDashboardSubModule('notes');
+              }}
+              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+                activeTab === 'dashboard' && dashboardSubModule === 'notes'
+                  ? 'font-bold shadow-sm'
+                  : 'opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'dashboard' && dashboardSubModule === 'notes'
+                  ? 'rgba(255,255,255,0.12)'
+                  : 'transparent',
+                color: activeTab === 'dashboard' && dashboardSubModule === 'notes'
+                  ? theme.accent
+                  : theme.text,
+              }}
+              title={t.notes}
+            >
+              <NotebookPen size={16} />
+              <span className="hidden sm:inline font-medium">{t.notes}</span>
+            </button>
+          </div>
+
+          {/* Bottom Settings & AI Buttons */}
+          <div className="flex flex-col space-y-1 pt-2 border-t" style={{ borderColor: theme.border }}>
+            <button
+              onClick={() => handleSelectTab('settings')}
+              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+                activeTab === 'settings' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
+              }`}
+              style={{
+                backgroundColor: activeTab === 'settings' ? 'rgba(255,255,255,0.12)' : 'transparent',
+                color: activeTab === 'settings' ? theme.accent : theme.text,
+              }}
+              title={t.settings}
+            >
+              <SettingsNavIcon size={16} />
+              <span className="hidden sm:inline font-medium">{t.settings}</span>
+            </button>
+          </div>
+        </aside>
+
+        {/* Center Main Content Area */}
         <div
-          className="flex flex-col items-center justify-between p-3 overflow-y-auto shrink-0 transition-all"
+          className="flex flex-col flex-1 p-3 overflow-y-auto shrink-0 transition-all"
           style={{ width: isAiWingOpen ? `${leftPaneWidth}px` : '100%' }}
         >
-          <div
-            className="flex items-center justify-between w-full max-w-[340px] p-1 mb-2 rounded-xl border transition-colors"
-            style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
-          >
-            <div className="flex items-center space-x-1.5 flex-1">
-              <button
-                onClick={() => handleSelectTab('dashboard')}
-                className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
-                  activeTab === 'dashboard' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
-                }`}
-                style={{
-                  backgroundColor: activeTab === 'dashboard' ? 'rgba(255,255,255,0.07)' : 'transparent',
-                  color: activeTab === 'dashboard' ? theme.text : theme.subtext,
-                }}
-                title={t.dashboard}
-              >
-                <HandClock size={15} color={activeTab === 'dashboard' ? theme.text : theme.subtext} />
-                <span className="text-xs truncate">{t.dashboard}</span>
-              </button>
-
-              <button
-                onClick={() => handleSelectTab('settings')}
-                className={`flex-1 py-1.5 px-2 rounded-lg flex items-center justify-center space-x-1.5 transition-all ${
-                  activeTab === 'settings' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
-                }`}
-                style={{
-                  backgroundColor: activeTab === 'settings' ? 'rgba(255,255,255,0.07)' : 'transparent',
-                  color: activeTab === 'settings' ? theme.text : theme.subtext,
-                }}
-                title={t.settings}
-              >
-                <HandGear size={15} color={activeTab === 'settings' ? theme.text : theme.subtext} />
-                <span className="text-xs truncate">{t.settings}</span>
-              </button>
-            </div>
-          </div>
 
           {/* Content Area Rendering */}
           <div className="w-full flex-1 flex flex-col items-center justify-center">
@@ -574,7 +685,6 @@ export const App: React.FC = () => {
                 activeSubModule={dashboardSubModule}
                 onSubModuleChange={setDashboardSubModule}
                 directions={directions}
-                onUpdateDirections={setDirections}
                 onRateQuality={handleRateQuality}
               />
               </ErrorBoundary>

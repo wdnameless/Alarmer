@@ -24,6 +24,8 @@ export interface Translations {
   tasksTitle: string;
   alarms: string;
   alarmsTitle: string;
+  notes: string;
+  notesTitle: string;
   stats: string;
   statsTitle: string;
   aiCopilot: string;
@@ -47,6 +49,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     tasksTitle: 'What needs doing',
     alarms: 'Alarms',
     alarmsTitle: 'Alarms',
+    notes: 'Notes',
+    notesTitle: 'Quick scratchpad',
     stats: 'Journal',
     statsTitle: 'Focus Journal & Budget',
     aiCopilot: 'AI Co-Pilot',
@@ -68,6 +72,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
     tasksTitle: 'Что нужно сделать',
     alarms: 'Алармы',
     alarmsTitle: 'Будильники',
+    notes: 'Заметки',
+    notesTitle: 'Быстрые заметки',
     stats: 'Журнал',
     statsTitle: 'Журнал фокуса и бюджет',
     aiCopilot: 'AI Co-Pilot',

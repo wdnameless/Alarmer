@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { CalendarDays, Play, Clock, Target } from 'lucide-react';
+import React, { useEffect,  useState } from 'react';
+import { CalendarDays, Play, Clock,  } from 'lucide-react';
 import type {
   Schedule,
   ScheduleStep,
@@ -8,12 +8,9 @@ import type {
   Direction,
   BlockSettings,
 } from '../types';
-import { DEFAULT_BLOCK_SETTINGS } from '../types/focus';
 import { blockDurationSec, findNextUp, schedulesForToday } from '../services/scheduleEngine';
-import { formatBlocks, blocksOnDay, directionProgress } from '../services/focusBudget';
 import { BlockPlayer } from './BlockPlayer';
 import { soundService } from '../services/sound';
-import { TimerService } from '../services/timer';
 
 export interface TodayViewProps {
   theme: ThemeColors;
@@ -62,44 +59,12 @@ export const TodayView: React.FC<TodayViewProps> = ({
   theme,
   schedules,
   onSession,
-  directions = [],
-  sessions = [],
-  blockSettings = DEFAULT_BLOCK_SETTINGS,
-  onStartBlock,
-  onNavigateToJournal,
+
 }) => {
   const [now, setNow] = useState(() => new Date());
   const [runningBlock, setRunningBlock] = useState<{ step: BlockStep; scheduleId: string } | null>(null);
 
-  const activeDirections = useMemo(
-    () => directions.filter((d) => !d.archived),
-    [directions]
-  );
 
-  const todayBlocks = useMemo(
-    () => blocksOnDay(sessions, now, blockSettings),
-    [sessions, now, blockSettings]
-  );
-
-  const dirProgressList = useMemo(() => {
-    if (activeDirections.length === 0) return [];
-    return directionProgress(sessions, activeDirections, now, blockSettings);
-  }, [sessions, activeDirections, now, blockSettings]);
-
-  const handleStartDirectionBlock = async (directionId: string) => {
-    soundService.playUiClick();
-    if (onStartBlock) {
-      onStartBlock(directionId);
-      return;
-    }
-    try {
-      await TimerService.setMode('block');
-      await TimerService.setDirection(directionId);
-      await TimerService.start();
-    } catch {
-      // Outside Tauri environment
-    }
-  };
   // Keep "in 12 minutes" honest without a full re-render loop.
   useEffect(() => {
     const timer = window.setInterval(() => setNow(new Date()), 30_000);
@@ -123,87 +88,6 @@ export const TodayView: React.FC<TodayViewProps> = ({
 
   return (
     <div className="flex flex-col w-full max-w-[340px] space-y-5">
-      {/* Day's completed blocks & Focus Block Card */}
-      <div
-        className="w-full rounded-3xl px-6 py-6"
-        style={{
-          backgroundColor: theme.cardBg,
-          boxShadow: '0 18px 48px rgba(0,0,0,0.45)',
-        }}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-2">
-            <Target size={14} style={{ color: theme.accent }} />
-            <span className="text-[11px] uppercase tracking-[0.18em] font-semibold" style={{ color: theme.text }}>
-              Начать блок фокуса
-            </span>
-          </div>
-          <div
-            data-testid="today-blocks-counter"
-            className="text-[11px] font-medium px-2 py-0.5 rounded-full"
-            style={{
-              backgroundColor: theme.surface,
-              color: theme.subtext,
-            }}
-            title="Завершено блоков сегодня"
-          >
-            Сегодня: <span className="font-semibold" style={{ color: theme.text }}>{formatBlocks(todayBlocks)}</span> бл
-          </div>
-        </div>
-
-        {activeDirections.length === 0 ? (
-          <div className="py-3 px-3 rounded-2xl border border-dashed text-center" style={{ borderColor: theme.border, backgroundColor: theme.surface }}>
-            <p className="text-[11px] leading-relaxed mb-1" style={{ color: theme.subtext }}>
-              Нет активных направлений. Создайте направление в журнале, чтобы планировать бюджет фокуса.
-            </p>
-            {onNavigateToJournal && (
-              <button
-                onClick={onNavigateToJournal}
-                className="mt-1 text-[11px] font-medium underline transition-opacity hover:opacity-80"
-                style={{ color: theme.accent }}
-              >
-                Перейти в журнал
-              </button>
-            )}
-          </div>
-        ) : (
-          <div className="flex flex-col gap-1.5 mt-2">
-            {dirProgressList.map(({ direction, used, budget }) => (
-              <button
-                key={direction.id}
-                data-testid={`start-block-${direction.id}`}
-                onClick={() => handleStartDirectionBlock(direction.id)}
-                className="w-full flex items-center justify-between px-3 py-2.5 rounded-xl border transition-all text-left group hover:scale-[1.01] active:scale-[0.98]"
-                style={{
-                  backgroundColor: theme.surface,
-                        }}
-              >
-                <div className="flex items-center gap-2.5 min-w-0">
-                  <span
-                    className="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm"
-                    style={{ backgroundColor: direction.color }}
-                  />
-                  <span className="text-xs font-medium truncate" style={{ color: theme.text }}>
-                    {direction.name}
-                  </span>
-                </div>
-
-                <div className="flex items-center gap-2 shrink-0 ml-2">
-                  <span className="text-[11px] tabular-nums" style={{ color: theme.subtext }}>
-                    {formatBlocks(used)}/{budget} бл
-                  </span>
-                  <div
-                    className="w-6 h-6 rounded-lg flex items-center justify-center transition-colors"
-                    style={{ backgroundColor: theme.surface, color: theme.text }}
-                  >
-                    <Play size={10} className="fill-current ml-0.5" />
-                  </div>
-                </div>
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
 
       {/* Schedules section */}
       {active.length === 0 ? (

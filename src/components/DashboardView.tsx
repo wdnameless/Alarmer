@@ -4,14 +4,13 @@ import { Timer } from "./Timer";
 import { Alarms } from "./Alarms";
 import { TodayView } from "./TodayView";
 import { TasksView } from "./TasksView";
-import { JournalView } from "./JournalView";
 import { TimerService } from '../services/timer';
 import { NotesView } from "./NotesView";
-import { Timer as TimerIcon, Bell, CalendarDays, ListTodo, BookOpen, NotebookPen } from "lucide-react";
+import { Timer as TimerIcon, Bell, CalendarDays, ListTodo, NotebookPen } from "lucide-react";
 import { I18nService } from "../services/i18n";
 
 /** Modules reachable from the dashboard. */
-export type SubModule = 'today' | 'timer' | 'tasks' | 'alarms' | 'stats' | 'notes';
+export type SubModule = 'today' | 'timer' | 'tasks' | 'alarms' | 'notes';
 
 interface DashboardViewProps {
   theme: ThemeColors;
@@ -32,7 +31,6 @@ interface DashboardViewProps {
   notes: NoteItem[];
   onUpdateNotes: (notes: NoteItem[]) => void;
   directions?: Direction[];
-  onUpdateDirections?: (directions: Direction[]) => void;
   onStartBlock?: (directionId: string) => void;
   onRateQuality?: (quality: number) => void;
   blockSettings?: BlockSettings;
@@ -57,7 +55,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
   activeSubModule,
   onSubModuleChange,
   directions = [],
-  onUpdateDirections,
   onStartBlock,
   onRateQuality,
   blockSettings,
@@ -75,7 +72,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
     { id: 'timer', label: t.timer, title: t.timerTitle, icon: <TimerIcon size={13} /> },
     { id: 'tasks', label: t.tasks, title: t.tasksTitle, icon: <ListTodo size={13} /> },
     { id: 'alarms', label: t.alarms, title: t.alarmsTitle, icon: <Bell size={13} /> },
-    { id: 'stats', label: t.stats, title: t.statsTitle, icon: <BookOpen size={13} /> },
     { id: 'notes', label: 'Заметки', title: 'Заметки и описания', icon: <NotebookPen size={13} /> },
   ];
 
@@ -137,7 +133,6 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
               onStartBlock?.(dirId);
               setSubModule('timer');
             }}
-            onNavigateToJournal={() => setSubModule('stats')}
             blockSettings={blockSettings}
           />
         </div>
@@ -179,15 +174,7 @@ export const DashboardView: React.FC<DashboardViewProps> = ({
             schedules={schedules}
           />
         </div>
-        <div className={`w-full flex-1 flex flex-col items-center justify-start overflow-y-auto ${subModule === 'stats' ? '' : 'hidden'}`}>
-          <JournalView
-            theme={theme}
-            sessions={sessions}
-            directions={directions}
-            tasks={tasks}
-            onUpdateDirections={onUpdateDirections}
-          />
-        </div>
+
       </div>
     </div>
   );
