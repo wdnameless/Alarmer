@@ -79,6 +79,10 @@ jobs:
           New-Item -ItemType File -Force -Path portable/alarmer/portable | Out-Null
           Compress-Archive -Path portable/alarmer -DestinationPath "$name.zip" -Force
           Write-Host "built $name.zip"
+          if ("${{ matrix.platform }}" -eq "windows") {
+            Copy-Item "src-tauri/target/release/${{ matrix.exeName }}" "alarmer-portable.exe"
+            Write-Host "prepared standalone alarmer-portable.exe"
+          }
 
       # Signs the portable archive with the same key the installers use, so a
       # portable build can verify its own update before replacing itself.
@@ -92,6 +96,10 @@ jobs:
           bunx tauri signer sign "$name.zip"
           if (-not (Test-Path "$name.zip.sig")) { throw "signing produced no .sig file" }
           Write-Host "signed $name.zip"
+          if (Test-Path "alarmer-portable.exe") {
+            bunx tauri signer sign "alarmer-portable.exe"
+            Write-Host "signed alarmer-portable.exe"
+          }
 
       # Collect every artifact this platform produced, so the publish job has
       # them all in one place.
@@ -102,6 +110,8 @@ jobs:
           path: |
             alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}.zip
             alarmer-${{ github.ref_name }}-portable-${{ matrix.platform }}.zip.sig
+            alarmer-portable.exe
+            alarmer-portable.exe.sig
             src-tauri/target/release/bundle/**/*.deb
             src-tauri/target/release/bundle/**/*.AppImage
             src-tauri/target/release/bundle/**/*.AppImage.sig

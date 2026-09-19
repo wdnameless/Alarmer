@@ -405,7 +405,7 @@ async fn missed_alarms_today() -> Result<Vec<scheduler::MissedAlarm>, String> {
 /// there instead of the per-user application data directory.
 #[tauri::command]
 async fn store_dir(app: tauri::AppHandle) -> Result<String, String> {
-    if std::env::var_os("ALARMER_PORTABLE").is_some() || has_portable_marker() {
+    if is_portable_running() {
         if let Ok(exe) = std::env::current_exe() {
             if let Some(dir) = exe.parent() {
                 let portable = dir.join("data");
@@ -422,12 +422,37 @@ async fn store_dir(app: tauri::AppHandle) -> Result<String, String> {
         .map_err(|e| format!("no app data dir: {e}"))
 }
 
-/// True when a `portable` marker file sits next to the executable.
+/// True when this process is running as a standalone portable application.
+///
+/// Returns true if:
+/// 1. `ALARMER_PORTABLE` environment variable is set, or
+/// 2. An explicit `portable` marker file exists beside the executable, or
+/// 3. The executable is running outside standard system install directories
+///    (not in `Program Files`, `Program Files (x86)`, or `AppData\Local\Programs`).
+pub fn is_portable_running() -> bool {
+    if std::env::var_os("ALARMER_PORTABLE").is_some() {
+        return true;
+    }
+    if let Ok(exe) = std::env::current_exe() {
+        if let Some(dir) = exe.parent() {
+            if dir.join("portable").exists() {
+                return true;
+            }
+        }
+        let exe_str = exe.to_string_lossy().to_lowercase();
+        // Check Windows standard installation directories
+        let in_program_files = exe_str.contains("program files");
+        let in_appdata_programs = exe_str.contains(r"appdata\local\programs");
+        if !in_program_files && !in_appdata_programs {
+            return true;
+        }
+    }
+    false
+}
+
+/// Kept for backwards compatibility.
 pub fn has_portable_marker() -> bool {
-    std::env::current_exe()
-        .ok()
-        .and_then(|exe| exe.parent().map(|d| d.join("portable").exists()))
-        .unwrap_or(false)
+    is_portable_running()
 }
 
 /// Passed to the executable when the OS starts it, so the app can come up in the

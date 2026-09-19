@@ -14,7 +14,7 @@ use std::path::PathBuf;
 
 /// True when this build keeps its data beside the executable.
 pub fn is_portable() -> bool {
-    std::env::var_os("ALARMER_PORTABLE").is_some() || super::has_portable_marker()
+    super::is_portable_running()
 }
 
 /// Directory this portable build lives in.
