@@ -1,5 +1,5 @@
 import { HandSparkle } from './components/CustomIcons';
-import { LayoutDashboard, Timer as TimerNavIcon, ListTodo, Bell, NotebookPen, Settings as SettingsNavIcon } from 'lucide-react';
+import { LayoutDashboard, Timer as TimerNavIcon, ListTodo, Bell, NotebookPen, Settings as SettingsNavIcon, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import React, { useState, useEffect, useMemo } from 'react';
 import { TitleBar } from './components/TitleBar';
 import { ChatMessage } from './services/aiCompiler';
@@ -46,6 +46,9 @@ export const App: React.FC = () => {
   const [isPinned, setIsPinned] = useState(false);
   const [aiTimerMinutes] = useState<number | undefined>(undefined);
   const [dashboardSubModule, setDashboardSubModule] = useState<SubModule>('today');
+  const [sidebarCollapsed, setSidebarCollapsed] = useState<boolean>(() =>
+    StoreService.getPreference('alarmer_sidebar_collapsed', false),
+  );
   const [isAiWingOpen, setIsAiWingOpen] = useState<boolean>(false);
   const [leftPaneWidth, setLeftPaneWidth] = useState<number>(() =>
     StoreService.getPreference('alarmer_left_pane_width', 340),
@@ -501,19 +504,37 @@ export const App: React.FC = () => {
       />
       {/* Main App Container with Left Sidebar Navigation */}
       <div className="flex-1 flex w-full h-full overflow-hidden relative">
-        {/* Left Vertical Sidebar */}
+        {/* Left Vertical Sidebar (Collapsible & Compact) */}
         <aside
-          className="w-16 sm:w-48 flex flex-col justify-between p-2.5 border-r shrink-0 select-none transition-all"
+          className={`flex flex-col justify-between p-2 border-r shrink-0 select-none transition-all duration-200 ${
+            sidebarCollapsed ? 'w-[52px]' : 'w-36'
+          }`}
           style={{ backgroundColor: theme.cardBg, borderColor: theme.border }}
         >
           {/* Main Module Nav Items */}
           <div className="flex flex-col space-y-1">
+            {/* Sidebar Collapse/Expand Toggle */}
+            <button
+              onClick={() => {
+                soundService.playUiClick();
+                setSidebarCollapsed((prev) => {
+                  const next = !prev;
+                  StoreService.setPreference('alarmer_sidebar_collapsed', next);
+                  return next;
+                });
+              }}
+              className="flex items-center justify-center p-1.5 mb-1 rounded-lg transition-all opacity-50 hover:opacity-100 hover:bg-white/5"
+              style={{ color: theme.subtext }}
+              title={sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
+            >
+              {sidebarCollapsed ? <PanelLeftOpen size={15} /> : <PanelLeftClose size={15} />}
+            </button>
             <button
               onClick={() => {
                 handleSelectTab('dashboard');
                 setDashboardSubModule('today');
               }}
-              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+              className={`flex items-center ${sidebarCollapsed ? "justify-center px-2 py-2" : "space-x-2 px-2.5 py-2"} rounded-xl text-xs transition-all ${
                 activeTab === 'dashboard' && dashboardSubModule === 'today'
                   ? 'font-bold shadow-sm'
                   : 'opacity-60 hover:opacity-100'
@@ -529,7 +550,7 @@ export const App: React.FC = () => {
               title={t.today}
             >
               <LayoutDashboard size={16} />
-              <span className="hidden sm:inline font-medium">{t.today}</span>
+              {!sidebarCollapsed && <span className="font-medium truncate text-xs">{t.today}</span>}
             </button>
 
             <button
@@ -537,7 +558,7 @@ export const App: React.FC = () => {
                 handleSelectTab('dashboard');
                 setDashboardSubModule('timer');
               }}
-              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+              className={`flex items-center ${sidebarCollapsed ? "justify-center px-2 py-2" : "space-x-2 px-2.5 py-2"} rounded-xl text-xs transition-all ${
                 activeTab === 'dashboard' && dashboardSubModule === 'timer'
                   ? 'font-bold shadow-sm'
                   : 'opacity-60 hover:opacity-100'
@@ -553,7 +574,7 @@ export const App: React.FC = () => {
               title={t.timer}
             >
               <TimerNavIcon size={16} />
-              <span className="hidden sm:inline font-medium">{t.timer}</span>
+              {!sidebarCollapsed && <span className="font-medium truncate text-xs">{t.timer}</span>}
             </button>
 
             <button
@@ -561,7 +582,7 @@ export const App: React.FC = () => {
                 handleSelectTab('dashboard');
                 setDashboardSubModule('tasks');
               }}
-              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+              className={`flex items-center ${sidebarCollapsed ? "justify-center px-2 py-2" : "space-x-2 px-2.5 py-2"} rounded-xl text-xs transition-all ${
                 activeTab === 'dashboard' && dashboardSubModule === 'tasks'
                   ? 'font-bold shadow-sm'
                   : 'opacity-60 hover:opacity-100'
@@ -577,7 +598,7 @@ export const App: React.FC = () => {
               title={t.tasks}
             >
               <ListTodo size={16} />
-              <span className="hidden sm:inline font-medium">{t.tasks}</span>
+              {!sidebarCollapsed && <span className="font-medium truncate text-xs">{t.tasks}</span>}
             </button>
 
             <button
@@ -585,7 +606,7 @@ export const App: React.FC = () => {
                 handleSelectTab('dashboard');
                 setDashboardSubModule('alarms');
               }}
-              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+              className={`flex items-center ${sidebarCollapsed ? "justify-center px-2 py-2" : "space-x-2 px-2.5 py-2"} rounded-xl text-xs transition-all ${
                 activeTab === 'dashboard' && dashboardSubModule === 'alarms'
                   ? 'font-bold shadow-sm'
                   : 'opacity-60 hover:opacity-100'
@@ -601,7 +622,7 @@ export const App: React.FC = () => {
               title={t.alarms}
             >
               <Bell size={16} />
-              <span className="hidden sm:inline font-medium">{t.alarms}</span>
+              {!sidebarCollapsed && <span className="font-medium truncate text-xs">{t.alarms}</span>}
             </button>
 
             <button
@@ -609,7 +630,7 @@ export const App: React.FC = () => {
                 handleSelectTab('dashboard');
                 setDashboardSubModule('notes');
               }}
-              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+              className={`flex items-center ${sidebarCollapsed ? "justify-center px-2 py-2" : "space-x-2 px-2.5 py-2"} rounded-xl text-xs transition-all ${
                 activeTab === 'dashboard' && dashboardSubModule === 'notes'
                   ? 'font-bold shadow-sm'
                   : 'opacity-60 hover:opacity-100'
@@ -625,7 +646,7 @@ export const App: React.FC = () => {
               title={t.notes}
             >
               <NotebookPen size={16} />
-              <span className="hidden sm:inline font-medium">{t.notes}</span>
+              {!sidebarCollapsed && <span className="font-medium truncate text-xs">{t.notes}</span>}
             </button>
           </div>
 
@@ -633,7 +654,7 @@ export const App: React.FC = () => {
           <div className="flex flex-col space-y-1 pt-2 border-t" style={{ borderColor: theme.border }}>
             <button
               onClick={() => handleSelectTab('settings')}
-              className={`flex items-center space-x-2.5 px-3 py-2.5 rounded-xl text-xs transition-all ${
+              className={`flex items-center ${sidebarCollapsed ? "justify-center px-2 py-2" : "space-x-2 px-2.5 py-2"} rounded-xl text-xs transition-all ${
                 activeTab === 'settings' ? 'font-bold shadow-sm' : 'opacity-60 hover:opacity-100'
               }`}
               style={{
@@ -643,7 +664,7 @@ export const App: React.FC = () => {
               title={t.settings}
             >
               <SettingsNavIcon size={16} />
-              <span className="hidden sm:inline font-medium">{t.settings}</span>
+              {!sidebarCollapsed && <span className="font-medium truncate text-xs">{t.settings}</span>}
             </button>
           </div>
         </aside>
