@@ -19,7 +19,7 @@ import { AlarmCenter, type MissedAlarm } from './components/AlarmCenter';
 import { UpdateBanner } from './components/UpdateBanner';
 import { trimSessions } from './services/session';
 import { TimerService } from './services/timer';
-import { checkForUpdate, installUpdate, type UpdateInfo } from './services/update';
+import { checkForUpdate, installUpdate, detectPortable, type UpdateInfo } from './services/update';
 import { ErrorBoundary } from './components/ErrorBoundary';
 import { invoke } from '@tauri-apps/api/core';
 import { listen } from '@tauri-apps/api/event';
@@ -362,15 +362,18 @@ export const App: React.FC = () => {
     soundService.playUiClick();
     setManualCheckState('checking');
     try {
+      console.log('[Update] Checking for updates...');
       const res = await checkForUpdate();
+      console.log('[Update] Check result:', res);
       if (res.status === 'update') {
         setPendingUpdate(res.info);
         setManualCheckState('available');
       } else {
         setManualCheckState('up_to_date');
-        setTimeout(() => setManualCheckState('idle'), 3000);
+        setTimeout(() => setManualCheckState('idle'), 4000);
       }
-    } catch {
+    } catch (err) {
+      console.error('[Update] Check error:', err);
       setManualCheckState('idle');
     }
   };
@@ -396,6 +399,7 @@ export const App: React.FC = () => {
    */
   useEffect(() => {
     if (!isTauri()) return;
+    void detectPortable();
     const timer = window.setTimeout(() => {
       void checkForUpdate().then((result) => {
         if (result.status === 'update') setPendingUpdate(result.info);

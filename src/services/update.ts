@@ -88,9 +88,17 @@ export async function checkForUpdate(): Promise<
   if (!isTauri()) return { status: 'error', message: 'Обновления доступны только в приложении.' };
 
   try {
-    // A portable build reads the release manifest itself: Tauri's updater would
-    // run the NSIS installer, losing exactly what makes the copy portable.
-    if (isPortable()) {
+    // Check if the build is portable (synchronously from store, or probe from backend)
+    let portable = isPortable();
+    if (!portable && isTauri()) {
+      try {
+        portable = await detectPortable();
+      } catch {
+        portable = false;
+      }
+    }
+
+    if (portable) {
       const found = await invoke<{
         version: string;
         notes: string;

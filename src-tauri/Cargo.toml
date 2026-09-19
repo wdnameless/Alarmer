@@ -1,6 +1,6 @@
 [package]
 name = "alarmer"
-version = "0.2.3"
+version = "0.2.4"
 description = "Alarmer backend: alarm scheduler, countdown timer, alarm audio and AI gateway"
 authors = ["Alarmer"]
 edition = "2021"
