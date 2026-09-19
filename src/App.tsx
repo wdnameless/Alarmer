@@ -358,23 +358,41 @@ export const App: React.FC = () => {
   const [isUpdating, setIsUpdating] = useState(false);
   const [manualCheckState, setManualCheckState] = useState<'idle' | 'checking' | 'available' | 'up_to_date'>('idle');
 
+  const [updateFeedback, setUpdateFeedback] = useState<{ kind: 'up_to_date' | 'error'; message: string } | null>(null);
+
   const handleManualUpdateCheck = async () => {
     soundService.playUiClick();
     setManualCheckState('checking');
+    setUpdateFeedback(null);
     try {
-      console.log('[Update] Checking for updates...');
       const res = await checkForUpdate();
-      console.log('[Update] Check result:', res);
       if (res.status === 'update') {
         setPendingUpdate(res.info);
         setManualCheckState('available');
-      } else {
+        // Automatically begin downloading and installing the update
+        setIsUpdating(true);
+        void installUpdate(res.info).catch((err) => {
+          console.error('Auto-install failed:', err);
+          setIsUpdating(false);
+          setUpdateFeedback({ kind: 'error', message: 'Ошибка при установке обновления' });
+        });
+      } else if (res.status === 'current') {
         setManualCheckState('up_to_date');
-        setTimeout(() => setManualCheckState('idle'), 4000);
+        setUpdateFeedback({ kind: 'up_to_date', message: 'У вас установлена последняя версия' });
+        setTimeout(() => {
+          setManualCheckState('idle');
+          setUpdateFeedback(null);
+        }, 5000);
+      } else {
+        setManualCheckState('idle');
+        setUpdateFeedback({ kind: 'error', message: res.status === 'error' ? res.message : 'Не удалось проверить обновления' });
+        setTimeout(() => setUpdateFeedback(null), 5000);
       }
     } catch (err) {
       console.error('[Update] Check error:', err);
       setManualCheckState('idle');
+      setUpdateFeedback({ kind: 'error', message: 'Ошибка при проверке обновлений' });
+      setTimeout(() => setUpdateFeedback(null), 5000);
     }
   };
 
@@ -400,6 +418,7 @@ export const App: React.FC = () => {
   useEffect(() => {
     if (!isTauri()) return;
     void detectPortable();
+    void windowService.restoreSavedSize();
     const timer = window.setTimeout(() => {
       void checkForUpdate().then((result) => {
         if (result.status === 'update') setPendingUpdate(result.info);
@@ -439,6 +458,29 @@ export const App: React.FC = () => {
         installing={isUpdating}
         onDismiss={() => setPendingUpdate(null)}
       />
+      {/* In-app feedback toast when user checks update manually and is up-to-date */}
+      {updateFeedback && (
+        <div
+          className="w-full py-2 px-4 flex items-center justify-between text-xs transition-all animate-in fade-in slide-in-from-top duration-200"
+          style={{
+            backgroundColor: updateFeedback.kind === 'up_to_date' ? 'rgba(34, 197, 94, 0.15)' : 'rgba(239, 68, 68, 0.15)',
+            borderBottom: `1px solid ${updateFeedback.kind === 'up_to_date' ? 'rgba(34, 197, 94, 0.3)' : 'rgba(239, 68, 68, 0.3)'}`,
+            color: updateFeedback.kind === 'up_to_date' ? '#4ade80' : '#f87171',
+          }}
+        >
+          <div className="flex items-center space-x-2">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: updateFeedback.kind === 'up_to_date' ? '#22c55e' : '#ef4444' }} />
+            <span className="font-medium">{updateFeedback.message}</span>
+          </div>
+          <button
+            onClick={() => setUpdateFeedback(null)}
+            className="opacity-60 hover:opacity-100 p-0.5"
+          >
+            ✕
+          </button>
+        </div>
+      )}
+
       {/* Sleek Custom Windows / macOS Titlebar with Drag & Controls */}
       <TitleBar
         theme={theme}

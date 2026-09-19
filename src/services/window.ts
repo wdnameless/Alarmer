@@ -45,11 +45,42 @@ export class WindowService {
     }
   }
 
+  static async restoreSavedSize(): Promise<void> {
+    if (!this.isTauri()) return;
+    try {
+      const { StoreService } = await import('./store');
+      const savedW = StoreService.getPreference<number>('alarmer_window_width', 0);
+      const savedH = StoreService.getPreference<number>('alarmer_window_height', 0);
+      if (savedW >= 300 && savedH >= 400) {
+        const win = getCurrentWindow();
+        await win.setSize(new LogicalSize(savedW, savedH));
+      }
+    } catch (e) {
+      console.warn('Failed to restore saved window size:', e);
+    }
+  }
+
+  static async saveCurrentSize(w: number, h: number): Promise<void> {
+    try {
+      const { StoreService } = await import('./store');
+      StoreService.setPreference('alarmer_window_width', Math.round(w));
+      StoreService.setPreference('alarmer_window_height', Math.round(h));
+    } catch (e) {
+      console.warn('Failed to save window size:', e);
+    }
+  }
+
   static async setCompact(compact: boolean): Promise<void> {
     if (this.isTauri()) {
       try {
         const win = getCurrentWindow();
-        const size = compact ? new LogicalSize(340, 480) : new LogicalSize(520, 680);
+        let size = new LogicalSize(340, 480);
+        if (!compact) {
+          const { StoreService } = await import('./store');
+          const savedW = StoreService.getPreference<number>('alarmer_window_width', 520);
+          const savedH = StoreService.getPreference<number>('alarmer_window_height', 680);
+          size = new LogicalSize(savedW, savedH);
+        }
         await win.setSize(size);
       } catch (e) {
         console.warn('Window setCompact error:', e);

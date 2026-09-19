@@ -13,6 +13,8 @@ export const ResizeHandles: React.FC = () => {
       const startY = e.clientY;
       const startWidth = window.innerWidth;
       const startHeight = window.innerHeight;
+      let lastW = startWidth;
+      let lastH = startHeight;
 
       const target = e.currentTarget as HTMLElement;
       try {
@@ -29,15 +31,15 @@ export const ResizeHandles: React.FC = () => {
         let newH = startHeight;
 
         if (direction === 'right' || direction === 'bottom-right') {
-          newW = Math.max(220, startWidth + deltaX);
+          lastW = newW = Math.max(220, startWidth + deltaX);
         } else if (direction === 'left') {
-          newW = Math.max(220, startWidth - deltaX);
+          lastW = newW = Math.max(220, startWidth - deltaX);
         }
 
         if (direction === 'bottom' || direction === 'bottom-right') {
-          newH = Math.max(340, startHeight + deltaY);
+          lastH = newH = Math.max(340, startHeight + deltaY);
         } else if (direction === 'top') {
-          newH = Math.max(340, startHeight - deltaY);
+          lastH = newH = Math.max(340, startHeight - deltaY);
         }
 
         if (isTauri) {
@@ -58,6 +60,11 @@ export const ResizeHandles: React.FC = () => {
         }
         window.removeEventListener('pointermove', onPointerMove);
         window.removeEventListener('pointerup', onPointerUp);
+        if (isTauri && lastW > 0 && lastH > 0) {
+          import('../services/window').then(({ WindowService }) => {
+            void WindowService.saveCurrentSize(lastW, lastH);
+          });
+        }
       };
 
       window.addEventListener('pointermove', onPointerMove);
