@@ -267,10 +267,16 @@ async fn set_companion_mode(app: tauri::AppHandle, open: bool) -> Result<(), Str
 
 /// Shows or hides the compact always-on-top mini overlay.
 #[tauri::command]
-async fn toggle_mini_overlay(app: tauri::AppHandle, open: bool) -> Result<(), String> {
+async fn toggle_mini_overlay(app: tauri::AppHandle, open: Option<bool>) -> Result<(), String> {
     const LABEL: &str = "mini-overlay";
 
-    if !open {
+    let should_close = match open {
+        Some(true) => false,
+        Some(false) => true,
+        None => app.get_webview_window(LABEL).is_some(),
+    };
+
+    if should_close {
         if let Some(win) = app.get_webview_window(LABEL) {
             let _ = win.close();
         }

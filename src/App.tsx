@@ -198,7 +198,7 @@ export const App: React.FC = () => {
     soundService.playUiClick();
     // The overlay is a second native window; a plain browser has no such thing.
     if (!isTauri()) return;
-    void invoke('toggle_mini_overlay', { open: true }).catch((e) =>
+    void invoke('toggle_mini_overlay', { open: null }).catch((e) =>
       console.warn('mini overlay unavailable:', e),
     );
   };

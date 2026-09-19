@@ -41,8 +41,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
   en: {
     dashboard: 'Dashboard',
     settings: 'Settings',
-    today: 'Today',
-    todayTitle: 'What is now and what is next',
+    today: 'Dashboard',
+    todayTitle: 'Dashboard & Widgets',
     timer: 'Timer',
     timerTitle: 'Timer',
     tasks: 'Tasks',
@@ -64,8 +64,8 @@ export const TRANSLATIONS: Record<Language, Translations> = {
   ru: {
     dashboard: 'Дашборд',
     settings: 'Настройки',
-    today: 'Сегодня',
-    todayTitle: 'Что сейчас и что дальше',
+    today: 'Дашборд',
+    todayTitle: 'Дашборд и виджеты',
     timer: 'Таймер',
     timerTitle: 'Таймер',
     tasks: 'Задачи',

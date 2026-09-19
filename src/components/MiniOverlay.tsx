@@ -1,3 +1,5 @@
+import { X } from 'lucide-react';
+import { WindowService } from '../services/window';
 import { useEffect, useState } from 'react';
 import { getCurrentWindow } from '@tauri-apps/api/window';
 import { THEMES } from '../constants/themes';
@@ -41,17 +43,31 @@ export function MiniOverlay() {
   return (
     <div
       data-tauri-drag-region
+      onPointerDown={(e) => {
+        if ((e.target as HTMLElement).closest('button')) return;
+        WindowService.startDragging();
+      }}
       className="w-screen h-screen flex items-center justify-center select-none cursor-move"
       style={{ background: 'transparent' }}
     >
       <div
-        className="relative flex flex-col items-center justify-center rounded-2xl border px-3 py-2 shadow-2xl"
+        className="relative flex flex-col items-center justify-center rounded-2xl border px-4 py-2 shadow-2xl group"
         style={{
           backgroundColor: `${theme.bg}E6`,
           borderColor: theme.border,
           backdropFilter: 'blur(12px)',
         }}
       >
+        <button
+          onClick={(e) => {
+            e.stopPropagation();
+            void getCurrentWindow().close();
+          }}
+          className="absolute -top-2 -right-2 w-5 h-5 rounded-full bg-red-500/80 hover:bg-red-500 text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity shadow-md z-50 cursor-pointer"
+          title="Закрыть виджет"
+        >
+          <X size={11} />
+        </button>
         {/* Hairline progress rail */}
         <div
           className="absolute left-2 right-2 bottom-1.5 h-[2px] rounded-full overflow-hidden"
