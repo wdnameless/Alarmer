@@ -310,49 +310,146 @@ export const RadialDial: React.FC<RadialDialProps> = ({
         )}
 
         {clockStyle === 'sand' && (
-          <div className="flex flex-col items-center justify-center transition-all duration-300">
-            {/* Hourglass Sand animation representation */}
-            <div className="relative w-14 h-16 flex flex-col items-center justify-between mb-1">
-              {/* Top glass cone */}
-              <div
-                className="w-12 h-7 border-t-2 border-l-2 border-r-2 rounded-t-xl overflow-hidden relative"
-                style={{ borderColor: theme.border }}
-              >
-                <div
-                  className="absolute bottom-0 inset-x-0 transition-all duration-500 ease-linear"
-                  style={{
-                    height: `${Math.max(0, activeProgress) * 100}%`,
-                    backgroundColor: theme.accent,
-                    opacity: 0.85,
-                  }}
+          <div className="flex flex-col items-center justify-center select-none">
+            {/* Sleek SVG Hourglass */}
+            <div className="relative w-20 h-24 flex items-center justify-center">
+              <svg width="72" height="88" viewBox="0 0 72 88" fill="none" className="overflow-visible">
+                <defs>
+                  {/* Glass reflections & gradients */}
+                  <linearGradient id="glassGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                    <stop offset="0%" stopColor="#ffffff" stopOpacity="0.18" />
+                    <stop offset="40%" stopColor="#ffffff" stopOpacity="0.04" />
+                    <stop offset="100%" stopColor="#ffffff" stopOpacity="0.12" />
+                  </linearGradient>
+
+                  <linearGradient id="sandGrad" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor={theme.accent} stopOpacity="0.95" />
+                    <stop offset="100%" stopColor={theme.accent} stopOpacity="0.75" />
+                  </linearGradient>
+
+                  {/* Top bulb clip path */}
+                  <clipPath id="topBulbClip">
+                    <path d="M 12 12 Q 12 36, 34 43 L 38 43 Q 60 36, 60 12 Z" />
+                  </clipPath>
+
+                  {/* Bottom bulb clip path */}
+                  <clipPath id="bottomBulbClip">
+                    <path d="M 34 45 L 38 45 Q 60 52, 60 76 L 12 76 Q 12 52, 34 45 Z" />
+                  </clipPath>
+
+                  {/* Filter for glowing sand */}
+                  <filter id="sandGlow" x="-20%" y="-20%" width="140%" height="140%">
+                    <feGaussianBlur stdDeviation="1.5" result="blur" />
+                    <feComposite in="SourceGraphic" in2="blur" operator="over" />
+                  </filter>
+                </defs>
+
+                {/* Top and Bottom Caps (Metallic frames) */}
+                <rect x="8" y="7" width="56" height="4" rx="2" fill={theme.text} opacity="0.4" />
+                <rect x="8" y="77" width="56" height="4" rx="2" fill={theme.text} opacity="0.4" />
+
+                {/* Side Support Pillars */}
+                <line x1="10" y1="10" x2="10" y2="78" stroke={theme.text} strokeWidth="1.5" opacity="0.25" strokeLinecap="round" />
+                <line x1="62" y1="10" x2="62" y2="78" stroke={theme.text} strokeWidth="1.5" opacity="0.25" strokeLinecap="round" />
+
+                {/* Outer Glass Flask Body */}
+                <path
+                  d="M 12 11 Q 12 37, 34 44 L 38 44 Q 60 37, 60 11 Z
+                     M 34 44 L 38 44 Q 60 51, 60 77 L 12 77 Q 12 51, 34 44 Z"
+                  fill="url(#glassGrad)"
+                  stroke={theme.text}
+                  strokeWidth="1.5"
+                  strokeOpacity="0.35"
+                  strokeLinejoin="round"
                 />
-              </div>
-              {/* Middle trickle */}
-              <div
-                className="w-0.5 h-2 transition-opacity duration-300"
-                style={{
-                  backgroundColor: theme.accent,
-                  opacity: activeProgress > 0 ? 0.9 : 0,
-                }}
-              />
-              {/* Bottom glass cone */}
-              <div
-                className="w-12 h-7 border-b-2 border-l-2 border-r-2 rounded-b-xl overflow-hidden relative"
-                style={{ borderColor: theme.border }}
-              >
-                <div
-                  className="absolute bottom-0 inset-x-0 transition-all duration-500 ease-linear"
-                  style={{
-                    height: `${Math.max(0, 1 - activeProgress) * 100}%`,
-                    backgroundColor: theme.accent,
-                    opacity: 0.85,
-                  }}
+
+                {/* Inner sand top bulb (drains down) */}
+                <g clipPath="url(#topBulbClip)">
+                  <rect
+                    x="10"
+                    y={11 + (1 - Math.max(0, Math.min(1, activeProgress))) * 33}
+                    width="52"
+                    height="35"
+                    fill="url(#sandGrad)"
+                    filter="url(#sandGlow)"
+                    className="transition-all duration-300"
+                  />
+                </g>
+
+                {/* Sand trickle stream (animated falling sand) */}
+                {activeProgress > 0 && activeProgress < 1 && (
+                  <>
+                    <line
+                      x1="36"
+                      y1="43"
+                      x2="36"
+                      y2="76"
+                      stroke={theme.accent}
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      opacity="0.9"
+                    />
+                    <circle cx="36" cy="50" r="1.2" fill="#ffffff" opacity="0.8">
+                      <animate attributeName="cy" values="44;74" dur="0.6s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.9;0.2" dur="0.6s" repeatCount="indefinite" />
+                    </circle>
+                    <circle cx="36" cy="60" r="1" fill="#ffffff" opacity="0.7">
+                      <animate attributeName="cy" values="44;74" dur="0.8s" begin="0.3s" repeatCount="indefinite" />
+                      <animate attributeName="opacity" values="0.8;0.1" dur="0.8s" begin="0.3s" repeatCount="indefinite" />
+                    </circle>
+                  </>
+                )}
+
+                {/* Inner sand bottom bulb (piles up in an organic mound) */}
+                <g clipPath="url(#bottomBulbClip)">
+                  {/* Base sand level */}
+                  <rect
+                    x="10"
+                    y={77 - (1 - Math.max(0, Math.min(1, activeProgress))) * 32}
+                    width="52"
+                    height="35"
+                    fill="url(#sandGrad)"
+                    filter="url(#sandGlow)"
+                    className="transition-all duration-300"
+                  />
+                  {/* Organic cone mound in center */}
+                  {activeProgress < 0.98 && (
+                    <ellipse
+                      cx="36"
+                      cy={77 - (1 - Math.max(0, Math.min(1, activeProgress))) * 32}
+                      rx="16"
+                      ry="4"
+                      fill={theme.accent}
+                      opacity="0.9"
+                    />
+                  )}
+                </g>
+
+                {/* Glass highlight glare reflection */}
+                <path
+                  d="M 16 16 Q 16 32, 28 39"
+                  stroke="#ffffff"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  opacity="0.25"
                 />
-              </div>
+                <path
+                  d="M 16 72 Q 16 56, 28 49"
+                  stroke="#ffffff"
+                  strokeWidth="1.5"
+                  strokeLinecap="round"
+                  opacity="0.18"
+                />
+              </svg>
             </div>
+
+            {/* Clean time badge below */}
             <span
-              className="font-mono text-sm font-semibold tabular-nums tracking-wider mt-1"
-              style={{ color: theme.text }}
+              className="font-mono text-base font-bold tabular-nums tracking-wider mt-1 px-3 py-0.5 rounded-full shadow-sm"
+              style={{
+                color: theme.text,
+                backgroundColor: `${theme.cardBg}ee`,
+              }}
             >
               {primaryText}
             </span>
