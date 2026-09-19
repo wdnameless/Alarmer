@@ -178,6 +178,50 @@ pub async fn download(url: &str) -> Result<Vec<u8>, String> {
     Ok(bytes.to_vec())
 }
 
+/// Downloads a URL into memory while emitting progress events.
+pub async fn download_with_progress(url: &str, app: &tauri::AppHandle) -> Result<Vec<u8>, String> {
+    use futures_util::StreamExt;
+    use tauri::Emitter;
+
+    #[derive(Clone, serde::Serialize)]
+    struct ProgressPayload {
+        downloaded: usize,
+        total: usize,
+        stage: String,
+    }
+
+    let client = reqwest::Client::builder()
+        .timeout(std::time::Duration::from_secs(300))
+        .build()
+        .map_err(|e| format!("cannot create the HTTP client: {e}"))?;
+
+    let response = client
+        .get(url)
+        .send()
+        .await
+        .map_err(|e| format!("cannot reach the update server: {e}"))?;
+
+    if !response.status().is_success() {
+        return Err(format!("the update server returned {}", response.status()));
+    }
+
+    let total = response.content_length().unwrap_or(0) as usize;
+    let mut stream = response.bytes_stream();
+    let mut bytes = Vec::with_capacity(if total > 0 { total } else { 8 * 1024 * 1024 });
+
+    while let Some(chunk_res) = stream.next().await {
+        let chunk = chunk_res.map_err(|e| format!("error downloading chunk: {e}"))?;
+        bytes.extend_from_slice(&chunk);
+        let _ = app.emit("update-progress", ProgressPayload {
+            downloaded: bytes.len(),
+            total,
+            stage: "downloading".into(),
+        });
+    }
+
+    Ok(bytes)
+}
+
 /// True when a previously staged update is waiting to be applied.
 pub fn has_staged_update() -> bool {
     portable_dir()

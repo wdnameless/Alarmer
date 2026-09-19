@@ -7,8 +7,12 @@ import "./index.css";
 /** Routes the webview to the right root: main app or the mini overlay window. */
 function Root() {
   const isOverlay = window.location.search.includes('window=mini-overlay');
+  return isOverlay ? <MiniOverlayWindow /> : <App />;
+}
+
+function MiniOverlayWindow() {
   useOverlayDismiss();
-  return isOverlay ? <MiniOverlay /> : <App />;
+  return <MiniOverlay />;
 }
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(

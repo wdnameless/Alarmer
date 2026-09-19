@@ -29,15 +29,51 @@ async fn is_portable_build() -> Result<bool, String> {
 /// point the updater at an arbitrary binary. The artifact is verified against
 /// the project's signing key before anything is written to disk.
 #[tauri::command]
-async fn portable_stage_update() -> Result<(), String> {
+async fn portable_stage_update(app: tauri::AppHandle) -> Result<(), String> {
+    use tauri::Emitter;
+
+    #[derive(Clone, serde::Serialize)]
+    struct ProgressPayload {
+        downloaded: usize,
+        total: usize,
+        stage: String,
+    }
+
+    let _ = app.emit("update-progress", ProgressPayload {
+        downloaded: 0,
+        total: 100,
+        stage: "manifest".into(),
+    });
+
     let manifest = portable_update::fetch_manifest().await?;
     let entry = manifest
         .portable_entry()
         .ok_or_else(|| "this release has no portable build for this platform".to_string())?;
 
-    let bytes = portable_update::download(&entry.url).await?;
+    let bytes = portable_update::download_with_progress(&entry.url, &app).await?;
+
+    let _ = app.emit("update-progress", ProgressPayload {
+        downloaded: bytes.len(),
+        total: bytes.len(),
+        stage: "verifying".into(),
+    });
+
     portable_update::verify(&bytes, &entry.signature)?;
+
+    let _ = app.emit("update-progress", ProgressPayload {
+        downloaded: bytes.len(),
+        total: bytes.len(),
+        stage: "extracting".into(),
+    });
+
     portable_update::stage(bytes)?;
+
+    let _ = app.emit("update-progress", ProgressPayload {
+        downloaded: 100,
+        total: 100,
+        stage: "ready".into(),
+    });
+
     Ok(())
 }
 
