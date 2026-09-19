@@ -4,7 +4,7 @@ import { ThemeColors, AlarmItem, Schedule, AISettings, DynamicUIConfig } from '.
 import { SchedulesPanel } from './SchedulesPanel';
 import { soundService } from '../services/sound';
 import { AIService } from '../services/ai';
-import { describeRepeat } from '../services/scheduleEngine';
+import { describeRepeat, findStepByFiringId } from '../services/scheduleEngine';
 
 /** Short weekday labels, indexed 0 = Sunday to match the stored data. */
 const WEEKDAY_LABELS = ['Вс', 'Пн', 'Вт', 'Ср', 'Чт', 'Пт', 'Сб'];
@@ -137,6 +137,19 @@ export const Alarms: React.FC<AlarmsProps> = ({
 
   const deleteAlarm = (id: string) => {
     soundService.playCountdownTick();
+    const match = findStepByFiringId(schedules, id);
+    if (match) {
+      const { schedule, step } = match;
+      const steps = schedule.steps.filter((st) => st.id !== step.id);
+      if (steps.length === 0) {
+        onUpdateSchedules(schedules.filter((s) => s.id !== schedule.id));
+      } else {
+        onUpdateSchedules(
+          schedules.map((s) => (s.id === schedule.id ? { ...s, steps } : s))
+        );
+      }
+      return;
+    }
     onUpdateAlarms(alarms.filter((a) => a.id !== id));
   };
 
@@ -531,9 +544,8 @@ export const Alarms: React.FC<AlarmsProps> = ({
                 </button>
                 <button
                   onClick={() => deleteAlarm(alarm.id)}
-                  disabled={isDerived(alarm)}
-                  title={isDerived(alarm) ? 'Удаляется вместе с программой' : 'Удалить'}
-                  className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 opacity-60 hover:opacity-100 disabled:cursor-not-allowed disabled:hover:bg-transparent"
+                  title="Удалить"
+                  className="p-1.5 rounded-lg hover:bg-red-500/20 text-red-400 opacity-60 hover:opacity-100 transition-colors"
                 >
                   <Trash2 size={14} />
                 </button>

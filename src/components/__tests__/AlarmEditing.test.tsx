@@ -404,10 +404,10 @@ describe('rows derived from a program', () => {
     expect(screen.queryByTitle('Добавить Сб')).toBeNull();
   });
 
-  it('does not let a derived row be deleted or switched off directly', () => {
+  it('lets a derived row step be removed and keeps toggle tied to program', () => {
     renderDerived();
 
-    expect(screen.getByTitle('Удаляется вместе с программой').hasAttribute('disabled')).toBe(true);
+    expect(screen.getByTitle('Удалить').hasAttribute('disabled')).toBe(false);
     expect(screen.getByTitle('Включается вместе с программой').hasAttribute('disabled')).toBe(true);
   });
 });
